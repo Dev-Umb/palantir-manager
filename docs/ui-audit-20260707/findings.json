@@ -1,0 +1,1758 @@
+[
+  {
+    "page": "login",
+    "role": "public",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/login",
+    "title": "登录 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "还没有账号？注册",
+        "rect": {
+          "left": 823,
+          "right": 1135,
+          "top": 571,
+          "width": 312,
+          "height": 21
+        }
+      }
+    ],
+    "modals": []
+  },
+  {
+    "page": "public-purchase",
+    "role": "public",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/purchase-request",
+    "title": "提交采购申请 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "public-material",
+    "role": "public",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/material-request",
+    "title": "领料申请 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "public-team-log",
+    "role": "public",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/team-log",
+    "title": "班组日报 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "dashboard-admin",
+    "role": "admin",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/",
+    "title": "经营大盘 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "objects-project-admin",
+    "role": "admin",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/objects/project",
+    "title": "本体工作台 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [
+      {
+        "tag": "table",
+        "cls": "data-table flat-fields",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 296,
+          "right": 2896,
+          "top": 190,
+          "width": 2600,
+          "height": 639
+        }
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 296,
+          "right": 2896,
+          "top": 190,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 296,
+          "right": 2896,
+          "top": 190,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "责任岗位",
+        "rect": {
+          "left": 1435,
+          "right": 1510,
+          "top": 190,
+          "width": 75,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "备注",
+        "rect": {
+          "left": 1510,
+          "right": 1557,
+          "top": 190,
+          "width": 47,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "项目对接日期",
+        "rect": {
+          "left": 1557,
+          "right": 1660,
+          "top": 190,
+          "width": 103,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "业务经理",
+        "rect": {
+          "left": 1660,
+          "right": 1744,
+          "top": 190,
+          "width": 84,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "合同数量",
+        "rect": {
+          "left": 1744,
+          "right": 1819,
+          "top": 190,
+          "width": 75,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "预估重量（吨）",
+        "rect": {
+          "left": 1819,
+          "right": 1936,
+          "top": 190,
+          "width": 117,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "签收数量",
+        "rect": {
+          "left": 1936,
+          "right": 2011,
+          "top": 190,
+          "width": 75,
+          "height": 39
+        }
+      }
+    ],
+    "clippedText": [],
+    "smallTargets": [
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "客户信息",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 340,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "物料主档",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 367,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "active",
+        "text": "项目主档",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 395,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "客户与合同",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 459,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "技术图纸与方案",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 486,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "生产任务",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 514,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "班组日报",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 541,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "拆解表",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 569,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "成品发货",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 596,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "对账回款",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 624,
+          "width": 182,
+          "height": 28
+        }
+      }
+    ],
+    "modals": []
+  },
+  {
+    "page": "project-create-modal",
+    "role": "admin",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/objects/project?mode=create",
+    "title": "本体工作台 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [
+      {
+        "tag": "table",
+        "cls": "data-table flat-fields",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 296,
+          "right": 2896,
+          "top": 190,
+          "width": 2600,
+          "height": 639
+        }
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 296,
+          "right": 2896,
+          "top": 190,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 296,
+          "right": 2896,
+          "top": 190,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "责任岗位",
+        "rect": {
+          "left": 1435,
+          "right": 1510,
+          "top": 190,
+          "width": 75,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "备注",
+        "rect": {
+          "left": 1510,
+          "right": 1557,
+          "top": 190,
+          "width": 47,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "项目对接日期",
+        "rect": {
+          "left": 1557,
+          "right": 1660,
+          "top": 190,
+          "width": 103,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "业务经理",
+        "rect": {
+          "left": 1660,
+          "right": 1744,
+          "top": 190,
+          "width": 84,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "合同数量",
+        "rect": {
+          "left": 1744,
+          "right": 1819,
+          "top": 190,
+          "width": 75,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "预估重量（吨）",
+        "rect": {
+          "left": 1819,
+          "right": 1936,
+          "top": 190,
+          "width": 117,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "签收数量",
+        "rect": {
+          "left": 1936,
+          "right": 2011,
+          "top": 190,
+          "width": 75,
+          "height": 39
+        }
+      }
+    ],
+    "clippedText": [],
+    "smallTargets": [
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "客户信息",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 340,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "物料主档",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 367,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "active",
+        "text": "项目主档",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 395,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "客户与合同",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 459,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "技术图纸与方案",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 486,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "生产任务",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 514,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "班组日报",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 541,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "拆解表",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 569,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "成品发货",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 596,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "对账回款",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 624,
+          "width": 182,
+          "height": 28
+        }
+      }
+    ],
+    "modals": [
+      {
+        "width": 920,
+        "height": 848,
+        "scrollHeight": 1694,
+        "clientHeight": 846
+      }
+    ]
+  },
+  {
+    "page": "objects-purchase-procurement",
+    "role": "procurement",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/objects/purchase",
+    "title": "本体工作台 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [
+      {
+        "tag": "table",
+        "cls": "data-table flat-fields",
+        "text": "日期 采购项目 发起人 材料名称 规格 上报数量 对应吨位 采购日期 供应商名称 最终采购数量 单价 总价 材料是否到货 单日采购状态 预计到货日期 实际到货日期 备注 任务ID ",
+        "rect": {
+          "left": 296,
+          "right": 2896,
+          "top": 190,
+          "width": 2600,
+          "height": 464
+        }
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "text": "日期 采购项目 发起人 材料名称 规格 上报数量 对应吨位 采购日期 供应商名称 最终采购数量 单价 总价 材料是否到货 单日采购状态 预计到货日期 实际到货日期 备注 任务ID",
+        "rect": {
+          "left": 296,
+          "right": 2896,
+          "top": 190,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "text": "日期 采购项目 发起人 材料名称 规格 上报数量 对应吨位 采购日期 供应商名称 最终采购数量 单价 总价 材料是否到货 单日采购状态 预计到货日期 实际到货日期 备注 任务ID",
+        "rect": {
+          "left": 296,
+          "right": 2896,
+          "top": 190,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "上报数量",
+        "rect": {
+          "left": 1368,
+          "right": 1461,
+          "top": 190,
+          "width": 92,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "对应吨位",
+        "rect": {
+          "left": 1461,
+          "right": 1553,
+          "top": 190,
+          "width": 92,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "采购日期",
+        "rect": {
+          "left": 1553,
+          "right": 1646,
+          "top": 190,
+          "width": 92,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "供应商名称",
+        "rect": {
+          "left": 1646,
+          "right": 1755,
+          "top": 190,
+          "width": 110,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "最终采购数量",
+        "rect": {
+          "left": 1755,
+          "right": 1882,
+          "top": 190,
+          "width": 127,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "单价",
+        "rect": {
+          "left": 1882,
+          "right": 2004,
+          "top": 190,
+          "width": 122,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "总价",
+        "rect": {
+          "left": 2004,
+          "right": 2062,
+          "top": 190,
+          "width": 58,
+          "height": 39
+        }
+      }
+    ],
+    "clippedText": [],
+    "smallTargets": [
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "物料主档",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 295,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "项目主档",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 322,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "active",
+        "text": "采购日报",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 386,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "采购申请（请购单）",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 414,
+          "width": 182,
+          "height": 28
+        }
+      }
+    ],
+    "modals": []
+  },
+  {
+    "page": "objects-material-warehouse",
+    "role": "warehouse",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/objects/material",
+    "title": "本体工作台 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [
+      {
+        "tag": "a",
+        "cls": "active",
+        "text": "物料主档",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 295,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "项目主档",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 322,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "采购申请（请购单）",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 386,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "领料申请",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 414,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "原材料入库单",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 441,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "生产领料出库单",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 469,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "原材料退料单",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 496,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "废料台账",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 524,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "废料季度统计",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 551,
+          "width": 182,
+          "height": 28
+        }
+      },
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "库存台账",
+        "rect": {
+          "left": 51,
+          "right": 233,
+          "top": 579,
+          "width": 182,
+          "height": 28
+        }
+      }
+    ],
+    "modals": []
+  },
+  {
+    "page": "procurement-approvals",
+    "role": "procurement",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/procurement/approvals",
+    "title": "采购OA审批 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "warehouse-material-approvals",
+    "role": "warehouse",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/warehouse/material-requests",
+    "title": "领料审批 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "rbac-admin",
+    "role": "admin",
+    "viewport": "desktop",
+    "errors": [],
+    "url": "https://palantir.umb.ink/admin/rbac",
+    "title": "用户与权限 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "login",
+    "role": "public",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/login",
+    "title": "登录 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [
+      {
+        "tag": "a",
+        "cls": "",
+        "text": "还没有账号？注册",
+        "rect": {
+          "left": 63,
+          "right": 327,
+          "top": 639,
+          "width": 264,
+          "height": 21
+        }
+      }
+    ],
+    "modals": []
+  },
+  {
+    "page": "public-purchase",
+    "role": "public",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/purchase-request",
+    "title": "提交采购申请 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "public-material",
+    "role": "public",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/material-request",
+    "title": "领料申请 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "public-team-log",
+    "role": "public",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/team-log",
+    "title": "班组日报 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "dashboard-admin",
+    "role": "admin",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/",
+    "title": "经营大盘 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [
+      {
+        "tag": "table",
+        "cls": "data-table",
+        "text": "编号 项目 阶段 责任岗位 风险 PRJ-20260707-010 REG-20260707131655 项目 项目完成 财务 公网回归测试 PRJ-20260707-009 RE",
+        "rect": {
+          "left": 48,
+          "right": 1168,
+          "top": 3121,
+          "width": 1120,
+          "height": 284
+        }
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "text": "编号 项目 阶段 责任岗位 风险",
+        "rect": {
+          "left": 48,
+          "right": 1168,
+          "top": 3121,
+          "width": 1120,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "text": "编号 项目 阶段 责任岗位 风险",
+        "rect": {
+          "left": 48,
+          "right": 1168,
+          "top": 3121,
+          "width": 1120,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "项目",
+        "rect": {
+          "left": 303,
+          "right": 689,
+          "top": 3121,
+          "width": 386,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "阶段",
+        "rect": {
+          "left": 689,
+          "right": 848,
+          "top": 3121,
+          "width": 160,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "责任岗位",
+        "rect": {
+          "left": 848,
+          "right": 974,
+          "top": 3121,
+          "width": 125,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "风险",
+        "rect": {
+          "left": 974,
+          "right": 1168,
+          "top": 3121,
+          "width": 194,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tbody",
+        "cls": "",
+        "text": "PRJ-20260707-010 REG-20260707131655 项目 项目完成 财务 公网回归测试 PRJ-20260707-009 REG-20260707124400 ",
+        "rect": {
+          "left": 48,
+          "right": 1168,
+          "top": 3160,
+          "width": 1120,
+          "height": 245
+        }
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "text": "PRJ-20260707-010 REG-20260707131655 项目 项目完成 财务 公网回归测试",
+        "rect": {
+          "left": 48,
+          "right": 1168,
+          "top": 3160,
+          "width": 1120,
+          "height": 49
+        }
+      },
+      {
+        "tag": "td",
+        "cls": "",
+        "text": "REG-20260707131655 项目",
+        "rect": {
+          "left": 303,
+          "right": 689,
+          "top": 3160,
+          "width": 386,
+          "height": 49
+        }
+      }
+    ],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "objects-project-admin",
+    "role": "admin",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/objects/project",
+    "title": "本体工作台 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [
+      {
+        "tag": "table",
+        "cls": "data-table flat-fields",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 48,
+          "right": 2648,
+          "top": 1427,
+          "width": 2600,
+          "height": 639
+        }
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 48,
+          "right": 2648,
+          "top": 1427,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 48,
+          "right": 2648,
+          "top": 1427,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "项目编号",
+        "rect": {
+          "left": 302,
+          "right": 495,
+          "top": 1427,
+          "width": 193,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "客户",
+        "rect": {
+          "left": 495,
+          "right": 749,
+          "top": 1427,
+          "width": 254,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "当前阶段",
+        "rect": {
+          "left": 749,
+          "right": 833,
+          "top": 1427,
+          "width": 84,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "总体状态",
+        "rect": {
+          "left": 833,
+          "right": 908,
+          "top": 1427,
+          "width": 75,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "合同金额",
+        "rect": {
+          "left": 908,
+          "right": 993,
+          "top": 1427,
+          "width": 84,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "交付日期",
+        "rect": {
+          "left": 993,
+          "right": 1109,
+          "top": 1427,
+          "width": 117,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "回款金额",
+        "rect": {
+          "left": 1109,
+          "right": 1187,
+          "top": 1427,
+          "width": 78,
+          "height": 39
+        }
+      }
+    ],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "project-create-modal",
+    "role": "admin",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/objects/project?mode=create",
+    "title": "本体工作台 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [
+      {
+        "tag": "table",
+        "cls": "data-table flat-fields",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 48,
+          "right": 2648,
+          "top": 1427,
+          "width": 2600,
+          "height": 639
+        }
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 48,
+          "right": 2648,
+          "top": 1427,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "text": "项目名称 项目编号 客户 当前阶段 总体状态 合同金额 交付日期 回款金额 责任岗位 备注 项目对接日期 业务经理 合同数量 预估重量（吨） 签收数量 发货数量 欠款 已开票金额 ",
+        "rect": {
+          "left": 48,
+          "right": 2648,
+          "top": 1427,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "项目编号",
+        "rect": {
+          "left": 302,
+          "right": 495,
+          "top": 1427,
+          "width": 193,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "客户",
+        "rect": {
+          "left": 495,
+          "right": 749,
+          "top": 1427,
+          "width": 254,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "当前阶段",
+        "rect": {
+          "left": 749,
+          "right": 833,
+          "top": 1427,
+          "width": 84,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "总体状态",
+        "rect": {
+          "left": 833,
+          "right": 908,
+          "top": 1427,
+          "width": 75,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "合同金额",
+        "rect": {
+          "left": 908,
+          "right": 993,
+          "top": 1427,
+          "width": 84,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "交付日期",
+        "rect": {
+          "left": 993,
+          "right": 1109,
+          "top": 1427,
+          "width": 117,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "回款金额",
+        "rect": {
+          "left": 1109,
+          "right": 1187,
+          "top": 1427,
+          "width": 78,
+          "height": 39
+        }
+      }
+    ],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": [
+      {
+        "width": 342,
+        "height": 732,
+        "scrollHeight": 1694,
+        "clientHeight": 730
+      }
+    ]
+  },
+  {
+    "page": "objects-purchase-procurement",
+    "role": "procurement",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/objects/purchase",
+    "title": "本体工作台 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [
+      {
+        "tag": "table",
+        "cls": "data-table flat-fields",
+        "text": "日期 采购项目 发起人 材料名称 规格 上报数量 对应吨位 采购日期 供应商名称 最终采购数量 单价 总价 材料是否到货 单日采购状态 预计到货日期 实际到货日期 备注 任务ID ",
+        "rect": {
+          "left": 48,
+          "right": 2648,
+          "top": 790,
+          "width": 2600,
+          "height": 464
+        }
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "text": "日期 采购项目 发起人 材料名称 规格 上报数量 对应吨位 采购日期 供应商名称 最终采购数量 单价 总价 材料是否到货 单日采购状态 预计到货日期 实际到货日期 备注 任务ID",
+        "rect": {
+          "left": 48,
+          "right": 2648,
+          "top": 790,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "text": "日期 采购项目 发起人 材料名称 规格 上报数量 对应吨位 采购日期 供应商名称 最终采购数量 单价 总价 材料是否到货 单日采购状态 预计到货日期 实际到货日期 备注 任务ID",
+        "rect": {
+          "left": 48,
+          "right": 2648,
+          "top": 790,
+          "width": 2600,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "采购项目",
+        "rect": {
+          "left": 361,
+          "right": 674,
+          "top": 790,
+          "width": 313,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "发起人",
+        "rect": {
+          "left": 674,
+          "right": 749,
+          "top": 790,
+          "width": 75,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "材料名称",
+        "rect": {
+          "left": 749,
+          "right": 1062,
+          "top": 790,
+          "width": 313,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "规格",
+        "rect": {
+          "left": 1062,
+          "right": 1120,
+          "top": 790,
+          "width": 58,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "上报数量",
+        "rect": {
+          "left": 1120,
+          "right": 1213,
+          "top": 790,
+          "width": 92,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "对应吨位",
+        "rect": {
+          "left": 1213,
+          "right": 1305,
+          "top": 790,
+          "width": 92,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "采购日期",
+        "rect": {
+          "left": 1305,
+          "right": 1398,
+          "top": 790,
+          "width": 92,
+          "height": 39
+        }
+      }
+    ],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "objects-material-warehouse",
+    "role": "warehouse",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/objects/material",
+    "title": "本体工作台 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [
+      {
+        "tag": "table",
+        "cls": "data-table",
+        "text": "编号 标题 简称 材料类型 材料规格 计量单位 MAT-20260707-052 REG-20260707131655 Q355B钢板 REG-20260707131655 Q35",
+        "rect": {
+          "left": 48,
+          "right": 1168,
+          "top": 1000,
+          "width": 1120,
+          "height": 699
+        }
+      },
+      {
+        "tag": "thead",
+        "cls": "",
+        "text": "编号 标题 简称 材料类型 材料规格 计量单位",
+        "rect": {
+          "left": 48,
+          "right": 1168,
+          "top": 1000,
+          "width": 1120,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tr",
+        "cls": "",
+        "text": "编号 标题 简称 材料类型 材料规格 计量单位",
+        "rect": {
+          "left": 48,
+          "right": 1168,
+          "top": 1000,
+          "width": 1120,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "标题",
+        "rect": {
+          "left": 207,
+          "right": 470,
+          "top": 1000,
+          "width": 263,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "简称",
+        "rect": {
+          "left": 470,
+          "right": 733,
+          "top": 1000,
+          "width": 263,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "材料类型",
+        "rect": {
+          "left": 733,
+          "right": 847,
+          "top": 1000,
+          "width": 114,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "材料规格",
+        "rect": {
+          "left": 847,
+          "right": 936,
+          "top": 1000,
+          "width": 89,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "计量单位",
+        "rect": {
+          "left": 936,
+          "right": 1014,
+          "top": 1000,
+          "width": 78,
+          "height": 39
+        }
+      },
+      {
+        "tag": "th",
+        "cls": "",
+        "text": "",
+        "rect": {
+          "left": 1014,
+          "right": 1168,
+          "top": 1000,
+          "width": 154,
+          "height": 39
+        }
+      },
+      {
+        "tag": "tbody",
+        "cls": "",
+        "text": "MAT-20260707-052 REG-20260707131655 Q355B钢板 REG-20260707131655 Q355B钢板 钢板 12mm 张 MAT-20260",
+        "rect": {
+          "left": 48,
+          "right": 1168,
+          "top": 1039,
+          "width": 1120,
+          "height": 660
+        }
+      }
+    ],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "procurement-approvals",
+    "role": "procurement",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/procurement/approvals",
+    "title": "采购OA审批 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "warehouse-material-approvals",
+    "role": "warehouse",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/warehouse/material-requests",
+    "title": "领料审批 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  },
+  {
+    "page": "rbac-admin",
+    "role": "admin",
+    "viewport": "mobile",
+    "errors": [],
+    "url": "https://palantir.umb.ink/admin/rbac",
+    "title": "用户与权限 - 鑫源昌智造中枢",
+    "blank": false,
+    "pageOverflow": false,
+    "overflow": [],
+    "clippedText": [],
+    "smallTargets": [],
+    "modals": []
+  }
+]

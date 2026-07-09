@@ -1,0 +1,187 @@
+<title>鑫源昌智造中枢测试使用说明</title>
+
+<callout emoji="📌" background-color="light-blue" border-color="blue">
+  <p>公网入口：<a href="https://palantir.umb.ink">https://palantir.umb.ink</a></p>
+  <p>公开问卷不需要登录；后台功能需要使用下方测试账号登录。测试密码不写入飞书文档，请向项目负责人获取。</p>
+  <p>最近更新：2026-07-08。本体工作台列表已统一升级为多维表格式表格，支持列宽自适应、固定列和单元格快速编辑。</p>
+</callout>
+
+<h1>公开问卷地址</h1>
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">表单</th>
+      <th background-color="light-gray">地址</th>
+      <th background-color="light-gray">用途</th>
+      <th background-color="light-gray">提交后流向</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>领料申请</td>
+      <td><a href="https://palantir.umb.ink/material-request">https://palantir.umb.ink/material-request</a></td>
+      <td>班组或现场人员提交领料需求。</td>
+      <td>进入库管「领料审批」，通过后自动生成出库单。</td>
+    </tr>
+    <tr>
+      <td>班组日报</td>
+      <td><a href="https://palantir.umb.ink/team-log">https://palantir.umb.ink/team-log</a></td>
+      <td>班组填写生产任务当日加工进度。</td>
+      <td>进入「本体工作台 - 班组日报」。</td>
+    </tr>
+    <tr>
+      <td>采购申请</td>
+      <td><a href="https://palantir.umb.ink/purchase-request">https://palantir.umb.ink/purchase-request</a></td>
+      <td>技术、生产、库管提交请购需求。</td>
+      <td>进入采购「采购OA审批」，通过后生成采购日报。</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1>测试账号</h1>
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">角色</th>
+      <th background-color="light-gray">账号</th>
+      <th background-color="light-gray">主要可测功能</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>系统管理员</td>
+      <td>admin@xyc.test</td>
+      <td>全量数据、用户与权限、所有对象配置。</td>
+    </tr>
+    <tr>
+      <td>业务员</td>
+      <td>business@xyc.test</td>
+      <td>客户、项目、合同，推进项目阶段。</td>
+    </tr>
+    <tr>
+      <td>技术员</td>
+      <td>engineering@xyc.test</td>
+      <td>技术图纸与方案、图纸附件、提交采购申请。</td>
+    </tr>
+    <tr>
+      <td>生产员</td>
+      <td>production@xyc.test</td>
+      <td>生产任务、班组日报、发货单、采购申请、领料申请查看。</td>
+    </tr>
+    <tr>
+      <td>采购员</td>
+      <td>procurement@xyc.test</td>
+      <td>采购OA审批、采购日报、采购到货状态。</td>
+    </tr>
+    <tr>
+      <td>库管员</td>
+      <td>warehouse@xyc.test</td>
+      <td>物料主档、领料审批、入库、出库、退料、库存台账、盘点。</td>
+    </tr>
+    <tr>
+      <td>财务员</td>
+      <td>finance@xyc.test</td>
+      <td>对账回款、开票记录、项目金额查看。</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1>常用后台入口</h1>
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">入口</th>
+      <th background-color="light-gray">地址</th>
+      <th background-color="light-gray">需要角色</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>登录</td>
+      <td><a href="https://palantir.umb.ink/login">https://palantir.umb.ink/login</a></td>
+      <td>所有后台账号</td>
+    </tr>
+    <tr>
+      <td>经营大盘</td>
+      <td><a href="https://palantir.umb.ink/">https://palantir.umb.ink/</a></td>
+      <td>所有测试账号</td>
+    </tr>
+    <tr>
+      <td>采购OA审批</td>
+      <td><a href="https://palantir.umb.ink/procurement/approvals">https://palantir.umb.ink/procurement/approvals</a></td>
+      <td>采购员</td>
+    </tr>
+    <tr>
+      <td>领料审批</td>
+      <td><a href="https://palantir.umb.ink/warehouse/material-requests">https://palantir.umb.ink/warehouse/material-requests</a></td>
+      <td>库管员</td>
+    </tr>
+    <tr>
+      <td>项目主档</td>
+      <td><a href="https://palantir.umb.ink/objects/project">https://palantir.umb.ink/objects/project</a></td>
+      <td>业务、技术、采购、生产、库管、财务、管理按权限查看或编辑</td>
+    </tr>
+    <tr>
+      <td>采购申请列表</td>
+      <td><a href="https://palantir.umb.ink/objects/requisition">https://palantir.umb.ink/objects/requisition</a></td>
+      <td>查看自己提交的采购申请流转；采购员可在列表中处理待审批申请</td>
+    </tr>
+    <tr>
+      <td>采购日报</td>
+      <td><a href="https://palantir.umb.ink/objects/purchase">https://palantir.umb.ink/objects/purchase</a></td>
+      <td>采购员维护采购状态；字段顺序与飞书多维表格保持一致</td>
+    </tr>
+    <tr>
+      <td>物料主档</td>
+      <td><a href="https://palantir.umb.ink/objects/material">https://palantir.umb.ink/objects/material</a></td>
+      <td>库管维护，采购查看</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1>新版表格使用说明</h1>
+<table>
+  <thead>
+    <tr>
+      <th background-color="light-gray">功能</th>
+      <th background-color="light-gray">说明</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>固定列</td>
+      <td>项目主档固定「项目名称」，采购日报固定「日期」；右侧操作列固定显示详情、编辑、删除等按钮。</td>
+    </tr>
+    <tr>
+      <td>字段宽度</td>
+      <td>日期、数量、状态等短字段会自动使用较窄列宽；项目、物料、客户等长字段保留更宽空间。</td>
+    </tr>
+    <tr>
+      <td>快速编辑</td>
+      <td>有编辑权限的用户可以双击单元格直接修改，保存时只保存当前字段，不会刷新整个页面。</td>
+    </tr>
+    <tr>
+      <td>采购日报字段</td>
+      <td>按多维表格 18 个字段展示：日期、采购项目、发起人、材料名称、规格、上报数量、对应吨位、采购日期、供应商名称、最终采购数量、单价、总价、材料是否到货、单日采购状态、预计到货日期、实际到货日期、备注、任务ID。</td>
+    </tr>
+    <tr>
+      <td>权限限制</td>
+      <td>项目主档仅业务员、财务和管理可编辑；物料主档由库管维护，采购只查看；其他对象按角色权限控制。</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1>快速测试路径</h1>
+<ol>
+  <li seq="auto">业务员登录，创建客户、项目、合同，合同金额会同步到项目主档。</li>
+  <li seq="auto">技术员登录，在技术图纸与方案里上传图纸附件。</li>
+  <li seq="auto">生产员登录，创建生产任务，也可以让班组通过公开班组日报表单提交进度。</li>
+  <li seq="auto">现场人员打开公开领料申请表单提交领料，库管员登录后在领料审批处理。</li>
+  <li seq="auto">技术、生产或库管打开公开采购申请表单提交请购，采购员在采购OA审批处理。</li>
+  <li seq="auto">库管员维护入库、出库、盘点，库存台账会自动更新。</li>
+  <li seq="auto">财务员维护对账回款、开票记录，开票金额会同步到项目主档。</li>
+</ol>
+
+<callout emoji="✅" background-color="light-green" border-color="green">
+  <p>建议测试时优先使用不同角色账号分开操作，这样能验证每个角色只能看到自己应该处理的功能。</p>
+</callout>
