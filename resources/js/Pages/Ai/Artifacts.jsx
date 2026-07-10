@@ -56,6 +56,7 @@ function TableArtifact({ artifact }) {
             <div className="ag-theme-quartz" style={{ height: Math.min(430, Math.max(180, rows.length * 42 + 64)) }}>
                 <AgGridProvider modules={gridModules}>
                     <AgGridReact
+                        theme="legacy"
                         rowData={rows}
                         columnDefs={columnDefs}
                         defaultColDef={{ sortable: true, resizable: true, filter: true }}
