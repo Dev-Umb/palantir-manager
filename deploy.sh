@@ -22,6 +22,7 @@ rsync -az --delete -e "ssh ${SSH_OPTS}" \
   --exclude='.env' \
   --exclude='.git' \
   --exclude='node_modules' \
+  --exclude='vendor' \
   --exclude='tests' \
   --exclude='*.png' \
   --exclude='storage/app/public/attachments/*' \
@@ -33,6 +34,7 @@ rsync -az --delete -e "ssh ${SSH_OPTS}" \
 
 echo "==> 3/5 服务器：迁移、同步元数据和缓存"
 ssh ${SSH_OPTS} ${HOST} "cd ${REMOTE} && \
+composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader && \
 php artisan migrate --force && \
 php artisan db:seed --class=XycPrototypeSeeder --force && \
 php artisan optimize:clear && \
