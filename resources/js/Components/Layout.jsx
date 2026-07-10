@@ -11,7 +11,7 @@ const iconFor = {
     'AI 数据助手': Bot,
 };
 
-export default function Layout({ title, eyebrow, children, aside }) {
+export default function Layout({ title, eyebrow, children, aside, immersive = false }) {
     const page = usePage();
     const { auth, nav, flash } = page.props;
     const visibleNav = (nav || []).filter((item) => item.visible);
@@ -68,18 +68,20 @@ export default function Layout({ title, eyebrow, children, aside }) {
                     </button>
                 </div>
             </aside>
-            <main className="workspace">
-                <header className="workspace-head">
-                    <div>
-                        <p>{eyebrow}</p>
-                        <h1>{title}</h1>
-                    </div>
-                    <div className="role-strip">
-                        {(auth.roles || []).map((role) => <span key={role.id}>{role.label}</span>)}
-                    </div>
-                </header>
+            <main className={`workspace ${immersive ? 'workspace-immersive' : ''}`}>
+                {!immersive && (
+                    <header className="workspace-head">
+                        <div>
+                            <p>{eyebrow}</p>
+                            <h1>{title}</h1>
+                        </div>
+                        <div className="role-strip">
+                            {(auth.roles || []).map((role) => <span key={role.id}>{role.label}</span>)}
+                        </div>
+                    </header>
+                )}
                 {flash?.status && <div className="notice">{flash.status}</div>}
-                <div className={aside ? 'workspace-grid' : ''}>
+                <div className={`workspace-content ${aside ? 'workspace-grid' : ''}`}>
                     <section>{children}</section>
                     {aside && <aside className="side-panel">{aside}</aside>}
                 </div>

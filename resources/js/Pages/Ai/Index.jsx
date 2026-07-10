@@ -195,7 +195,7 @@ export default function AiIndex({ conversations: initialConversations }) {
     }
 
     return (
-        <Layout title="AI 数据助手" eyebrow="实时数据分析">
+        <Layout immersive>
             <Head title="AI 数据助手" />
             <div className="ai-v2-shell">
                 <header className="ai-v2-toolbar">
@@ -204,7 +204,7 @@ export default function AiIndex({ conversations: initialConversations }) {
                             <Menu size={18} />
                         </button>
                         <div>
-                            <strong>数据分析 Agent</strong>
+                            <strong>数据分析助手</strong>
                             <span><ConnectionDot state={connection} />{connectionLabel(connection, activeRun)}</span>
                         </div>
                     </div>
@@ -228,14 +228,15 @@ export default function AiIndex({ conversations: initialConversations }) {
                             <button
                                 type="button"
                                 key={item.id}
-                                className={conversationId === item.id ? 'active' : ''}
+                                className={`ai-history-item ${conversationId === item.id ? 'active' : ''}`}
                                 onClick={() => openConversation(item.id)}
+                                aria-current={conversationId === item.id ? 'true' : undefined}
                             >
                                 <span>{item.title || '未命名对话'}</span>
                                 <small>{formatRelativeTime(item.updated_at)}</small>
                             </button>
                         ))}
-                        {conversations.length === 0 && <p className="muted">暂无历史对话</p>}
+                        {conversations.length === 0 && <p className="muted">暂无对话</p>}
                     </div>
                 </aside>
                 {historyOpen && <button className="ai-drawer-backdrop" type="button" onClick={() => setHistoryOpen(false)} aria-label="关闭对话历史" />}
@@ -257,7 +258,7 @@ export default function AiIndex({ conversations: initialConversations }) {
                             onKeyDown={handleComposerKeyDown}
                             rows={1}
                             placeholder="询问项目、回款、生产或库存数据"
-                            aria-label="发送给数据分析 Agent"
+                            aria-label="发送给数据分析助手"
                         />
                         <div className="ai-composer-actions">
                             {activeRun && (
