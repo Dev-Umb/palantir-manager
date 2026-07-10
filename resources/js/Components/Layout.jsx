@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Box, ClipboardCheck, ClipboardPlus, Database, LayoutDashboard, LogOut, ShieldCheck, UserRound } from 'lucide-react';
+import { Bot, Box, ClipboardCheck, ClipboardPlus, Database, LayoutDashboard, LogOut, ShieldCheck, UserRound } from 'lucide-react';
 
 const iconFor = {
     '经营大盘': LayoutDashboard,
@@ -8,6 +8,7 @@ const iconFor = {
     '领料审批': ClipboardCheck,
     '本体工作台': Database,
     '用户与权限': ShieldCheck,
+    'AI 数据助手': Bot,
 };
 
 export default function Layout({ title, eyebrow, children, aside }) {

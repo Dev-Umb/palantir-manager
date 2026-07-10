@@ -1,0 +1,20 @@
+[Unit]
+Description=Palantir AI queue worker %i
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=www-data
+WorkingDirectory=/var/www/palantir
+ExecStart=/usr/bin/php artisan queue:work database --queue=ai --sleep=1 --tries=3 --timeout=210 --max-time=3600
+Restart=always
+RestartSec=3
+TimeoutStopSec=220
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

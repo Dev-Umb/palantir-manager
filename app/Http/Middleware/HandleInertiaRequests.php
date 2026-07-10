@@ -61,6 +61,7 @@ class HandleInertiaRequests extends Middleware
                     ->values(),
             ],
             ['label' => '用户与权限', 'href' => route('rbac.index'), 'visible' => $can('rbac.manage')],
+            ['label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2')],
         ];
     }
 }

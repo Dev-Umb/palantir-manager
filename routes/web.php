@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\AiController;
+use App\Http\Controllers\AiRunController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OntologyController;
@@ -26,6 +28,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/', DashboardController::class)->middleware('permission:dashboard.view')->name('dashboard');
+    Route::get('/ai', [AiController::class, 'index'])->name('ai.index');
+    Route::post('/ai/runs', [AiRunController::class, 'store'])->name('ai.runs.store');
+    Route::get('/ai/runs/{run}', [AiRunController::class, 'show'])->name('ai.runs.show');
+    Route::get('/ai/runs/{run}/events', [AiRunController::class, 'events'])->name('ai.runs.events');
+    Route::post('/ai/runs/{run}/cancel', [AiRunController::class, 'cancel'])->name('ai.runs.cancel');
+    Route::post('/ai/messages', [AiController::class, 'messages'])->name('ai.messages');
+    Route::get('/ai/conversations/{conversation}', [AiController::class, 'show'])->name('ai.conversations.show');
 
     Route::get('/requests/create', [RequisitionController::class, 'create'])
         ->middleware('permission:requisition.create')
