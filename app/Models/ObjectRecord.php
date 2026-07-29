@@ -7,7 +7,18 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['business_object_id', 'code', 'title', 'payload', 'created_by'])]
+#[Fillable([
+    'business_object_id',
+    'code',
+    'title',
+    'payload',
+    'stock_dimension_key',
+    'workflow_key',
+    'workflow_target_roles',
+    'workflow_seen_at',
+    'workflow_seen_by',
+    'created_by',
+])]
 class ObjectRecord extends Model
 {
     use HasUuids;
@@ -18,7 +29,11 @@ class ObjectRecord extends Model
 
     protected function casts(): array
     {
-        return ['payload' => 'array'];
+        return [
+            'payload' => 'array',
+            'workflow_target_roles' => 'array',
+            'workflow_seen_at' => 'datetime',
+        ];
     }
 
     public function businessObject(): BelongsTo

@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
+use Illuminate\Support\Facades\DB;
 
 class SyncProjectContractAmount
 {
@@ -13,8 +14,14 @@ class SyncProjectContractAmount
             return;
         }
 
+        DB::transaction(fn () => $this->sync($projectId));
+    }
+
+    private function sync(string $projectId): void
+    {
         $project = ObjectRecord::whereKey($projectId)
             ->whereRelation('businessObject', 'key', 'project')
+            ->lockForUpdate()
             ->first();
 
         $contract = BusinessObject::where('key', 'contract')->first();
@@ -27,8 +34,10 @@ class SyncProjectContractAmount
             ->get();
 
         $payload = $project->payload ?? [];
-        $payload['contract_amount'] = $contracts->sum(fn (ObjectRecord $record) => (float) ($record->payload['amount'] ?? 0));
         $payload['related_contract_no'] = $contracts->pluck('code')->implode('、');
+        $payload['contract_qty'] = round($contracts->sum(
+            fn (ObjectRecord $contract): float => (float) ($contract->payload['contract_qty'] ?? 0),
+        ), 4);
         $project->update(['payload' => $payload]);
     }
 }

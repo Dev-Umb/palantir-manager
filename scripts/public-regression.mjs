@@ -210,7 +210,6 @@ async function main() {
   const procurement = await login('procurement');
   const warehouse = await login('warehouse');
   const finance = await login('finance');
-  const publicClient = new Client('public');
 
   const customer = await createObject(business, 'business', 'customer', {
     name: `${runId} 客户`,
@@ -277,30 +276,34 @@ async function main() {
     progress: 45,
   }, (record) => record.payload.project_id === project.id && record.payload.drawing_id === drawing.id, '项目链路');
 
-  await createObject(production, 'production', 'team_log', {
-    work_order_id: workOrder.id,
-    part_name: `${runId} 箱型梁`,
-    team: '班组A',
-    real_qty: 6,
-    work_date: '2026-07-07',
-  }, (record) => record.payload.work_order_id === workOrder.id, '项目链路');
+  const productionTeams = await objectPage(production, 'production_team');
+  const productionTeam = findRecord(productionTeams, (record) => (record.payload.status ?? '启用') !== '停用');
+  if (!productionTeam) throw new Error('No active production team available for team-log regression');
 
-  await publicClient.request('GET', '/team-log');
-  const publicTeamLog = await publicClient.request('POST', '/team-log', {
-    work_order_id: workOrder.id,
-    part_name: `${runId} 公开日报`,
-    team: '班组A',
-    real_qty: 4,
+  await createObject(production, 'production', 'team_log', {
+    project_id: project.id,
+    team_id: productionTeam.id,
+    part_name: `${runId} 箱型梁`,
+    progress: 45,
+    work_date: '2026-07-07',
+  }, (record) => record.payload.project_id === project.id && record.payload.part_name === `${runId} 箱型梁`, '项目链路');
+
+  await production.request('GET', '/team-log');
+  const authenticatedTeamLog = await production.request('POST', '/team-log', {
+    project_id: project.id,
+    team_id: productionTeam.id,
+    part_name: `${runId} 登录日报`,
+    progress: 62,
     work_date: '2026-07-07',
   });
-  if (![302, 303].includes(publicTeamLog.response.status)) {
-    throw new Error(`Public team log failed: ${publicTeamLog.response.status}`);
+  if (![302, 303].includes(authenticatedTeamLog.response.status)) {
+    throw new Error(`Authenticated team log failed: ${authenticatedTeamLog.response.status}`);
   }
   const teamLogPage = await objectPage(production, 'team_log');
-  if (!findRecord(teamLogPage, (record) => record.payload.part_name === `${runId} 公开日报`)) {
-    throw new Error('Public team log not found');
+  if (!findRecord(teamLogPage, (record) => record.payload.part_name === `${runId} 登录日报`)) {
+    throw new Error('Authenticated team log not found');
   }
-  mark('项目链路', 'public', '公开班组日报提交', 'PASS');
+  mark('项目链路', 'production', '登录班组日报提交', 'PASS');
 
   await updateRecord(production, 'production', workOrder, { status: '完成', progress: 100 }, '项目链路', '生产任务完成');
 

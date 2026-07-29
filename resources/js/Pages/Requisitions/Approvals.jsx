@@ -1,5 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { Check, XCircle } from 'lucide-react';
+import { useState } from 'react';
 import Layout from '../../Components/Layout';
 
 export default function Approvals({ pending, processed }) {
@@ -41,13 +42,24 @@ export default function Approvals({ pending, processed }) {
 function ApprovalCard({ record, actions = false }) {
     const payload = record.payload || {};
     const display = record.display || {};
+    const [decision, setDecision] = useState('');
 
     function approve() {
-        router.post(`/requests/${record.id}/approve`, {}, { preserveScroll: true });
+        if (!window.confirm(`确认通过 ${record.code} 的采购申请吗？\n\n通过后将进入采购执行。`)) return;
+        submitDecision('approve');
     }
 
     function reject() {
-        router.post(`/requests/${record.id}/reject`, {}, { preserveScroll: true });
+        if (!window.confirm(`确认驳回 ${record.code} 的采购申请吗？\n\n请先确认申请信息确实需要重新提交。`)) return;
+        submitDecision('reject');
+    }
+
+    function submitDecision(nextDecision) {
+        setDecision(nextDecision);
+        router.post(`/requests/${record.id}/${nextDecision}`, {}, {
+            preserveScroll: true,
+            onFinish: () => setDecision(''),
+        });
     }
 
     return (
@@ -55,7 +67,7 @@ function ApprovalCard({ record, actions = false }) {
             <div>
                 <span className="mono">{record.code}</span>
                 <h3>{display.material_id || '未选择物料'}</h3>
-                <p>{payload.reason || '未填写原因'}</p>
+                <p>{payload.reason || '申请人未填写原因，审批前建议先确认实际用途。'}</p>
             </div>
             <dl>
                 <div><dt>需求方</dt><dd>{payload.requester || '-'}</dd></div>
@@ -66,11 +78,11 @@ function ApprovalCard({ record, actions = false }) {
             </dl>
             {actions && (
                 <div className="approval-actions">
-                    <button type="button" className="icon-success" onClick={approve} title="通过">
-                        <Check size={16} /> 通过
+                    <button type="button" className="icon-success" onClick={approve} disabled={Boolean(decision)}>
+                        <Check size={16} /> {decision === 'approve' ? '处理中...' : '通过申请'}
                     </button>
-                    <button type="button" className="icon-warning" onClick={reject} title="驳回">
-                        <XCircle size={16} /> 驳回
+                    <button type="button" className="icon-warning" onClick={reject} disabled={Boolean(decision)}>
+                        <XCircle size={16} /> {decision === 'reject' ? '处理中...' : '驳回'}
                     </button>
                 </div>
             )}

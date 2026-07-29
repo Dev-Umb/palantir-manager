@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\SyncXycMetadata;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -41,7 +40,7 @@ class AuthController extends Controller
         return Inertia::render('Auth/Register');
     }
 
-    public function store(Request $request, SyncXycMetadata $sync): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
@@ -49,11 +48,10 @@ class AuthController extends Controller
             'password' => ['required', 'confirmed', Password::min(8)],
         ]);
 
-        $user = DB::transaction(function () use ($data, $sync) {
-            $sync->handle();
-
+        $user = DB::transaction(function () use ($data) {
+            $role = Role::where('name', config('xyc.default_role'))->firstOrFail();
             $user = User::create($data);
-            $user->roles()->attach(Role::where('name', config('xyc.default_role'))->firstOrFail());
+            $user->roles()->attach($role);
 
             return $user;
         });

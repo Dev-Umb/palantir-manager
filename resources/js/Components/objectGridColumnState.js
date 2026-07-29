@@ -1,5 +1,5 @@
-export function columnOrderStorageKey(objectKey) {
-    return `xyc.objectGrid.columnOrder.${objectKey}`;
+export function columnOrderStorageKey(userId, objectKey) {
+    return `xyc.objectGrid.columnOrder.${userId}.${objectKey}`;
 }
 
 export function columnOrderFromState(state, fieldKeys) {
@@ -14,6 +14,29 @@ export function columnOrderState(savedOrder, fieldKeys) {
         ...ordered,
         ...fieldKeys.filter((key) => !seen.has(key)),
     ].map((colId) => ({ colId }));
+}
+
+export function fieldsInColumnOrder(fields, savedOrder = []) {
+    const byKey = new Map(fields.map((field) => [field.key, field]));
+    const ordered = columnOrderState(savedOrder, fields.map((field) => field.key))
+        .map(({ colId }) => byKey.get(colId))
+        .filter(Boolean);
+
+    return [
+        ...ordered.filter((field) => field.scope !== 'item'),
+        ...ordered.filter((field) => field.scope === 'item'),
+    ];
+}
+
+export function readColumnOrder(storageKey) {
+    try {
+        const value = window.localStorage.getItem(storageKey);
+        const parsed = value ? JSON.parse(value) : [];
+
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
 }
 
 function currentKeys(keys, fieldKeys) {

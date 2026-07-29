@@ -15,7 +15,7 @@ export default function Login() {
                 <div className="auth-copy">
                     <span className="brand-mark">鑫</span>
                     <h1>鑫源昌智造中枢</h1>
-                    <p>用账号密码进入本体工作台。基础角色默认只能看大盘和提交采购申请。</p>
+                    <p>登录后可按职责查看经营数据、业务资料和待办任务。基础角色默认只能看大盘和提交采购申请。</p>
                 </div>
                 <form onSubmit={submit} className="auth-form">
                     <label><span>邮箱</span><input value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} type="email" required autoFocus /></label>
