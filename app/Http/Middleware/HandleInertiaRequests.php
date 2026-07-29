@@ -60,15 +60,17 @@ class HandleInertiaRequests extends Middleware
             ->values();
 
         return [
-            ['label' => '经营大盘', 'href' => route('dashboard'), 'visible' => $can('dashboard.view')],
-            ['label' => '通知中心', 'href' => route('notifications.index'), 'visible' => true],
-            ['label' => '提交采购申请', 'href' => route('requisitions.create'), 'visible' => $can('requisition.create')],
-            ['label' => '采购OA审批', 'href' => route('requisitions.approvals'), 'visible' => $can('object.requisition.update')],
-            ['label' => '现场报工', 'href' => route('team-logs.create'), 'visible' => $can('object.team_log.create')],
+            ['key' => 'dashboard', 'label' => '经营大盘', 'href' => route('dashboard'), 'visible' => $can('dashboard.view'), 'mobile_priority' => 10],
+            ['key' => 'notifications', 'label' => '通知中心', 'href' => route('notifications.index'), 'visible' => true, 'mobile_priority' => 40],
+            ['key' => 'requisition-create', 'label' => '提交采购申请', 'href' => route('requisitions.create'), 'visible' => $can('requisition.create'), 'mobile_priority' => 20],
+            ['key' => 'approvals', 'label' => '采购OA审批', 'href' => route('requisitions.approvals'), 'visible' => $can('object.requisition.update'), 'mobile_priority' => 30],
+            ['key' => 'team-log', 'label' => '现场报工', 'href' => route('team-logs.create'), 'visible' => $can('object.team_log.create'), 'mobile_priority' => 35],
             [
+                'key' => 'ontology',
                 'label' => '本体工作台',
                 'href' => route('objects.index'),
                 'visible' => $objects->isNotEmpty(),
+                'mobile_priority' => 50,
                 'children' => $objects
                     ->groupBy('group')
                     ->map(fn ($items, string $group) => [
@@ -81,8 +83,8 @@ class HandleInertiaRequests extends Middleware
                     ])
                     ->values(),
             ],
-            ['label' => '用户与权限', 'href' => route('rbac.index'), 'visible' => $can('rbac.manage')],
-            ['label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view')],
+            ['key' => 'rbac', 'label' => '用户与权限', 'href' => route('rbac.index'), 'visible' => $can('rbac.manage'), 'mobile_priority' => 80],
+            ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
         ];
     }
 }

@@ -3,15 +3,14 @@ import { Bell, Bot, Box, ClipboardCheck, ClipboardPlus, Database, HardHat, Layou
 import { businessText } from '../businessLanguage';
 
 const iconFor = {
-    '经营大盘': LayoutDashboard,
-    '通知中心': Bell,
-    '提交采购申请': ClipboardPlus,
-    '采购OA审批': ClipboardCheck,
-    '现场报工': HardHat,
-    '本体工作台': Database,
-    '业务资料': Database,
-    '用户与权限': ShieldCheck,
-    'AI 数据助手': Bot,
+    dashboard: LayoutDashboard,
+    notifications: Bell,
+    'requisition-create': ClipboardPlus,
+    approvals: ClipboardCheck,
+    'team-log': HardHat,
+    ontology: Database,
+    rbac: ShieldCheck,
+    ai: Bot,
 };
 
 export default function Layout({ title, eyebrow, children, aside, immersive = false }) {
@@ -33,14 +32,14 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                 <nav className="nav-list">
                     {visibleNav.map((item) => {
                         const itemLabel = businessText(item.label);
-                        const Icon = iconFor[itemLabel] || iconFor[item.label] || LayoutDashboard;
+                        const Icon = iconFor[item.key] || LayoutDashboard;
                         const open = isActive(page.url, item.href) || (item.children || []).some((group) => group.items.some((child) => isActive(page.url, child.href, true)));
                         return (
                             <div key={item.href} className="nav-group">
                                 <Link href={item.href} className={`nav-item ${open ? 'active' : ''}`}>
                                     <Icon size={17} />
                                     <span>{itemLabel}</span>
-                                    {item.label === '通知中心' && notificationUnreadCount > 0 && (
+                                    {item.key === 'notifications' && notificationUnreadCount > 0 && (
                                         <b className="nav-badge" aria-label={`${notificationUnreadCount} 条未读通知`}>
                                             {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
                                         </b>

@@ -23,7 +23,9 @@ class NavigationContractTest extends TestCase
         $this->actingAs($admin)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->has('auth')->has('flash')->has('notificationUnreadCount')
             ->has('nav', 8)
+            ->where('nav.0.key', 'dashboard')
             ->where('nav.0.label', '经营大盘')
+            ->where('nav.0.mobile_priority', 10)
             ->where('nav.0.visible', true)
             ->has('nav.5.children')
             ->has('nav.5.children.0.items.0.new_task_count'));
