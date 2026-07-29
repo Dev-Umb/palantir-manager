@@ -455,7 +455,7 @@ describe('server pagination and export', () => {
         expect(screen.getByRole('link', { name: '上一页' })).toHaveAttribute('href', previousUrl);
         expect(screen.getByRole('link', { name: '下一页' })).toHaveAttribute('href', nextUrl);
 
-        const filterForm = screen.getByRole('search', { name: '对象记录筛选' });
+        const filterForm = screen.getByRole('search', { name: '业务数据筛选' });
         expect(filterForm.querySelector('input[name="mode"]')).toHaveValue('detail');
         expect(filterForm.querySelector('input[name="record"]')).toHaveValue('material-87');
         expect(screen.getByTestId('server-export')).toHaveAttribute(

@@ -267,7 +267,7 @@ describe('ObjectGrid date editing', () => {
         await waitFor(() => expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBe(139));
     });
 
-    it('shows a localized actionable empty state instead of the AG Grid English default', async () => {
+    it('keeps an empty grid localized without the AG Grid English default', async () => {
         render(
             <ObjectGrid
                 object={{ key: 'project', label: '项目主档' }}
@@ -280,10 +280,7 @@ describe('ObjectGrid date editing', () => {
             />,
         );
 
-        const emptyTitle = await screen.findByText('暂无项目主档记录');
-        const emptyState = emptyTitle.closest('[role="status"]');
-        expect(emptyState.textContent).toContain('暂无项目主档记录');
-        expect(emptyState.textContent).toContain('点击右上角“新建”开始录入');
+        expect(await screen.findByText('已平铺全部 0 个字段，可左右滚动查看')).not.toBeNull();
         expect(screen.queryByText('No Rows To Show')).toBeNull();
     });
 
@@ -393,7 +390,7 @@ describe('ObjectGrid date editing', () => {
         expect(remarkWidth).toBe(420);
     });
 
-    it('starts with key fields and lets the user reveal the complete record', async () => {
+    it('starts with every field visible for horizontal review', async () => {
         const fields = Array.from({ length: 10 }, (_, index) => ({
             key: `field_${index + 1}`,
             label: `字段 ${index + 1}`,
@@ -412,14 +409,8 @@ describe('ObjectGrid date editing', () => {
             />,
         );
 
-        expect(await screen.findByText('当前显示 6 / 10 列')).not.toBeNull();
-        expect(screen.queryByRole('columnheader', { name: '字段 10' })).toBeNull();
-
-        fireEvent.click(screen.getByRole('button', { name: '显示全部字段（10）' }));
-
+        expect(await screen.findByText('已平铺全部 10 个字段，可左右滚动查看')).not.toBeNull();
         expect(await screen.findByRole('columnheader', { name: '字段 10' })).not.toBeNull();
-        expect(screen.getByText('当前显示 10 / 10 列')).not.toBeNull();
-        expect(screen.getByRole('button', { name: '回到精简视图' }).getAttribute('aria-pressed')).toBe('true');
     });
 
     it('uses explicit text and accessible names for row actions', async () => {
