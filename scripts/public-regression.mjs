@@ -161,6 +161,11 @@ class Client {
     if (![302, 303].includes(result.response.status)) {
       throw new Error(`Login failed for ${email}: ${result.response.status}`);
     }
+
+    const authenticated = await this.request('GET', '/');
+    if (authenticated.response.status !== 200) {
+      throw new Error(`Login did not create an authenticated session for ${email}: ${authenticated.response.status}`);
+    }
   }
 }
 
