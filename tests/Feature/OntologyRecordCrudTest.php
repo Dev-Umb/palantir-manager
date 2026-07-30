@@ -10,6 +10,7 @@ use Database\Seeders\XycPrototypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class OntologyRecordCrudTest extends TestCase
@@ -58,6 +59,123 @@ class OntologyRecordCrudTest extends TestCase
 
         $this->actingAs($this->userWithRole('basic'));
         $this->get("/attachments/{$record->id}/attachment")->assertForbidden();
+    }
+
+    public function test_project_customer_relation_can_be_updated(): void
+    {
+        $this->seed(XycPrototypeSeeder::class);
+        $this->actingAs($this->userWithRole('admin'));
+        $customerObject = BusinessObject::where('key', 'customer')->firstOrFail();
+        $projectObject = BusinessObject::where('key', 'project')->firstOrFail();
+        $oldCustomer = ObjectRecord::create([
+            'business_object_id' => $customerObject->id,
+            'code' => 'CUST-OLD',
+            'title' => '原客户',
+            'payload' => ['name' => '原客户'],
+        ]);
+        $newCustomer = ObjectRecord::create([
+            'business_object_id' => $customerObject->id,
+            'code' => 'CUST-NEW',
+            'title' => '新客户',
+            'payload' => ['name' => '新客户'],
+        ]);
+        $project = ObjectRecord::create([
+            'business_object_id' => $projectObject->id,
+            'code' => 'PRJ-CUSTOMER-EDIT',
+            'title' => '客户关联修改回归',
+            'payload' => [
+                'name' => '客户关联修改回归',
+                'customer_id' => $oldCustomer->id,
+                '_snapshots' => [
+                    'customer_id' => ['id' => $oldCustomer->id, 'label' => 'CUST-OLD · 原客户'],
+                ],
+            ],
+        ]);
+
+        $this->putJson("/records/{$project->id}", [
+            'payload' => [
+                'name' => '客户关联修改回归',
+                'customer_id' => $newCustomer->id,
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('record.payload.customer_id', $newCustomer->id)
+            ->assertJsonPath('record.display.customer_id', 'CUST-NEW · 新客户');
+
+        $this->assertSame($newCustomer->id, $project->fresh()->payload['customer_id']);
+    }
+
+    public function test_project_list_uses_the_current_customer_name_after_customer_update(): void
+    {
+        $this->seed(XycPrototypeSeeder::class);
+        $this->actingAs($this->userWithRole('admin'));
+        $customerObject = BusinessObject::where('key', 'customer')->firstOrFail();
+        $projectObject = BusinessObject::where('key', 'project')->firstOrFail();
+        $customer = ObjectRecord::create([
+            'business_object_id' => $customerObject->id,
+            'code' => 'CUST-LIVE',
+            'title' => '更新前客户',
+            'payload' => ['name' => '更新前客户'],
+        ]);
+        ObjectRecord::create([
+            'business_object_id' => $projectObject->id,
+            'code' => 'PRJ-LIVE-CUSTOMER',
+            'title' => '客户名称同步回归',
+            'payload' => [
+                'name' => '客户名称同步回归',
+                'customer_id' => $customer->id,
+                '_snapshots' => [
+                    'customer_id' => ['id' => $customer->id, 'label' => 'CUST-LIVE · 更新前客户'],
+                ],
+            ],
+        ]);
+
+        $this->put("/records/{$customer->id}", [
+            'payload' => ['name' => '更新后客户'],
+        ])->assertRedirect();
+
+        $this->get('/objects/project?q=PRJ-LIVE-CUSTOMER')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('records.data', 1)
+                ->where('records.data.0.payload.customer_id', $customer->id)
+                ->where('records.data.0.display.customer_id', 'CUST-LIVE · 更新后客户'));
+    }
+
+    public function test_non_project_customer_relations_keep_their_saved_snapshot(): void
+    {
+        $this->seed(XycPrototypeSeeder::class);
+        $this->actingAs($this->userWithRole('admin'));
+        $customerObject = BusinessObject::where('key', 'customer')->firstOrFail();
+        $contractObject = BusinessObject::where('key', 'contract')->firstOrFail();
+        $customer = ObjectRecord::create([
+            'business_object_id' => $customerObject->id,
+            'code' => 'CUST-HISTORY',
+            'title' => '历史客户名称',
+            'payload' => ['name' => '历史客户名称'],
+        ]);
+        ObjectRecord::create([
+            'business_object_id' => $contractObject->id,
+            'code' => 'CONTRACT-HISTORY',
+            'title' => 'CONTRACT-HISTORY',
+            'payload' => [
+                'customer_id' => $customer->id,
+                '_snapshots' => [
+                    'customer_id' => ['id' => $customer->id, 'label' => 'CUST-HISTORY · 历史客户名称'],
+                ],
+            ],
+        ]);
+
+        $customer->update([
+            'title' => '当前客户名称',
+            'payload' => ['name' => '当前客户名称'],
+        ]);
+
+        $this->get('/objects/contract?q=CONTRACT-HISTORY')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('records.data', 1)
+                ->where('records.data.0.display.customer_id', 'CUST-HISTORY · 历史客户名称'));
     }
 
     private function userWithRole(string $role): User

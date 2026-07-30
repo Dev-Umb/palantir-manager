@@ -43,7 +43,7 @@ vi.mock('@inertiajs/react', async () => {
                 processing: false,
                 setData: (key, value) => setFormData((current) => ({ ...current, [key]: value })),
                 post: inertia.post,
-                put: inertia.put,
+                put: (url, options) => inertia.put(url, data, options),
             };
         },
     };
@@ -341,6 +341,18 @@ describe('project customer contact choices', () => {
         fireEvent.click(await screen.findByRole('button', { name: '乙客户' }));
 
         expect(within(dialog).getByText('客户已变更，已清除 1 位不属于新客户的联系人。')).toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole('button', { name: '保存' }));
+
+        expect(inertia.put).toHaveBeenCalledWith(
+            '/records/project-1',
+            {
+                payload: {
+                    customer_id: 'customer-b',
+                    customer_contact_ids: [],
+                },
+            },
+            { preserveScroll: true },
+        );
     });
 
     it('renders project contacts with name and phone only', async () => {
