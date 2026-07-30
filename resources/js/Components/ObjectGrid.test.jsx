@@ -206,8 +206,8 @@ describe('ObjectGrid date editing', () => {
         expect(screen.getByLabelText('CG-001 更多操作')).not.toBeNull();
     });
 
-    it('inserts the stacked contact list immediately after the customer name', async () => {
-        const onContactDetail = vi.fn();
+    it('inserts the one-line contact summary immediately after the customer name', async () => {
+        const onContactOpen = vi.fn();
 
         render(
             <ObjectGrid
@@ -226,24 +226,25 @@ describe('ObjectGrid date editing', () => {
                     { key: 'address', label: '地址', type: 'text' },
                 ]}
                 can={{ create: true, update: true, delete: false }}
-                contactCan={{ create: true }}
                 selectedRecordId={null}
                 relationOptions={{}}
                 onRecordChange={() => {}}
-                onContactDetail={onContactDetail}
+                onContactOpen={onContactOpen}
             />,
         );
 
         const headers = (await screen.findAllByRole('columnheader')).map((header) => header.textContent.trim());
         expect(headers.indexOf('联系人列表')).toBe(headers.indexOf('客户名称') + 1);
-        expect(await screen.findByText('13900000000')).not.toBeNull();
-        expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBeGreaterThan(60);
+        expect(await screen.findByText('李经理 · 13900000000')).not.toBeNull();
+        expect(screen.queryByRole('button', { name: '新增联系人' })).toBeNull();
+        expect(screen.queryByRole('button', { name: /查看李经理详情/ })).toBeNull();
+        expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBe(44);
 
-        fireEvent.click(screen.getByRole('button', { name: '查看李经理详情' }));
-        expect(onContactDetail).toHaveBeenCalledWith(expect.objectContaining({ id: 'contact-1' }), expect.objectContaining({ id: 'customer-1' }));
+        fireEvent.click(screen.getByRole('button', { name: '李经理 · 13900000000，共 1 项' }));
+        expect(onContactOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'customer-1' }));
     });
 
-    it('recalculates customer row height after the contact list changes', async () => {
+    it('keeps the customer row height fixed when the contact count changes', async () => {
         const customer = {
             id: 'customer-1',
             code: 'CUST-001',
@@ -256,21 +257,21 @@ describe('ObjectGrid date editing', () => {
             object: { key: 'customer', label: '客户信息' },
             fields: [{ key: 'name', label: '客户名称', type: 'text' }],
             can: { create: true, update: true, delete: false },
-            contactCan: { create: true },
             selectedRecordId: null,
             relationOptions: {},
             onRecordChange: () => {},
         };
         const { rerender } = render(<ObjectGrid {...props} records={[customer]} />);
 
-        await waitFor(() => expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBe(92));
+        await waitFor(() => expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBe(44));
 
         rerender(<ObjectGrid {...props} records={[{
             ...customer,
             contacts: [...customer.contacts, { id: 'contact-2', name: '王工', phone: '13700000000' }],
         }]} />);
 
-        await waitFor(() => expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBe(139));
+        await waitFor(() => expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBe(44));
+        expect(await screen.findByText('+1')).not.toBeNull();
     });
 
     it('keeps an empty grid localized without the AG Grid English default', async () => {
@@ -417,6 +418,25 @@ describe('ObjectGrid date editing', () => {
 
         expect(await screen.findByText(/共 10 个字段，当前可见 \d+ 列，可横向滚动查看全部字段/)).not.toBeNull();
         expect(await screen.findByRole('columnheader', { name: '字段 10' })).not.toBeNull();
+    });
+
+    it('exposes the complete column name from a truncated header', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'project', label: '项目主档' }}
+                records={[]}
+                fields={[{ key: 'contract_delivery_status', label: '合同交付与履约状态', type: 'text' }]}
+                can={{ update: false, delete: false }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                savedColumnWidths={{ contract_delivery_status: 160 }}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        await screen.findByRole('columnheader', { name: '合同交付与履约状态' });
+        expect(document.querySelector('.ag-header-cell[col-id="contract_delivery_status"] .grid-header-label')?.getAttribute('title'))
+            .toBe('合同交付与履约状态');
     });
 
     it('applies saved user widths before adaptive defaults', async () => {

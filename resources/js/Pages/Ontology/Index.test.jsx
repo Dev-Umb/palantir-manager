@@ -60,7 +60,7 @@ vi.mock('../../Components/Layout', () => ({
 }));
 
 vi.mock('../../Components/ObjectGrid', () => ({
-    default: ({ object, records, fields, savedColumnWidths, onColumnOrderChange, onColumnWidthsChange, onContactDetail, onContactCreate, exportUrl }) => (
+    default: ({ object, records, fields, savedColumnWidths, onColumnOrderChange, onColumnWidthsChange, onContactOpen, exportUrl }) => (
         <div>
             <div data-testid="grid-order">{fields.map((field) => field.key).join('|')}</div>
             <div data-testid="grid-widths">{JSON.stringify(savedColumnWidths)}</div>
@@ -68,14 +68,7 @@ vi.mock('../../Components/ObjectGrid', () => ({
             <button type="button" onClick={() => onColumnOrderChange?.(['note', 'deleted_field', 'phone', 'note'])}>模拟拖动列</button>
             <button type="button" onClick={() => onColumnWidthsChange?.({ phone: 214, note: 320 })}>模拟调整列宽</button>
             {object.key === 'customer' && records[0] && (
-                <>
-                    <button type="button" onClick={() => onContactCreate?.(records[0])}>模拟新增联系人</button>
-                    {(records[0].contacts || []).map((contact) => (
-                        <button type="button" key={contact.id} onClick={() => onContactDetail?.(contact, records[0])}>
-                            模拟查看{contact.name}
-                        </button>
-                    ))}
-                </>
+                <button type="button" onClick={() => onContactOpen?.(records[0])}>模拟打开联系人</button>
             )}
         </div>
     ),
@@ -211,7 +204,7 @@ describe('customer contact detail list', () => {
     beforeEach(() => window.localStorage.clear());
     afterEach(cleanup);
 
-    it('opens a unified contact detail from the customer grid', async () => {
+    it('opens the contact list and then a unified contact detail from the customer grid', async () => {
         window.history.replaceState({}, '', '/objects/customer');
         renderPage(null, {
             ...record,
@@ -225,7 +218,11 @@ describe('customer contact detail list', () => {
             }],
         });
 
-        fireEvent.click(await screen.findByRole('button', { name: '模拟查看李经理' }));
+        fireEvent.click(await screen.findByRole('button', { name: '模拟打开联系人' }));
+
+        const listDialog = await screen.findByRole('dialog', { name: '客户联系人' });
+        expect(within(listDialog).getByText('共 1 位联系人')).toBeInTheDocument();
+        fireEvent.click(within(listDialog).getByRole('button', { name: '查看 李经理 详情' }));
 
         const dialog = await screen.findByRole('dialog', { name: '联系人详情' });
         expect(within(dialog).getByText('李经理')).toBeInTheDocument();
@@ -236,11 +233,13 @@ describe('customer contact detail list', () => {
         expect(within(dialog).queryByText('启用')).not.toBeInTheDocument();
     });
 
-    it('opens contact creation inside the customer view', async () => {
+    it('opens contact creation from the contact list', async () => {
         window.history.replaceState({}, '', '/objects/customer');
         renderPage(null, { ...record, contacts: [] });
 
-        fireEvent.click(await screen.findByRole('button', { name: '模拟新增联系人' }));
+        fireEvent.click(await screen.findByRole('button', { name: '模拟打开联系人' }));
+        const listDialog = await screen.findByRole('dialog', { name: '客户联系人' });
+        fireEvent.click(within(listDialog).getByRole('button', { name: '新增联系人' }));
 
         const dialog = await screen.findByRole('dialog', { name: '新增联系人' });
         expect(within(dialog).getByLabelText('联系人姓名')).toBeInTheDocument();

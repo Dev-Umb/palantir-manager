@@ -86,6 +86,10 @@ export default function Index({ objects = [], currentObject, records, can, relat
         setContactModal({ mode: 'detail', contact, customer });
     }
 
+    function openContactList(customer) {
+        setContactModal({ mode: 'list', contact: null, contacts: customer.contacts || [], customer });
+    }
+
     function openContactCreate(customer) {
         if (!contactObject) return;
         setContactModal({ mode: 'create', contact: null, customer });
@@ -129,15 +133,13 @@ export default function Index({ objects = [], currentObject, records, can, relat
                                 records={tableRecords}
                                 fields={orderedFields}
                                 can={can}
-                                contactCan={contactCan}
                                 selectedRecordId={selectedRecordId}
                                 relationOptions={relationOptions}
                                 savedColumnWidths={columnWidths}
                                 onRecordChange={updateTableRecord}
                                 onColumnOrderChange={saveColumnOrder}
                                 onColumnWidthsChange={saveColumnWidths}
-                                onContactDetail={openContactDetail}
-                                onContactCreate={openContactCreate}
+                                onContactOpen={openContactList}
                             />
                         </Suspense>
                         <ObjectPagination records={records} />
@@ -172,6 +174,7 @@ export default function Index({ objects = [], currentObject, records, can, relat
                     mode={contactModal.mode}
                     contactObjectId={contactObject?.id}
                     customer={contactModal.customer}
+                    contacts={contactModal.contacts || contactModal.customer.contacts || []}
                     contact={contactModal.contact}
                     can={contactCan}
                     onSaved={contactSaved}
