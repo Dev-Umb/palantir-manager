@@ -158,6 +158,7 @@ export default function Index({ objects = [], currentObject, records, can, relat
                 <Modal title={`新建${objectLabel}`} closeHref={closeHref}>
                     <form onSubmit={create}>
                         <RecordForm
+                            objectKey={currentObject.key}
                             fields={orderedFields}
                             payload={createForm.data.payload}
                             setPayload={(payload) => createForm.setData('payload', payload)}
@@ -175,7 +176,7 @@ export default function Index({ objects = [], currentObject, records, can, relat
                 </Modal>
             )}
             {mode === 'edit' && can.update && selectedRecord && (
-                <EditRecordModal key={selectedRecord.id} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} closeHref={closeHref} />
+                <EditRecordModal key={selectedRecord.id} object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} closeHref={closeHref} />
             )}
             {contactModal && (
                 <CustomerContactModal
@@ -312,7 +313,7 @@ function exportUrlFor(objectKey, params) {
     return `/objects/${objectKey}/export.csv${query ? `?${query}` : ''}`;
 }
 
-function EditRecordModal({ record, fields, relationOptions, closeHref }) {
+function EditRecordModal({ object, record, fields, relationOptions, closeHref }) {
     const updateForm = useForm({ payload: payloadForEdit(record.payload, fields) });
 
     function update(event) {
@@ -324,6 +325,8 @@ function EditRecordModal({ record, fields, relationOptions, closeHref }) {
         <Modal title={`${record.code} · 编辑`} closeHref={closeHref}>
             <form onSubmit={update}>
                 <RecordForm
+                    objectKey={object.key}
+                    record={record}
                     fields={fields}
                     payload={updateForm.data.payload}
                     setPayload={(payload) => updateForm.setData('payload', payload)}
@@ -367,8 +370,11 @@ function Modal({ title, closeHref, children }) {
     );
 }
 
-function RecordForm({ fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {} }) {
+function RecordForm({ objectKey, record = null, fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {} }) {
     const itemFields = fields.filter((field) => field.scope === 'item');
+    const formFields = objectKey === 'customer'
+        ? fields.filter((field) => field.key !== 'cooperation_history')
+        : fields;
     const [contactClearNotice, setContactClearNotice] = useState('');
     const scopedOptions = scopedRelationOptions(relationOptions, payload, recordDisplay);
     const selectedTeam = scopedOptions.team_id?.items?.find((item) => item.id === payload.team_id);
@@ -397,13 +403,16 @@ function RecordForm({ fields, payload, setPayload, processing, errors, submitLab
 
     return (
         <SchemaForm
-            fields={fields}
+            fields={formFields}
             data={payload}
             setData={setField}
             processing={processing}
             submitLabel={submitLabel}
             relationOptions={scopedOptions}
         >
+            {objectKey === 'customer' && (
+                <CustomerProjectHistory projects={record?.cooperation_projects || []} />
+            )}
             {itemFields.length > 0 && (
                 <LineItemsEditor
                     fields={itemFields}
@@ -428,7 +437,8 @@ function RecordForm({ fields, payload, setPayload, processing, errors, submitLab
 
 function RecordDetail({ object, record, fields, relationOptions, contactCan, onContactDetail, onContactCreate }) {
     const commonFields = fields.filter((field) => field.scope !== 'item'
-        && !(object.key === 'project' && field.key === 'customer_contact_ids'));
+        && !(object.key === 'project' && field.key === 'customer_contact_ids')
+        && !(object.key === 'customer' && field.key === 'cooperation_history'));
     const itemFields = fields.filter((field) => field.scope === 'item');
 
     return (
@@ -449,12 +459,38 @@ function RecordDetail({ object, record, fields, relationOptions, contactCan, onC
                     </div>
                 ))}
             </div>
+            {object.key === 'customer' && <CustomerProjectHistory projects={record.cooperation_projects || []} />}
             {itemFields.length > 0 && (
                 <LineItemsDetail fields={itemFields} items={record.payload?.items || []} relationOptions={relationOptions} />
             )}
             {object.key === 'project' && <ProjectContacts contacts={record.contacts || []} />}
             {object.key === 'customer' && <CustomerContacts customer={record} contacts={record.contacts || []} can={contactCan} onDetail={onContactDetail} onCreate={onContactCreate} />}
         </>
+    );
+}
+
+function CustomerProjectHistory({ projects }) {
+    return (
+        <section className="customer-project-history wide" aria-label="合作历史">
+            <div className="customer-project-history-head">
+                <div>
+                    <span>合作历史</span>
+                    <small>根据该客户关联的项目自动生成</small>
+                </div>
+                <b>{projects.length} 个项目</b>
+            </div>
+            {projects.length ? (
+                <ul>
+                    {projects.map((project) => (
+                        <li key={project.id}>
+                            <span className="mono">{project.code || '未填写编号'}</span>
+                            <strong>{project.title || '未命名项目'}</strong>
+                            <time>{project.date || '未填写时间'}</time>
+                        </li>
+                    ))}
+                </ul>
+            ) : <p className="muted">暂无关联项目；项目关联此客户后会自动显示在这里。</p>}
+        </section>
     );
 }
 

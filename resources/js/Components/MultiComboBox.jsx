@@ -1,11 +1,17 @@
 import { Check, ChevronDown, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { comboMenuStyleFromRect, shouldCloseComboForPointer } from './comboBoxMenuPosition';
 import { useRemoteOptions } from './useRemoteOptions';
 
-export default function MultiComboBox({ value = [], items = [], selectedItems = [], onChange, searchUrl = '', searchContext = {} }) {
-    const [open, setOpen] = useState(false);
+export default function MultiComboBox({ value = [], items = [], selectedItems = [], onChange, onClose, startOpen = false, searchUrl = '', searchContext = {} }) {
+    const [open, setOpen] = useState(startOpen);
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(-1);
+    const [menuStyle, setMenuStyle] = useState(null);
+    const rootRef = useRef(null);
+    const triggerRef = useRef(null);
+    const menuRef = useRef(null);
     const remote = useRemoteOptions({
         searchUrl,
         query,
@@ -28,6 +34,44 @@ export default function MultiComboBox({ value = [], items = [], selectedItems = 
         .filter((id) => !availableById.has(id))
         .map((id) => historicalById.get(id) || initialById.get(id) || { id, label: id });
 
+    function closeMenu() {
+        setOpen(false);
+        setQuery('');
+        onClose?.();
+    }
+
+    const positionMenu = useCallback(() => {
+        const rect = triggerRef.current?.getBoundingClientRect();
+        if (rect) setMenuStyle(comboMenuStyleFromRect(rect));
+    }, []);
+
+    useLayoutEffect(() => {
+        if (!open) return undefined;
+
+        positionMenu();
+        window.addEventListener('resize', positionMenu);
+        window.addEventListener('scroll', positionMenu, true);
+
+        return () => {
+            window.removeEventListener('resize', positionMenu);
+            window.removeEventListener('scroll', positionMenu, true);
+        };
+    }, [open, positionMenu]);
+
+    useEffect(() => {
+        if (!open) return undefined;
+
+        function closeOnPointerDown(event) {
+            if (shouldCloseComboForPointer(rootRef.current, menuRef.current, event.target)) {
+                closeMenu();
+            }
+        }
+
+        document.addEventListener('pointerdown', closeOnPointerDown, true);
+
+        return () => document.removeEventListener('pointerdown', closeOnPointerDown, true);
+    }, [open]);
+
     function toggle(id) {
         const next = new Set(selected);
         if (next.has(id)) next.delete(id);
@@ -37,8 +81,7 @@ export default function MultiComboBox({ value = [], items = [], selectedItems = 
 
     function navigate(event) {
         if (event.key === 'Escape') {
-            setOpen(false);
-            setQuery('');
+            closeMenu();
             return;
         }
         if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) || !availableItems.length) return;
@@ -53,50 +96,70 @@ export default function MultiComboBox({ value = [], items = [], selectedItems = 
         }
     }
 
+    const menu = open && (
+        <div
+            ref={menuRef}
+            className="multi-combo-menu ag-custom-component-popup"
+            style={menuStyle || undefined}
+        >
+            <div className="combo-search">
+                <Search size={14} />
+                <input
+                    value={query}
+                    onChange={(event) => {
+                        setQuery(event.target.value);
+                        setActiveIndex(-1);
+                    }}
+                    onKeyDown={navigate}
+                    placeholder="输入联系人姓名或手机号"
+                    autoFocus
+                />
+            </div>
+            <div className="combo-options">
+                {availableItems.map((item) => (
+                    <button
+                        type="button"
+                        className={`combo-option ${availableItems[activeIndex]?.id === item.id ? 'active' : ''}`}
+                        key={item.id}
+                        onMouseEnter={() => setActiveIndex(availableItems.findIndex((candidate) => candidate.id === item.id))}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => toggle(item.id)}
+                    >
+                        <span>{item.label}</span>
+                        {selected.has(item.id) && <Check size={14} />}
+                    </button>
+                ))}
+                {historicalSelected.map((item) => (
+                    <button type="button" className="combo-option" key={item.id} onMouseDown={(event) => event.preventDefault()} onClick={() => toggle(item.id)}>
+                        <span>{item.label}（历史关联）</span>
+                        <Check size={14} />
+                    </button>
+                ))}
+                {remote.loading && <p className="combo-empty">正在搜索...</p>}
+                {remote.failed && <p className="combo-empty" role="alert">搜索失败，请重试</p>}
+                {!remote.loading && !remote.failed && !availableItems.length && !historicalSelected.length && <p className="combo-empty">没有可选项</p>}
+            </div>
+            <button type="button" className="multi-combo-done" onMouseDown={(event) => event.preventDefault()} onClick={closeMenu}>
+                完成选择
+            </button>
+        </div>
+    );
+
     return (
-        <div className="multi-combo">
-            <button type="button" className="combo-trigger" onClick={() => setOpen((current) => !current)}>
+        <div className="multi-combo" ref={rootRef}>
+            <button
+                ref={triggerRef}
+                type="button"
+                className="combo-trigger"
+                onClick={() => {
+                    if (open) closeMenu();
+                    else setOpen(true);
+                }}
+            >
                 <span className={labels.length ? '' : 'placeholder'}>{labels.length ? labels.join('、') : '未选择'}</span>
                 <ChevronDown size={15} />
             </button>
-            {open && (
-                <div className="multi-combo-menu">
-                    <div className="combo-search">
-                        <Search size={14} />
-                        <input
-                            value={query}
-                            onChange={(event) => {
-                                setQuery(event.target.value);
-                                setActiveIndex(-1);
-                            }}
-                            onKeyDown={navigate}
-                            placeholder="输入联系人姓名或手机号"
-                            autoFocus
-                        />
-                    </div>
-                    {availableItems.map((item) => (
-                        <button
-                            type="button"
-                            className={`combo-option ${availableItems[activeIndex]?.id === item.id ? 'active' : ''}`}
-                            key={item.id}
-                            onMouseEnter={() => setActiveIndex(availableItems.findIndex((candidate) => candidate.id === item.id))}
-                            onClick={() => toggle(item.id)}
-                        >
-                            <span>{item.label}</span>
-                            {selected.has(item.id) && <Check size={14} />}
-                        </button>
-                    ))}
-                    {historicalSelected.map((item) => (
-                        <button type="button" className="combo-option" key={item.id} onClick={() => toggle(item.id)}>
-                            <span>{item.label}（历史关联）</span>
-                            <Check size={14} />
-                        </button>
-                    ))}
-                    {remote.loading && <p className="combo-empty">正在搜索...</p>}
-                    {remote.failed && <p className="combo-empty" role="alert">搜索失败，请重试</p>}
-                    {!remote.loading && !remote.failed && !availableItems.length && !historicalSelected.length && <p className="combo-empty">没有可选项</p>}
-                </div>
-            )}
+            {menu && (typeof document === 'undefined' ? menu : createPortal(menu, document.body))}
         </div>
     );
 }
