@@ -4,120 +4,127 @@ namespace App\Http\Controllers;
 
 use App\Actions\CreateObjectRecord;
 use App\Models\BusinessObject;
-use App\Models\ObjectRecord;
 use App\Support\ObjectRelations;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\File;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ShopFloorController extends Controller
 {
-    public function __construct(private ObjectRelations $relations)
+    public function __construct(private ObjectRelations $relations) {}
+
+    public function teamLogCreate(Request $request): Response
     {
+        return $this->renderTeamLogForm($request);
     }
 
-    public function materialRequestCreate(): Response
+    public function publicTeamLogCreate(Request $request): Response
     {
-        return Inertia::render('MaterialRequests/Create', [
-            'materials' => $this->relations->optionsForObjectKey('material'),
-            'projects' => $this->relations->optionsForObjectKey('project'),
-            'submitUrl' => route('material-requests.public.store'),
-        ]);
+        return $this->renderTeamLogForm($request, publicForm: true);
     }
 
-    public function materialRequestStore(Request $request, CreateObjectRecord $writer): RedirectResponse
+    private function renderTeamLogForm(Request $request, bool $publicForm = false): Response
     {
-        $data = $request->validate([
-            'requester' => ['required', 'string', 'max:120'],
-            'material_id' => ['required', 'string'],
-            'project_id' => ['nullable', 'string'],
-            'qty' => ['required', 'numeric', 'min:0.01'],
-            'unit' => ['nullable', 'string'],
-            'team' => ['nullable', 'string'],
-            'apply_date' => ['nullable', 'date'],
-            'reason' => ['nullable', 'string', 'max:500'],
-        ]);
+        $object = BusinessObject::where('key', 'team_log')->firstOrFail();
+        $options = $this->relations->optionsFor($object, user: $request->user());
 
-        $object = BusinessObject::where('key', 'material_request')->firstOrFail();
-        $this->relations->validatePayloadRelations($object, $data);
-
-        $data['status'] = '待审批';
-        $writer->handle($object, $data, null, 'material_request.create');
-
-        return redirect()->route('material-requests.public.create')->with('status', '领料申请已提交，请等待库管审批。');
-    }
-
-    public function materialRequestApprovals(): Response
-    {
-        $object = BusinessObject::where('key', 'material_request')->firstOrFail();
-        $query = fn () => $object->records()->with('businessObject')->latest();
-        $pending = $query()->where('payload->status', '待审批')->get();
-        $processed = $query()->where('payload->status', '!=', '待审批')->take(30)->get();
-        $this->relations->preloadLabels($pending->merge($processed));
-
-        return Inertia::render('MaterialRequests/Approvals', [
-            'pending' => $pending->map(fn (ObjectRecord $record) => $this->relations->formatRecord($record))->values(),
-            'processed' => $processed->map(fn (ObjectRecord $record) => $this->relations->formatRecord($record))->values(),
-        ]);
-    }
-
-    public function materialRequestApprove(Request $request, ObjectRecord $record, CreateObjectRecord $writer): RedirectResponse
-    {
-        abort_unless($record->businessObject?->key === 'material_request', 404);
-
-        $payload = $record->payload ?? [];
-        if (($payload['status'] ?? null) !== '已出库') {
-            $outbound = BusinessObject::where('key', 'outbound')->firstOrFail();
-            $outboundRecord = $writer->handle($outbound, [
-                'material_id' => $payload['material_id'] ?? '',
-                'project_id' => $payload['project_id'] ?? '',
-                'qty' => $payload['qty'] ?? '',
-                'team' => $payload['team'] ?? '',
-                'apply_date' => $payload['apply_date'] ?? now()->format('Y-m-d'),
-            ], $request->user(), 'material_request.approve');
-
-            $payload['status'] = '已出库';
-            $payload['outbound_id'] = $outboundRecord->id;
-            $record->update(['payload' => $payload]);
-        }
-
-        return back()->with('status', '领料申请已通过，已生成出库单。');
-    }
-
-    public function materialRequestReject(ObjectRecord $record): RedirectResponse
-    {
-        abort_unless($record->businessObject?->key === 'material_request', 404);
-
-        $payload = $record->payload ?? [];
-        $payload['status'] = '已驳回';
-        $record->update(['payload' => $payload]);
-
-        return back()->with('status', '领料申请已驳回。');
-    }
-
-    public function teamLogCreate(): Response
-    {
         return Inertia::render('TeamLogs/Create', [
-            'workOrders' => $this->relations->optionsForObjectKey('work_order'),
-            'submitUrl' => route('team-logs.public.store'),
+            'projects' => $options['project_id']['items'] ?? [],
+            'teams' => $options['team_id']['items'] ?? [],
+            'materials' => $this->relations->optionsForObjectKey('material'),
+            'searchUrls' => [
+                'project_id' => $publicForm ? '' : ($options['project_id']['search_url'] ?? ''),
+                'team_id' => $publicForm ? '' : ($options['team_id']['search_url'] ?? ''),
+                'material_id' => $publicForm
+                    ? route('requisitions.public.material-options', absolute: false)
+                    : route('relation-options.index', [
+                        'source_object' => 'requisition',
+                        'field' => 'material_id',
+                    ], false),
+            ],
+            'submitUrl' => $publicForm ? $request->fullUrl() : route('team-logs.store'),
+            'publicForm' => $publicForm,
         ]);
     }
 
     public function teamLogStore(Request $request, CreateObjectRecord $writer): RedirectResponse
     {
+        return $this->storeTeamLog($request, $writer);
+    }
+
+    public function publicTeamLogStore(Request $request, CreateObjectRecord $writer): RedirectResponse
+    {
+        return $this->storeTeamLog($request, $writer, publicForm: true);
+    }
+
+    private function storeTeamLog(
+        Request $request,
+        CreateObjectRecord $writer,
+        bool $publicForm = false,
+    ): RedirectResponse {
         $data = $request->validate([
-            'work_order_id' => ['required', 'string'],
+            'project_id' => ['required', 'string'],
+            'team_id' => ['required', 'string'],
+            'status' => ['required', Rule::in(['开始生产', '生产中', '异常暂停', '完成任务'])],
+            'process' => ['required', Rule::in(['切割', '焊接', '总装', '打磨', '其他'])],
+            'completed_qty' => ['nullable', 'numeric', 'min:0'],
+            'unit' => ['nullable', Rule::in(['件', '套', 'kg', '吨', '张', '根'])],
+            'exception_type' => ['required', Rule::in(['无', '缺料', '图纸问题', '设备故障', '质量问题', '人员不足', '其他'])],
             'part_name' => ['nullable', 'string', 'max:160'],
-            'team' => ['nullable', 'string'],
-            'real_qty' => ['required', 'numeric', 'min:0'],
             'work_date' => ['nullable', 'date'],
+            'remark' => ['nullable', 'string', 'max:1000'],
+            'attachment' => ['nullable', File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024)],
+            'shortage_material_id' => [Rule::requiredIf($request->input('exception_type') === '缺料'), 'nullable', 'string'],
+            'shortage_qty' => [Rule::requiredIf($request->input('exception_type') === '缺料'), 'nullable', 'numeric', 'min:0.01'],
+            'shortage_unit' => [Rule::requiredIf($request->input('exception_type') === '缺料'), 'nullable', Rule::in(['吨', 'kg', '张', '根'])],
         ]);
 
         $object = BusinessObject::where('key', 'team_log')->firstOrFail();
-        $this->relations->validatePayloadRelations($object, $data);
-        $writer->handle($object, $data, null, 'team_log.public_create');
+        if ($request->hasFile('attachment')) {
+            $data['attachment'] = $request->file('attachment')->store('attachments', 'local');
+        }
+        if ($data['exception_type'] !== '无') {
+            $data['status'] = '异常暂停';
+        }
 
-        return redirect()->route('team-logs.public.create')->with('status', '班组日报已提交。');
+        DB::transaction(function () use ($object, $data, $request, $writer): void {
+            $this->relations->lockReferenceGraph();
+            $reportPayload = Arr::except($data, ['shortage_material_id', 'shortage_qty', 'shortage_unit']);
+            $this->relations->validatePayloadRelations($object, $reportPayload, $request->user());
+            $writer->handle($object, $reportPayload, $request->user(), 'team_log.create');
+
+            if ($data['exception_type'] !== '缺料') {
+                return;
+            }
+
+            $requisition = BusinessObject::where('key', 'requisition')->firstOrFail();
+            $writer->handle($requisition, [
+                'requester' => '生产',
+                'material_id' => $data['shortage_material_id'],
+                'qty' => $data['shortage_qty'],
+                'unit' => $data['shortage_unit'],
+                'project_id' => $data['project_id'],
+                'urgency' => '紧急',
+                'reason' => collect(['现场报工缺料', $data['part_name'] ?? null, $data['remark'] ?? null])
+                    ->filter()
+                    ->implode(' · '),
+                'status' => '待处理',
+            ], $request->user(), 'team_log.shortage_requisition');
+        });
+
+        $message = $data['exception_type'] === '缺料'
+            ? '报工已提交，并已自动生成紧急采购申请。'
+            : '现场报工已提交。';
+
+        if ($publicForm) {
+            return redirect()->to($request->fullUrl())->with('status', $message);
+        }
+
+        return redirect()->route('team-logs.create')->with('status', $message);
     }
 }

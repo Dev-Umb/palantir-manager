@@ -2,7 +2,14 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import ComboBox from '../../Components/ComboBox';
 import Layout from '../../Components/Layout';
 
-export default function Create({ materials, projects, submitUrl = '/requests', publicForm = false }) {
+export default function Create({
+    materials,
+    projects,
+    materialSearchUrl = '',
+    projectSearchUrl = '',
+    submitUrl = '/requests',
+    publicForm = false,
+}) {
     const { flash } = usePage().props;
     const params = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
     const form = useForm({
@@ -33,15 +40,30 @@ export default function Create({ materials, projects, submitUrl = '/requests', p
                 </div>
                 {publicForm && flash?.status && <div className="notice">{flash.status}</div>}
                 <form className="form-grid" onSubmit={submit}>
-                    <label><span>需求方</span><ComboBox value={form.data.requester} onChange={(value) => form.setData('requester', value)} options={options(['生产', '技术', '库管', '业务'])} /></label>
-                    <label><span>物料</span><ComboBox value={form.data.material_id} onChange={(value) => form.setData('material_id', value)} options={materials.map((item) => ({ value: item.id, label: item.label }))} /></label>
-                    <label><span>需求数量</span><input type="number" step="any" value={form.data.qty} onChange={(e) => form.setData('qty', e.target.value)} required /></label>
+                    <label><span>需求方</span><ComboBox value={form.data.requester} onChange={(value) => form.setData('requester', value)} options={options(['生产', '技术', '业务'])} /></label>
+                    <label><span>物料</span><ComboBox value={form.data.material_id} onChange={(value) => form.setData('material_id', value)} options={materials.map((item) => ({ value: item.id, label: item.label }))} searchUrl={materialSearchUrl} /></label>
+                    <label>
+                        <span>需求数量<b>*</b></span>
+                        <input type="number" step="any" min="0.01" value={form.data.qty} onChange={(e) => form.setData('qty', e.target.value)} required />
+                    </label>
                     <label><span>单位</span><ComboBox value={form.data.unit} onChange={(value) => form.setData('unit', value)} options={options(['吨', 'kg', '张', '根'])} /></label>
-                    <label><span>关联项目</span><ComboBox value={form.data.project_id} onChange={(value) => form.setData('project_id', value)} options={[{ value: '', label: '不关联' }, ...projects.map((item) => ({ value: item.id, label: item.label }))]} /></label>
+                    {!publicForm && <label><span>关联项目</span><ComboBox value={form.data.project_id} onChange={(value) => form.setData('project_id', value)} options={[{ value: '', label: '不关联' }, ...projects.map((item) => ({ value: item.id, label: item.label }))]} searchUrl={projectSearchUrl} /></label>}
                     <label><span>紧急程度</span><ComboBox value={form.data.urgency} onChange={(value) => form.setData('urgency', value)} options={options(['普通', '紧急', '特急'])} /></label>
-                    <label className="wide"><span>原因</span><textarea value={form.data.reason} onChange={(e) => form.setData('reason', e.target.value)} placeholder="如：生产急需、盘库缺料" /></label>
-                    {Object.values(form.errors).map((error) => <p key={error} className="form-error">{error}</p>)}
-                    <button type="submit" disabled={form.processing}>{form.processing ? '提交中...' : '提交申请'}</button>
+                    <label className="wide">
+                        <span>申请原因 <em>建议填写</em></span>
+                        <textarea
+                            value={form.data.reason}
+                            maxLength={500}
+                            onChange={(e) => form.setData('reason', e.target.value)}
+                            placeholder="说明为什么需要采购，审批人会更快判断。例如：生产现场缺料，需在 7 月 30 日前到货"
+                        />
+                        <small className="field-hint">写清用途和期望时间，可减少审批往返。</small>
+                    </label>
+                    {Object.values(form.errors).map((error) => <p key={error} className="form-error" role="alert">{error}</p>)}
+                    <div className="form-actions request-form-actions">
+                        <span>提交后将进入采购审批，审批前请确认物料、数量和项目。</span>
+                        <button type="submit" disabled={form.processing}>{form.processing ? '正在提交...' : '确认并提交申请'}</button>
+                    </div>
                 </form>
             </section>
         </>
@@ -52,7 +74,7 @@ export default function Create({ materials, projects, submitUrl = '/requests', p
     }
 
     return (
-        <Layout title="提交采购申请" eyebrow="采购申请">
+        <Layout title="提交采购申请" eyebrow="提交采购申请">
             {content}
         </Layout>
     );

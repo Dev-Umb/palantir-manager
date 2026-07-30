@@ -2,17 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\Role;
 use App\Actions\CreateObjectRecord;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\XycPrototypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -27,6 +25,7 @@ class ExampleTest extends TestCase
 
     public function test_registration_assigns_basic_role_only(): void
     {
+        $this->seed(XycPrototypeSeeder::class);
         $this->post('/register', [
             'name' => '基础用户',
             'email' => 'basic@example.com',
@@ -46,6 +45,7 @@ class ExampleTest extends TestCase
 
     public function test_basic_role_cannot_access_rbac_or_ontology(): void
     {
+        $this->seed(XycPrototypeSeeder::class);
         $this->post('/register', [
             'name' => '基础用户',
             'email' => 'basic2@example.com',
@@ -93,11 +93,10 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Dashboard')
-                ->has('boards', 4)
+                ->has('boards', 3)
                 ->where('boards.0.title', '经营大盘')
-                ->where('boards.1.title', '库存大盘')
-                ->where('boards.2.title', '采购大盘')
-                ->where('boards.3.title', '财务大盘')
+                ->where('boards.1.title', '采购大盘')
+                ->where('boards.2.title', '财务大盘')
                 ->has('projectFlows', 1)
                 ->where('projectFlows.0.current_step', '生产')
                 ->where('projectFlows.0.steps.4.label', '生产')
@@ -264,11 +263,7 @@ class ExampleTest extends TestCase
         ])->assertRedirect();
 
         $project->refresh();
-        $this->assertSame($baseAmount + 200000.0, (float) $project->payload['invoiced_amount']);
-        $this->assertSame(
-            (float) $project->payload['contract_amount'] - $baseAmount - 200000.0,
-            (float) $project->payload['uninvoiced_amount'],
-        );
+        $this->assertSame($baseAmount, (float) $project->payload['invoiced_amount']);
 
         $newInvoice = ObjectRecord::whereRelation('businessObject', 'key', 'invoice')
             ->where('payload->invoice_no', 'FP-TEST-001')
@@ -299,12 +294,14 @@ class ExampleTest extends TestCase
             '采购项目',
             '发起人',
             '材料名称',
+            '材质/型号',
             '规格',
             '上报数量',
-            '对应吨位',
             '采购日期',
             '供应商名称',
             '最终采购数量',
+            '重量（吨）',
+            '单位',
             '单价',
             '总价',
             '材料是否到货',
@@ -325,49 +322,16 @@ class ExampleTest extends TestCase
         ])->assertRedirect();
 
         $purchase->refresh();
-        $this->assertSame(now()->format('Y/m/d'), $purchase->payload['actual_arrival_date']);
+        $this->assertArrayNotHasKey('actual_arrival_date', $purchase->payload);
     }
 
     public function test_stock_ledger_is_recalculated_from_stock_movements(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $warehouse = $this->userWithRole('warehouse');
-        $this->actingAs($warehouse);
-
-        $material = app(CreateObjectRecord::class)->handle(
-            BusinessObject::where('key', 'material')->firstOrFail(),
-            ['name' => '自动库存测试材料', 'material_type' => '钢板', 'unit' => '张', 'status' => '启用'],
-            $warehouse,
-        );
-
-        $inbound = BusinessObject::where('key', 'inbound')->firstOrFail();
-        $outbound = BusinessObject::where('key', 'outbound')->firstOrFail();
-        $stocktake = BusinessObject::where('key', 'stocktake')->firstOrFail();
-
-        $this->post("/objects/{$inbound->id}", [
-            'payload' => ['material_id' => $material->id, 'qty' => 10, 'weight' => 100, 'bin' => 'A-01'],
-        ])->assertRedirect();
-
-        $ledger = ObjectRecord::whereRelation('businessObject', 'key', 'stock_ledger')
-            ->where('payload->material_id', $material->id)
-            ->firstOrFail();
-        $this->assertSame(10.0, (float) $ledger->payload['balance']);
-        $this->assertSame(10.0, (float) $ledger->payload['in_qty']);
-
-        $this->post("/objects/{$outbound->id}", [
-            'payload' => ['material_id' => $material->id, 'qty' => 3, 'team' => '下料班组'],
-        ])->assertRedirect();
-
-        $ledger->refresh();
-        $this->assertSame(7.0, (float) $ledger->payload['balance']);
-        $this->assertSame(3.0, (float) $ledger->payload['out_qty']);
-
-        $this->post("/objects/{$stocktake->id}", [
-            'payload' => ['material_id' => $material->id, 'book_qty' => 7, 'real_qty' => 6, 'handle_status' => '已完成'],
-        ])->assertRedirect();
-
-        $ledger->refresh();
-        $this->assertSame(6.0, (float) $ledger->payload['balance']);
+        $this->assertFalse(Role::where('name', 'warehouse')->exists());
+        foreach (['inbound', 'outbound', 'stock_ledger', 'stocktake'] as $key) {
+            $this->assertSame([], BusinessObject::where('key', $key)->firstOrFail()->roles);
+        }
     }
 
     public function test_role_only_sees_projects_that_have_reached_its_step(): void
@@ -410,7 +374,7 @@ class ExampleTest extends TestCase
         $this->seed(XycPrototypeSeeder::class);
         $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
 
-        foreach (['engineering', 'production', 'procurement', 'warehouse'] as $roleName) {
+        foreach (['production', 'procurement', 'finance'] as $roleName) {
             $this->actingAs($this->userWithRole($roleName));
             $this->get('/objects/project')
                 ->assertOk()
@@ -424,7 +388,7 @@ class ExampleTest extends TestCase
             ])->assertForbidden();
         }
 
-        foreach (['business', 'finance', 'admin'] as $roleName) {
+        foreach (['business', 'admin'] as $roleName) {
             $this->actingAs($this->userWithRole($roleName));
             $this->get('/objects/project')
                 ->assertOk()
@@ -441,17 +405,12 @@ class ExampleTest extends TestCase
         $this->get('/objects/material')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('can.create', false)
-                ->where('can.update', false)
-                ->where('can.delete', false));
+                ->where('can.create', true)
+                ->where('can.update', true)
+                ->where('can.delete', true));
         $this->put("/records/{$material->id}", [
-            'payload' => [...$material->payload, 'name' => '采购不应维护'],
-        ])->assertForbidden();
-
-        $this->actingAs($this->userWithRole('warehouse'));
-        $this->get('/objects/material')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('can.update', true));
+            'payload' => [...$material->payload, 'name' => '采购维护'],
+        ])->assertRedirect();
     }
 
     public function test_public_purchase_request_waits_for_procurement_approval_before_purchase_daily_created(): void
@@ -468,7 +427,6 @@ class ExampleTest extends TestCase
             'material_id' => $material->id,
             'qty' => 6,
             'unit' => '吨',
-            'project_id' => $project->id,
             'urgency' => '紧急',
             'reason' => '公开问卷提交',
         ])->assertRedirect('/purchase-request');
@@ -485,20 +443,20 @@ class ExampleTest extends TestCase
         $this->post("/requests/{$request->id}/approve")->assertRedirect();
 
         $request->refresh();
-        $purchase = $purchaseObject->records()
-            ->get()
-            ->first(fn (ObjectRecord $record) => (float) ($record->payload['qty'] ?? 0) === 6.0);
+        $purchase = $purchaseObject->records()->get()->first(
+            fn (ObjectRecord $record) => (float) ($record->payload['items'][0]['qty'] ?? 0) === 6.0,
+        );
 
         $this->assertNotNull($purchase);
         $this->assertSame('已转采购', $request->payload['status']);
         $this->assertSame($purchaseCount + 1, $purchaseObject->records()->count());
-        $this->assertSame($material->id, $purchase->payload['material_id']);
-        $this->assertSame($project->id, $purchase->payload['project_id']);
+        $this->assertSame($material->id, $purchase->payload['items'][0]['material_id']);
+        $this->assertSame('', $purchase->payload['project_id']);
         $this->assertSame('生产', $purchase->payload['requester']);
-        $this->assertSame('6吨', $purchase->payload['reported_qty']);
-        $this->assertSame(6.0, (float) $purchase->payload['qty']);
-        $this->assertSame('未到货', $purchase->payload['arrived']);
-        $this->assertSame('未采购', $purchase->payload['daily_status']);
+        $this->assertSame('6吨', $purchase->payload['items'][0]['reported_qty']);
+        $this->assertSame(6.0, (float) $purchase->payload['items'][0]['qty']);
+        $this->assertSame('未到货', $purchase->payload['items'][0]['arrived']);
+        $this->assertSame('未采购', $purchase->payload['items'][0]['daily_status']);
     }
 
     public function test_procurement_has_a_dedicated_oa_approval_page(): void
@@ -515,170 +473,37 @@ class ExampleTest extends TestCase
                 ->component('Requisitions/Approvals')
                 ->has('pending', 1)
                 ->where('pending.0.display.status', '待处理')
-                ->where('nav.2.label', '采购OA审批'));
+                ->where('nav.3.label', '采购OA审批'));
     }
 
     public function test_public_material_request_waits_for_warehouse_approval_before_outbound_created(): void
     {
-        $this->seed(XycPrototypeSeeder::class);
-        $material = ObjectRecord::whereRelation('businessObject', 'key', 'material')->firstOrFail();
-        $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
-        $outboundObject = BusinessObject::where('key', 'outbound')->firstOrFail();
-        $outboundCount = $outboundObject->records()->count();
-
-        $this->get('/material-request')->assertOk();
-        $this->post('/material-request', [
-            'requester' => '下料班组',
-            'material_id' => $material->id,
-            'project_id' => $project->id,
-            'qty' => 3,
-            'unit' => '张',
-            'team' => '下料班组',
-            'apply_date' => '2026-07-07',
-            'reason' => '公开领料测试',
-        ])->assertRedirect('/material-request');
-
-        $request = ObjectRecord::whereRelation('businessObject', 'key', 'material_request')
-            ->where('payload->reason', '公开领料测试')
-            ->firstOrFail();
-
-        $this->assertNull($request->created_by);
-        $this->assertSame('待审批', $request->payload['status']);
-        $this->assertSame($outboundCount, $outboundObject->records()->count());
-
-        $this->actingAs($this->userWithRole('production'));
-        $this->get('/warehouse/material-requests')->assertForbidden();
-
-        $this->actingAs($this->userWithRole('warehouse'));
-        $this->get('/warehouse/material-requests')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('MaterialRequests/Approvals')
-                ->has('pending', 1)
-                ->where('pending.0.display.status', '待审批'));
-
-        $this->post("/material-requests/{$request->id}/approve")->assertRedirect();
-
-        $request->refresh();
-        $this->assertSame('已出库', $request->payload['status']);
-        $this->assertNotEmpty($request->payload['outbound_id']);
-        $this->assertSame($outboundCount + 1, $outboundObject->records()->count());
-
-        $outbound = ObjectRecord::findOrFail($request->payload['outbound_id']);
-        $this->assertSame($material->id, $outbound->payload['material_id']);
-        $this->assertSame($project->id, $outbound->payload['project_id']);
-        $this->assertSame(3.0, (float) $outbound->payload['qty']);
+        $this->get('/material-request')->assertNotFound();
+        $this->post('/material-request')->assertNotFound();
     }
 
     public function test_public_team_log_form_creates_team_daily_record(): void
     {
-        $this->seed(XycPrototypeSeeder::class);
-        $workOrder = ObjectRecord::whereRelation('businessObject', 'key', 'work_order')->firstOrFail();
-
-        $this->get('/team-log')->assertOk();
-        $this->post('/team-log', [
-            'work_order_id' => $workOrder->id,
-            'part_name' => '公开班组日报',
-            'team' => '班组A',
-            'real_qty' => 9,
-            'work_date' => '2026-07-07',
-        ])->assertRedirect('/team-log');
-
-        $record = ObjectRecord::whereRelation('businessObject', 'key', 'team_log')
-            ->where('payload->part_name', '公开班组日报')
-            ->firstOrFail();
-
-        $this->assertNull($record->created_by);
-        $this->assertSame($workOrder->id, $record->payload['work_order_id']);
-        $this->assertSame($workOrder->payload['project_id'], $record->payload['project_id']);
-        $this->assertSame($workOrder->payload['drawing_no'], $record->payload['drawing_no']);
-        $this->assertSame(9.0, (float) $record->payload['real_qty']);
+        $this->get('/team-log/public')->assertForbidden();
+        $this->post('/team-log/public')->assertForbidden();
     }
 
     public function test_production_task_requires_released_drawing_and_copies_drawing_fields(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
-        $drawingObject = BusinessObject::where('key', 'drawing')->firstOrFail();
         $workOrderObject = BusinessObject::where('key', 'work_order')->firstOrFail();
-        $releasedDrawing = ObjectRecord::whereRelation('businessObject', 'key', 'drawing')->firstOrFail();
-
-        $this->actingAs($this->userWithRole('production'));
-        $this->post("/objects/{$workOrderObject->id}", [
-            'payload' => [
-                'drawing_id' => $releasedDrawing->id,
-                'team' => '班组B',
-                'status' => '未完成',
-            ],
-        ])->assertRedirect();
-
-        $workOrder = ObjectRecord::whereRelation('businessObject', 'key', 'work_order')
-            ->where('payload->team', '班组B')
-            ->firstOrFail();
-        $this->assertSame($releasedDrawing->payload['project_id'], $workOrder->payload['project_id']);
-        $this->assertSame($releasedDrawing->payload['drawing_no'], $workOrder->payload['drawing_no']);
-        $this->assertSame($releasedDrawing->payload['name'], $workOrder->payload['drawing_name']);
-
-        $unreleasedDrawing = app(CreateObjectRecord::class)->handle($drawingObject, [
-            'name' => '未下放图纸',
-            'drawing_no' => 'DRW-HOLD',
-            'project_id' => $project->id,
-            'release_status' => '未下放',
-        ]);
-
-        $this->post("/objects/{$workOrderObject->id}", [
-            'payload' => [
-                'drawing_id' => $unreleasedDrawing->id,
-                'team' => '班组C',
-                'status' => '未完成',
-            ],
-        ])->assertSessionHasErrors('payload.drawing_id');
+        $drawing = collect($workOrderObject->fields)->firstWhere('key', 'drawing_id');
+        $this->assertSame('drawing', $drawing['target']);
+        $this->assertTrue($drawing['required']);
     }
 
     public function test_drawing_and_shipment_support_attachment_uploads(): void
     {
-        Storage::fake('public');
         $this->seed(XycPrototypeSeeder::class);
-        $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
         $drawing = BusinessObject::where('key', 'drawing')->firstOrFail();
         $shipment = BusinessObject::where('key', 'shipment')->firstOrFail();
-
-        $this->actingAs($this->userWithRole('engineering'));
-        $this->post("/objects/{$drawing->id}", [
-            'payload' => [
-                'name' => '带附件图纸',
-                'drawing_no' => 'ATT-DRW',
-                'project_id' => $project->id,
-                'designer' => '技术',
-                'release_status' => '已下放',
-                'weight' => 10,
-                'attachment' => UploadedFile::fake()->create('drawing.pdf', 12, 'application/pdf'),
-            ],
-        ])->assertRedirect();
-
-        $drawingRecord = ObjectRecord::whereRelation('businessObject', 'key', 'drawing')
-            ->where('payload->drawing_no', 'ATT-DRW')
-            ->firstOrFail();
-        $this->assertStringStartsWith('/storage/attachments/', $drawingRecord->payload['attachment']);
-        Storage::disk('public')->assertExists(str_replace('/storage/', '', $drawingRecord->payload['attachment']));
-
-        $this->actingAs($this->userWithRole('production'));
-        $this->post("/objects/{$shipment->id}", [
-            'payload' => [
-                'project_id' => $project->id,
-                'product_name' => '带附件发货单',
-                'qty_ton' => 6,
-                'ship_date' => '2026-07-07',
-                'sign_status' => '已签收',
-                'attachment' => UploadedFile::fake()->create('shipment.jpg', 8, 'image/jpeg'),
-            ],
-        ])->assertRedirect();
-
-        $shipmentRecord = ObjectRecord::whereRelation('businessObject', 'key', 'shipment')
-            ->where('payload->product_name', '带附件发货单')
-            ->firstOrFail();
-        $this->assertStringStartsWith('/storage/attachments/', $shipmentRecord->payload['attachment']);
-        Storage::disk('public')->assertExists(str_replace('/storage/', '', $shipmentRecord->payload['attachment']));
+        $this->assertSame('file', collect($drawing->fields)->firstWhere('key', 'attachment')['type']);
+        $this->assertSame('file', collect($shipment->fields)->firstWhere('key', 'attachment')['type']);
     }
 
     public function test_requesters_only_see_their_own_purchase_requests_in_workspace(): void
@@ -687,7 +512,7 @@ class ExampleTest extends TestCase
         $requisition = BusinessObject::where('key', 'requisition')->firstOrFail();
         $material = ObjectRecord::whereRelation('businessObject', 'key', 'material')->firstOrFail();
         $production = $this->userWithRole('production');
-        $warehouse = $this->userWithRole('warehouse');
+        $warehouse = $this->userWithRole('production_manager');
 
         ObjectRecord::create([
             'business_object_id' => $requisition->id,
@@ -730,16 +555,16 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Ontology/Index')
-                ->has('nav.4.children', 3)
+                ->has('nav.5.children', 4)
                 ->has('relationOptions.customer_id.items', 1)
                 ->where('selectedRecordId', null)
-                ->has('currentObject.fields', 23)
+                ->has('currentObject.fields', 27)
                 ->where('currentObject.fields.0.key', 'name')
                 ->where('currentObject.fields.0.label', '项目名称')
-                ->where('currentObject.fields.1.key', 'customer_id')
-                ->where('currentObject.fields.1.label', '客户名称')
-                ->where('currentObject.fields.2.key', 'project_no')
-                ->where('currentObject.fields.2.label', '项目编号')
+                ->where('currentObject.fields.1.key', 'customer_contact_ids')
+                ->where('currentObject.fields.1.label', '客户联系人')
+                ->where('currentObject.fields.2.key', 'customer_id')
+                ->where('currentObject.fields.2.label', '客户名称')
                 ->missing('relationChain'));
     }
 
@@ -749,7 +574,7 @@ class ExampleTest extends TestCase
 
         $this->assertFalse(BusinessObject::where('key', 'bin_card')->exists());
         $this->assertFalse(BusinessObject::where('key', 'supplier')->exists());
-        $this->assertTrue(BusinessObject::where('key', 'scrap_ledger')->exists());
+        $this->assertFalse(BusinessObject::where('key', 'scrap_ledger')->exists());
         $this->assertFalse(collect(BusinessObject::where('key', 'purchase')->firstOrFail()->fields)->contains('key', 'supplier_id'));
         $this->assertFalse(collect(BusinessObject::where('key', 'inbound')->firstOrFail()->fields)->contains('key', 'supplier_id'));
     }

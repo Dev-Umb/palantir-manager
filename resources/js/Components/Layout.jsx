@@ -1,18 +1,21 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Box, ClipboardCheck, ClipboardPlus, Database, LayoutDashboard, LogOut, ShieldCheck, UserRound } from 'lucide-react';
+import { Bell, Bot, Box, ClipboardCheck, ClipboardPlus, Database, HardHat, LayoutDashboard, LogOut, ShieldCheck, UserRound } from 'lucide-react';
+import { businessText } from '../businessLanguage';
 
 const iconFor = {
-    '经营大盘': LayoutDashboard,
-    '提交采购申请': ClipboardPlus,
-    '采购OA审批': ClipboardCheck,
-    '领料审批': ClipboardCheck,
-    '本体工作台': Database,
-    '用户与权限': ShieldCheck,
+    dashboard: LayoutDashboard,
+    notifications: Bell,
+    'requisition-create': ClipboardPlus,
+    approvals: ClipboardCheck,
+    'team-log': HardHat,
+    ontology: Database,
+    rbac: ShieldCheck,
+    ai: Bot,
 };
 
-export default function Layout({ title, eyebrow, children, aside }) {
+export default function Layout({ title, eyebrow, children, aside, immersive = false, hideHeader = false }) {
     const page = usePage();
-    const { auth, nav, flash } = page.props;
+    const { auth, nav, flash, notificationUnreadCount = 0 } = page.props;
     const visibleNav = (nav || []).filter((item) => item.visible);
 
     function logout() {
@@ -28,22 +31,55 @@ export default function Layout({ title, eyebrow, children, aside }) {
                 </div>
                 <nav className="nav-list">
                     {visibleNav.map((item) => {
-                        const Icon = iconFor[item.label] || LayoutDashboard;
+                        const itemLabel = businessText(item.label);
+                        const Icon = iconFor[item.key] || LayoutDashboard;
                         const open = isActive(page.url, item.href) || (item.children || []).some((group) => group.items.some((child) => isActive(page.url, child.href, true)));
+                        const moduleGroups = (item.children || []).filter((group) => group.items?.length > 0);
                         return (
                             <div key={item.href} className="nav-group">
                                 <Link href={item.href} className={`nav-item ${open ? 'active' : ''}`}>
                                     <Icon size={17} />
-                                    <span>{item.label}</span>
+                                    <span>{itemLabel}</span>
+                                    {item.key === 'notifications' && notificationUnreadCount > 0 && (
+                                        <b className="nav-badge" aria-label={`${notificationUnreadCount} 条未读通知`}>
+                                            {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
+                                        </b>
+                                    )}
                                 </Link>
-                                {open && item.children?.length > 0 && (
+                                {open && item.key === 'ontology' && moduleGroups.length > 0 && (
+                                    <div className="nav-module-list" aria-label="业务资料模块">
+                                        {moduleGroups.map((group) => {
+                                            const active = group.items.some((child) => isActive(page.url, child.href, true));
+
+                                            return (
+                                                <Link
+                                                    key={group.label}
+                                                    href={group.items[0].href}
+                                                    className={active ? 'active' : ''}
+                                                    aria-current={active ? 'page' : undefined}
+                                                >
+                                                    {businessText(group.label)}
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {open && item.key !== 'ontology' && item.children?.length > 0 && (
                                     <div className="nav-sublist">
                                         {item.children.map((group) => (
                                             <section key={group.label}>
-                                                <h4>{group.label}</h4>
+                                                <h4>{businessText(group.label)}</h4>
                                                 {group.items.map((child) => (
                                                     <Link key={child.href} href={child.href} className={isActive(page.url, child.href, true) ? 'active' : ''}>
-                                                        {child.label}
+                                                        <span>{businessText(child.label)}</span>
+                                                        {child.new_task_count > 0 && (
+                                                            <b
+                                                                className="nav-child-badge"
+                                                                aria-label={`${businessText(child.label)} ${child.new_task_count} 个新任务`}
+                                                            >
+                                                                {child.new_task_count > 99 ? '99+' : child.new_task_count}
+                                                            </b>
+                                                        )}
                                                     </Link>
                                                 ))}
                                             </section>
@@ -67,18 +103,17 @@ export default function Layout({ title, eyebrow, children, aside }) {
                     </button>
                 </div>
             </aside>
-            <main className="workspace">
-                <header className="workspace-head">
-                    <div>
-                        <p>{eyebrow}</p>
-                        <h1>{title}</h1>
-                    </div>
-                    <div className="role-strip">
-                        {(auth.roles || []).map((role) => <span key={role.id}>{role.label}</span>)}
-                    </div>
-                </header>
+            <main className={`workspace ${immersive ? 'workspace-immersive' : ''}`}>
+                {!hideHeader && (
+                    <header className="workspace-head">
+                        <div>
+                            <p>{eyebrow}</p>
+                            <h1>{title}</h1>
+                        </div>
+                    </header>
+                )}
                 {flash?.status && <div className="notice">{flash.status}</div>}
-                <div className={aside ? 'workspace-grid' : ''}>
+                <div className={`workspace-content ${aside ? 'workspace-grid' : ''}`}>
                     <section>{children}</section>
                     {aside && <aside className="side-panel">{aside}</aside>}
                 </div>

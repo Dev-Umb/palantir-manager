@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => 'openai',
+    'default' => env('AI_PROVIDER', 'ark'),
     'default_for_images' => 'gemini',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
@@ -38,6 +38,9 @@ return [
         ],
     ],
 
+    'request_timeout' => env('AI_REQUEST_TIMEOUT', 180),
+    'harness_v2' => env('AI_HARNESS_V2', true),
+
     /*
     |--------------------------------------------------------------------------
     | AI Providers
@@ -50,6 +53,20 @@ return [
     */
 
     'providers' => [
+        'ark' => [
+            'driver' => 'openai',
+            'key' => env('ARK_API_KEY'),
+            'url' => env('ARK_BASE_URL', 'https://ark.cn-beijing.volces.com/api/plan/v3'),
+            'store' => false,
+            'models' => [
+                'text' => [
+                    'default' => env('ARK_MODEL', 'ark-code-latest'),
+                    'cheapest' => env('ARK_MODEL', 'ark-code-latest'),
+                    'smartest' => env('ARK_MODEL', 'ark-code-latest'),
+                ],
+            ],
+        ],
+
         'anthropic' => [
             'driver' => 'anthropic',
             'key' => env('ANTHROPIC_API_KEY'),
@@ -139,6 +156,14 @@ return [
         'xai' => [
             'driver' => 'xai',
             'key' => env('XAI_API_KEY'),
+        ],
+    ],
+
+    'conversations' => [
+        'generate_title' => env('AI_CONVERSATION_TITLES', false),
+        'tables' => [
+            'conversations' => 'agent_conversations',
+            'messages' => 'agent_conversation_messages',
         ],
     ],
 

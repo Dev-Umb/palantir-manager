@@ -1,13 +1,12 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { expect, test } from 'vitest';
 import { comboMenuStyleFromRect, shouldCloseComboForFocus, shouldCloseComboForPointer } from './comboBoxMenuPosition.js';
 
 test('combo menu is positioned against the viewport, not its scroll container', () => {
-    assert.deepEqual(comboMenuStyleFromRect({
+    expect(comboMenuStyleFromRect({
         left: 24,
         bottom: 120,
         width: 360,
-    }, 720), {
+    }, 720)).toEqual({
         position: 'fixed',
         zIndex: 100,
         top: 126,
@@ -19,22 +18,22 @@ test('combo menu is positioned against the viewport, not its scroll container', 
 });
 
 test('combo menu height is bounded by remaining viewport space', () => {
-    assert.equal(comboMenuStyleFromRect({
+    expect(comboMenuStyleFromRect({
         left: 24,
         bottom: 660,
         width: 360,
-    }, 720)['--combo-menu-max-height'], '36px');
+    }, 720)['--combo-menu-max-height']).toBe('36px');
 });
 
 test('combo focus close ignores empty relatedTarget after portal autofocus', () => {
-    assert.equal(shouldCloseComboForFocus(null, null, null), false);
+    expect(shouldCloseComboForFocus(null, null, null)).toBe(false);
 });
 
 test('combo focus close keeps focus inside the portaled menu', () => {
     const option = {};
     const menu = { contains: (target) => target === option };
 
-    assert.equal(shouldCloseComboForFocus(null, menu, option), false);
+    expect(shouldCloseComboForFocus(null, menu, option)).toBe(false);
 });
 
 test('combo pointer close only closes outside the trigger and portaled menu', () => {
@@ -44,7 +43,7 @@ test('combo pointer close only closes outside the trigger and portaled menu', ()
     const root = { contains: (target) => target === trigger };
     const menu = { contains: (target) => target === option };
 
-    assert.equal(shouldCloseComboForPointer(root, menu, trigger), false);
-    assert.equal(shouldCloseComboForPointer(root, menu, option), false);
-    assert.equal(shouldCloseComboForPointer(root, menu, outside), true);
+    expect(shouldCloseComboForPointer(root, menu, trigger)).toBe(false);
+    expect(shouldCloseComboForPointer(root, menu, option)).toBe(false);
+    expect(shouldCloseComboForPointer(root, menu, outside)).toBe(true);
 });

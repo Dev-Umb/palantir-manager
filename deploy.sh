@@ -14,22 +14,41 @@ php artisan test
 
 echo "==> 2/4 rsync 同步代码到服务器（不覆盖 .env / storage 上传件）"
 rsync -az --delete -e "ssh ${SSH_OPTS}" \
-  --exclude='.env' \
+  --exclude='.env*' \
   --exclude='.git' \
+  --exclude='.agents' \
+  --exclude='.claude' \
+  --exclude='.cloudstudio' \
+  --exclude='.codex' \
+  --exclude='.DS_Store' \
+  --exclude='.mcp.json' \
+  --exclude='.phpunit.result.cache' \
+  --exclude='.superpowers' \
+  --exclude='AGENTS.md' \
+  --exclude='CLAUDE.md' \
+  --exclude='deploy' \
+  --exclude='docs' \
+  --exclude='frontend' \
   --exclude='node_modules' \
   --exclude='tests' \
+  --exclude='vendor' \
   --exclude='*.png' \
-  --exclude='storage/app/public/attachments/*' \
+  --exclude='bootstrap/cache/*' \
+  --exclude='database/database.sqlite' \
+  --exclude='storage/app/deploy-backups/***' \
+  --exclude='storage/app/private/***' \
+  --exclude='storage/app/public/***' \
   --exclude='storage/logs/*' \
   --exclude='storage/framework/cache/data/*' \
   --exclude='storage/framework/sessions/*' \
+  --exclude='storage/framework/testing/*' \
   --exclude='storage/framework/views/*' \
   ./ ${HOST}:${REMOTE}/
 
 echo "==> 3/4 服务器：同步元数据、清缓存、重启服务"
 ssh ${SSH_OPTS} ${HOST} "cd ${REMOTE} && \
-php artisan db:seed --class=XycPrototypeSeeder --force && \
 php artisan optimize:clear && \
+php artisan db:seed --class=XycPrototypeSeeder --force && \
 php artisan route:cache && \
 php artisan config:cache && \
 php artisan view:cache && \

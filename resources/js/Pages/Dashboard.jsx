@@ -1,10 +1,10 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { ArrowRight, ClipboardPlus, Network } from 'lucide-react';
+import { ArrowRight, Bell, ClipboardPlus, FileWarning, Network, WalletCards } from 'lucide-react';
 import { useState } from 'react';
 import ComboBox from '../Components/ComboBox';
 import Layout from '../Components/Layout';
 
-export default function Dashboard({ stats, boards, projectFlows, recentProjects, stockRisks }) {
+export default function Dashboard({ stats, boards, projectFlows, recentProjects, stockRisks, notificationSummary = {}, notificationRisks = [] }) {
     const { auth } = usePage().props;
     const canRequest = auth.permissions.includes('requisition.create');
     const projectAccess = auth.permissions.some((key) => key.startsWith('object.project.'));
@@ -14,7 +14,7 @@ export default function Dashboard({ stats, boards, projectFlows, recentProjects,
     return (
         <Layout
             title="经营大盘"
-            eyebrow="全厂总览"
+            eyebrow="经营大盘"
         >
             <Head title="经营大盘" />
             <div className="kpi-grid">
@@ -26,13 +26,45 @@ export default function Dashboard({ stats, boards, projectFlows, recentProjects,
                 ))}
             </div>
 
+            <section className="surface notification-risk-panel">
+                <div className="section-head">
+                    <div>
+                        <p>项目风险</p>
+                        <h2>合同与回款提醒</h2>
+                        <span>合同 {notificationSummary.contract || 0} 项 · 回款 {notificationSummary.payment || 0} 项</span>
+                    </div>
+                    <Link className="small-action" href="/notifications"><Bell size={15} /> 通知中心</Link>
+                </div>
+                {notificationRisks.length ? (
+                    <div className="notification-risk-grid">
+                        {notificationRisks.slice(0, 8).map((risk) => {
+                            const Icon = risk.type === 'contract' ? FileWarning : WalletCards;
+                            const body = (
+                                <>
+                                    <Icon size={18} />
+                                    <div>
+                                        <strong>{risk.project_no} · {risk.project_name}</strong>
+                                        <span>{risk.message}</span>
+                                    </div>
+                                    {!risk.read && <b>未读</b>}
+                                </>
+                            );
+
+                            return risk.project_url
+                                ? <Link className={`notification-risk-card ${risk.type}`} href={risk.project_url} key={risk.id}>{body}</Link>
+                                : <div className={`notification-risk-card ${risk.type}`} key={risk.id}>{body}</div>;
+                        })}
+                    </div>
+                ) : <p className="muted">暂无超过三个月的合同或回款风险。</p>}
+            </section>
+
             <div className="board-grid">
                 {boards.map((board) => (
                     <section key={board.title} className={`surface dashboard-board ${board.type === 'flow' ? 'wide-board' : ''}`}>
                     <div className="section-head">
                         <div>
                                 <p>{board.title === '经营大盘' ? '项目流转' : '业务情况'}</p>
-                                <h2>{board.title}</h2>
+                                <h2>{board.title === '经营大盘' ? '项目流转' : board.title}</h2>
                                 <span>{board.desc}</span>
                         </div>
                             {board.title === '经营大盘' && <Network size={20} />}
@@ -45,7 +77,12 @@ export default function Dashboard({ stats, boards, projectFlows, recentProjects,
                                         <span>选择项目</span>
                                         <ComboBox value={projectId} onChange={setProjectId} options={projectFlows.map((project) => ({ value: project.id, label: project.label }))} />
                                     </label>
-                                    {selectedProject && <strong>当前走到：{selectedProject.current_step}</strong>}
+                                    {selectedProject && (
+                                        <div className="project-flow-summary">
+                                            <strong>当前走到：{selectedProject.current_step}</strong>
+                                            <span>累计发货重量：{selectedProject.shipped_weight_ton || 0} 吨</span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flow-row">
                                     {(selectedProject?.steps || board.items).map((item) => (
@@ -69,23 +106,25 @@ export default function Dashboard({ stats, boards, projectFlows, recentProjects,
                         {board.title === '库存大盘' && (
                             <div className="risk-list">
                                 <h3>库存提醒</h3>
-                                {stockRisks.length ? stockRisks.map((record) => (
-                                    <div className="risk-row" key={record.id}>
-                                        <div>
-                                            <span>{record.display?.material_id || record.title || record.code}</span>
-                                            <small>最低库存 {record.payload.minimum_stock || '-'}</small>
-                                        </div>
-                                        <strong>{record.payload.balance ?? '-'} 结存</strong>
-                                        {canRequest && record.payload.material_id && (
-                                            <Link
-                                                className="small-action"
-                                                href={`/requests/create?material_id=${record.payload.material_id}&requester=库管&reason=${encodeURIComponent('库存低于预警，需补料')}`}
-                                            >
-                                                提申请
-                                            </Link>
-                                        )}
-                                    </div>
-                                )) : <p className="muted">暂无库存风险。</p>}
+                                {stockRisks.length ? stockRisks.map((record) => {
+                                    const href = canRequest && record.payload.material_id
+                                        ? `/requests/create?material_id=${record.payload.material_id}&requester=库管&reason=${encodeURIComponent('库存低于预警，需补料')}`
+                                        : null;
+                                    const content = (
+                                        <>
+                                            <div>
+                                                <span>{record.display?.material_id || record.title || record.code}</span>
+                                                <small>最低库存 {record.payload.minimum_stock || '-'}</small>
+                                            </div>
+                                            <strong>{record.payload.balance_weight ?? '-'} kg</strong>
+                                            {href && <span className="small-action">提申请</span>}
+                                        </>
+                                    );
+
+                                    return href
+                                        ? <Link className="risk-row" href={href} key={record.id}>{content}</Link>
+                                        : <div className="risk-row" key={record.id}>{content}</div>;
+                                }) : <p className="muted">暂无库存风险。</p>}
                             </div>
                         )}
                     </section>
@@ -124,5 +163,6 @@ export default function Dashboard({ stats, boards, projectFlows, recentProjects,
 function stepText(status) {
     if (status === 'done') return '已过';
     if (status === 'current') return '当前';
+    if (status === 'parallel-shipment' || status === 'parallel-payment') return '进行中';
     return '未到';
 }

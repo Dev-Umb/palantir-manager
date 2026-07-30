@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\BusinessObject;
+use App\Models\ProjectNotification;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -23,6 +24,13 @@ class HandleInertiaRequests extends Middleware
                 'permissions' => $permissions,
             ],
             'nav' => $user ? $this->navigation($request, $permissions) : [],
+            'notificationUnreadCount' => fn () => $user
+                ? ProjectNotification::query()
+                    ->where('user_id', $user->id)
+                    ->active()
+                    ->whereNull('read_at')
+                    ->count()
+                : 0,
             'flash' => ['status' => fn () => $request->session()->get('status')],
         ];
     }
@@ -32,23 +40,37 @@ class HandleInertiaRequests extends Middleware
         $can = fn (string $permission) => in_array($permission, $permissions, true);
         $roles = $request->user()?->roles->pluck('name')->all() ?? [];
         $objects = BusinessObject::query()
+            ->withCount(['records as new_task_count' => function ($query) use ($roles): void {
+                $query->whereNotNull('workflow_key')->whereNull('workflow_seen_at');
+                if (! in_array('admin', $roles, true)) {
+                    $query->where(function ($targets) use ($roles): void {
+                        foreach ($roles as $role) {
+                            $targets->orWhereJsonContains('workflow_target_roles', $role);
+                        }
+                    });
+                }
+            }])
             ->orderBy('sort_order')
             ->get()
             ->filter(fn (BusinessObject $object) => $can("object.{$object->key}.view"))
-            ->reject(fn (BusinessObject $object) => $object->key === 'requisition'
-                && in_array('procurement', $roles, true)
-                && ! in_array('admin', $roles, true))
+            ->reject(fn (BusinessObject $object) => $object->key === 'customer_contact'
+                || ($object->key === 'requisition'
+                    && in_array('procurement', $roles, true)
+                    && ! in_array('admin', $roles, true)))
             ->values();
 
         return [
-            ['label' => '经营大盘', 'href' => route('dashboard'), 'visible' => $can('dashboard.view')],
-            ['label' => '提交采购申请', 'href' => route('requisitions.create'), 'visible' => $can('requisition.create')],
-            ['label' => '采购OA审批', 'href' => route('requisitions.approvals'), 'visible' => $can('object.requisition.update')],
-            ['label' => '领料审批', 'href' => route('material-requests.approvals'), 'visible' => $can('object.material_request.update')],
+            ['key' => 'dashboard', 'label' => '经营大盘', 'href' => route('dashboard'), 'visible' => $can('dashboard.view'), 'mobile_priority' => 10],
+            ['key' => 'notifications', 'label' => '通知中心', 'href' => route('notifications.index'), 'visible' => true, 'mobile_priority' => 40],
+            ['key' => 'requisition-create', 'label' => '提交采购申请', 'href' => route('requisitions.create'), 'visible' => $can('requisition.create'), 'mobile_priority' => 20],
+            ['key' => 'approvals', 'label' => '采购OA审批', 'href' => route('requisitions.approvals'), 'visible' => $can('object.requisition.update'), 'mobile_priority' => 30],
+            ['key' => 'team-log', 'label' => '现场报工', 'href' => route('team-logs.create'), 'visible' => $can('object.team_log.create'), 'mobile_priority' => 35],
             [
+                'key' => 'ontology',
                 'label' => '本体工作台',
                 'href' => route('objects.index'),
                 'visible' => $objects->isNotEmpty(),
+                'mobile_priority' => 50,
                 'children' => $objects
                     ->groupBy('group')
                     ->map(fn ($items, string $group) => [
@@ -56,11 +78,13 @@ class HandleInertiaRequests extends Middleware
                         'items' => $items->map(fn (BusinessObject $object) => [
                             'label' => $object->label,
                             'href' => route('objects.index', $object->key),
+                            'new_task_count' => (int) $object->new_task_count,
                         ])->values(),
                     ])
                     ->values(),
             ],
-            ['label' => '用户与权限', 'href' => route('rbac.index'), 'visible' => $can('rbac.manage')],
+            ['key' => 'rbac', 'label' => '用户与权限', 'href' => route('rbac.index'), 'visible' => $can('rbac.manage'), 'mobile_priority' => 80],
+            ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
         ];
     }
 }

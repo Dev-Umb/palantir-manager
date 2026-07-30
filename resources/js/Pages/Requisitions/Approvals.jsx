@@ -1,12 +1,14 @@
 import { Head, router } from '@inertiajs/react';
 import { Check, XCircle } from 'lucide-react';
+import { useState } from 'react';
 import Layout from '../../Components/Layout';
+import RowActions from '../../Components/RowActions';
 
 export default function Approvals({ pending, processed }) {
     return (
-        <Layout title="采购OA审批" eyebrow="请购审批">
+        <Layout title="采购OA审批" eyebrow="采购OA审批">
             <Head title="采购OA审批" />
-            <section className="surface">
+            <section className="surface approval-pending">
                 <div className="section-head">
                     <div>
                         <p>待审批</p>
@@ -21,7 +23,7 @@ export default function Approvals({ pending, processed }) {
                 ) : <p className="muted">暂无待审批采购申请。</p>}
             </section>
 
-            <section className="surface">
+            <section className="surface approval-processed">
                 <div className="section-head">
                     <div>
                         <p>已处理</p>
@@ -41,13 +43,24 @@ export default function Approvals({ pending, processed }) {
 function ApprovalCard({ record, actions = false }) {
     const payload = record.payload || {};
     const display = record.display || {};
+    const [decision, setDecision] = useState('');
 
     function approve() {
-        router.post(`/requests/${record.id}/approve`, {}, { preserveScroll: true });
+        if (!window.confirm(`确认通过 ${record.code} 的采购申请吗？\n\n通过后将进入采购执行。`)) return;
+        submitDecision('approve');
     }
 
     function reject() {
-        router.post(`/requests/${record.id}/reject`, {}, { preserveScroll: true });
+        if (!window.confirm(`确认驳回 ${record.code} 的采购申请吗？\n\n请先确认申请信息确实需要重新提交。`)) return;
+        submitDecision('reject');
+    }
+
+    function submitDecision(nextDecision) {
+        setDecision(nextDecision);
+        router.post(`/requests/${record.id}/${nextDecision}`, {}, {
+            preserveScroll: true,
+            onFinish: () => setDecision(''),
+        });
     }
 
     return (
@@ -55,7 +68,7 @@ function ApprovalCard({ record, actions = false }) {
             <div>
                 <span className="mono">{record.code}</span>
                 <h3>{display.material_id || '未选择物料'}</h3>
-                <p>{payload.reason || '未填写原因'}</p>
+                <p>{payload.reason || '申请人未填写原因，审批前建议先确认实际用途。'}</p>
             </div>
             <dl>
                 <div><dt>需求方</dt><dd>{payload.requester || '-'}</dd></div>
@@ -66,12 +79,19 @@ function ApprovalCard({ record, actions = false }) {
             </dl>
             {actions && (
                 <div className="approval-actions">
-                    <button type="button" className="icon-success" onClick={approve} title="通过">
-                        <Check size={16} /> 通过
-                    </button>
-                    <button type="button" className="icon-warning" onClick={reject} title="驳回">
-                        <XCircle size={16} /> 驳回
-                    </button>
+                    <RowActions
+                        menuLabel={`${record.code} 更多审批操作`}
+                        primary={(
+                            <button type="button" className="approval-primary" onClick={approve} disabled={Boolean(decision)}>
+                                <Check size={16} /> {decision === 'approve' ? '处理中...' : '通过申请'}
+                            </button>
+                        )}
+                        secondary={[
+                            <button key="reject" type="button" className="danger" onClick={reject} disabled={Boolean(decision)}>
+                                <XCircle size={16} /> {decision === 'reject' ? '处理中...' : '驳回'}
+                            </button>,
+                        ]}
+                    />
                 </div>
             )}
         </article>

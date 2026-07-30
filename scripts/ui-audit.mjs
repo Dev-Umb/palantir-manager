@@ -22,15 +22,13 @@ const accounts = {
 const pages = [
     ['login', null, '/login'],
     ['public-purchase', null, '/purchase-request'],
-    ['public-material', null, '/material-request'],
-    ['public-team-log', null, '/team-log'],
+    ['team-log-production', 'production', '/team-log'],
     ['dashboard-admin', 'admin', '/'],
     ['objects-project-admin', 'admin', '/objects/project'],
     ['project-create-modal', 'admin', '/objects/project?mode=create'],
     ['objects-purchase-procurement', 'procurement', '/objects/purchase'],
     ['objects-material-warehouse', 'warehouse', '/objects/material'],
     ['procurement-approvals', 'procurement', '/procurement/approvals'],
-    ['warehouse-material-approvals', 'warehouse', '/warehouse/material-requests'],
     ['rbac-admin', 'admin', '/admin/rbac'],
 ];
 
