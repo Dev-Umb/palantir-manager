@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Layout from './Layout';
 
@@ -25,6 +25,24 @@ vi.mock('@inertiajs/react', () => ({
                         new_task_count: 3,
                     }],
                 }],
+            }, {
+                key: 'rbac',
+                label: '用户与权限',
+                href: '/admin/rbac',
+                visible: true,
+                mobile_priority: 80,
+            }, {
+                key: 'ai',
+                label: 'AI 数据助手',
+                href: '/ai',
+                visible: true,
+                mobile_priority: 60,
+            }, {
+                key: 'team-log',
+                label: '现场报工',
+                href: '/team-log',
+                visible: true,
+                mobile_priority: 35,
             }],
         },
     }),
@@ -57,5 +75,22 @@ describe('Layout workflow task navigation', () => {
         expect(container.querySelector('.workspace-head')).toBeNull();
         expect(screen.queryByRole('heading', { name: '客户信息' })).toBeNull();
         expect(screen.getByText('内容')).not.toBeNull();
+    });
+
+    it('keeps secondary mobile routes out of the focus tree until More is opened', async () => {
+        const { container } = render(<Layout title="技术图纸与方案"><div>内容</div></Layout>);
+
+        expect(container.querySelector('.desktop-rail')).not.toBeNull();
+        expect(screen.queryByRole('dialog', { name: '更多业务入口' })).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: '更多业务入口' }));
+
+        const dialog = screen.getByRole('dialog', { name: '更多业务入口' });
+        expect(within(dialog).getByRole('link', { name: '用户与权限' })).not.toBeNull();
+        expect(within(dialog).getByRole('button', { name: '退出' })).not.toBeNull();
+        await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: '关闭更多业务入口' })));
+
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(screen.queryByRole('dialog', { name: '更多业务入口' })).toBeNull();
     });
 });
