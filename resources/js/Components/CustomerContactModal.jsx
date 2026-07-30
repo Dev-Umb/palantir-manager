@@ -1,14 +1,15 @@
-import { ArrowLeft, BriefcaseBusiness, ChevronRight, Pencil, Plus, X } from 'lucide-react';
+import { ArrowLeft, BriefcaseBusiness, ChevronRight, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useDialogFocus } from './useDialogFocus';
 
-export default function CustomerContactModal({ mode = 'detail', contactObjectId, customer, contacts = [], contact = null, can = {}, onSaved, onClose }) {
+export default function CustomerContactModal({ mode = 'detail', contactObjectId, customer, contacts = [], contact = null, can = {}, onSaved, onDeleted, onClose }) {
     const [view, setView] = useState(mode);
     const [activeContact, setActiveContact] = useState(contact);
     const [name, setName] = useState(contact?.name || '');
     const [phone, setPhone] = useState(contact?.phone || '');
     const [errors, setErrors] = useState([]);
     const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const titleId = useId();
     const panelRef = useRef(null);
     useDialogFocus(true, panelRef);
@@ -23,16 +24,16 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
 
     useEffect(() => {
         function closeOnEscape(event) {
-            if (event.key === 'Escape' && !saving) onClose?.();
+            if (event.key === 'Escape' && !saving && !deleting) onClose?.();
         }
 
         document.addEventListener('keydown', closeOnEscape);
         return () => document.removeEventListener('keydown', closeOnEscape);
-    }, [onClose, saving]);
+    }, [deleting, onClose, saving]);
 
     async function save(event) {
         event.preventDefault();
-        if (saving) return;
+        if (saving || deleting) return;
 
         setSaving(true);
         setErrors([]);
@@ -63,6 +64,35 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
             setErrors(error instanceof ContactSaveError ? error.messages : ['保存失败，请重试。']);
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function destroy() {
+        if (!activeContact?.id || deleting) return;
+        if (!window.confirm(`确定删除联系人“${activeContact.name || '未命名联系人'}”吗？\n\n删除后无法恢复。`)) return;
+
+        setDeleting(true);
+        setErrors([]);
+        try {
+            const response = await fetch(`/records/${activeContact.id}`, {
+                method: 'DELETE',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken(),
+                },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const messages = Object.values(data.errors || {}).flat();
+                throw new ContactSaveError(messages.length ? messages : [data.message || '删除失败，请重试。']);
+            }
+
+            onDeleted?.(activeContact.id);
+        } catch (error) {
+            setErrors(error instanceof ContactSaveError ? error.messages : ['删除失败，请重试。']);
+        } finally {
+            setDeleting(false);
         }
     }
 
@@ -130,16 +160,22 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
                     <>
                         <div className="contact-modal-body">
                             <ContactDetail contact={activeContact} />
+                            {errors.map((error, index) => <p className="form-error contact-modal-error" key={`${error}-${index}`}>{error}</p>)}
                         </div>
-                        {(mode === 'list' || can.update) && (
+                        {(mode === 'list' || can.update || can.delete) && (
                             <footer className="contact-modal-footer">
+                                {can.delete && activeContact?.id && (
+                                    <button type="button" className="small-action secondary-button contact-delete-button" onClick={destroy} disabled={deleting}>
+                                        <Trash2 size={14} /> {deleting ? '删除中…' : '删除联系人'}
+                                    </button>
+                                )}
                                 {mode === 'list' && (
-                                    <button type="button" className="small-action secondary-button" onClick={() => setView('list')}>
+                                    <button type="button" className="small-action secondary-button" onClick={() => setView('list')} disabled={deleting}>
                                         <ArrowLeft size={14} /> 返回联系人列表
                                     </button>
                                 )}
                                 {can.update && (
-                                    <button type="button" className="small-action action-button" onClick={() => setView('edit')}>
+                                    <button type="button" className="small-action action-button" onClick={() => setView('edit')} disabled={deleting}>
                                         <Pencil size={14} /> 编辑联系人
                                     </button>
                                 )}
@@ -158,7 +194,7 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
                                 <span>联系电话</span>
                                 <input value={phone} onChange={(event) => setPhone(event.target.value)} />
                             </label>
-                            {errors.map((error, index) => <p className="form-error" key={`${error}-${index}`}>{error}</p>)}
+                            {errors.map((error, index) => <p className="form-error contact-modal-error" key={`${error}-${index}`}>{error}</p>)}
                         </div>
                         <footer className="contact-modal-footer">
                             <button type="button" className="small-action secondary-button" onClick={returnToListOrClose}>取消</button>

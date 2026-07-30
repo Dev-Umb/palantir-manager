@@ -15,6 +15,7 @@ class CreateObjectRecord
 {
     public function __construct(
         private SyncProjectContractAmount $contractAmount,
+        private SyncProjectInvoiceAmount $invoiceAmount,
         private SyncProjectFinance $projectFinance,
         private SyncProjectNotifications $projectNotifications,
         private MaterialNames $materialNames,
@@ -84,6 +85,10 @@ class CreateObjectRecord
 
             if ($object->key === 'contract') {
                 $this->contractAmount->handle($payload['project_id'] ?? null);
+            }
+
+            if ($object->key === 'invoice') {
+                $this->invoiceAmount->handle($payload['project_id'] ?? null);
             }
 
             if ($object->key === 'receivable') {

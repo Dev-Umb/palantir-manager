@@ -737,6 +737,9 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
 .contact-modal-form label { display: grid; gap: 6px; }
 .contact-modal-form label > span { color: var(--muted); font-size: 12px; font-weight: 650; }
 .contact-modal-footer { flex: 0 0 auto; display: flex; justify-content: flex-end; gap: 8px; padding: 13px 20px; border-top: 1px solid var(--line); background: #fbfcfd; }
+.contact-modal-footer .contact-delete-button { margin-right: auto; border-color: #efcecc; color: var(--red); background: var(--red-bg); }
+.contact-modal-error { margin: 0; padding: 0; }
+.contact-modal-detail + .contact-modal-error { margin-top: 12px; }
 .contact-modal-detail { display: grid; gap: 12px; }
 .contact-modal-detail > h3 { margin: 0; color: #364152; font-size: 13px; }
 .contact-modal-detail dl { display: grid; margin: 0; border-top: 1px solid var(--line); }

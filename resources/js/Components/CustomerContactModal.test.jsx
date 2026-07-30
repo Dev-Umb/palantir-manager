@@ -21,7 +21,7 @@ describe('CustomerContactModal', () => {
                     { id: 'contact-1', name: '李经理', phone: '13900000000', projects: [] },
                     { id: 'contact-2', name: '王工', phone: '', projects: [] },
                 ]}
-                can={{ create: true, update: true }}
+                can={{ create: true, update: true, delete: true }}
                 onClose={() => {}}
             />,
         );
@@ -34,6 +34,7 @@ describe('CustomerContactModal', () => {
 
         const detailDialog = screen.getByRole('dialog', { name: '联系人详情' });
         expect(within(detailDialog).getByText('13900000000')).toBeInTheDocument();
+        expect(within(detailDialog).getByRole('button', { name: '删除联系人' })).toBeInTheDocument();
         fireEvent.click(within(detailDialog).getByRole('button', { name: '返回联系人列表' }));
         expect(screen.getByRole('dialog', { name: '客户联系人' })).toBeInTheDocument();
     });
@@ -173,5 +174,105 @@ describe('CustomerContactModal', () => {
                 customer_id: 'customer-1',
             } }),
         })));
+    });
+
+    it('deletes an unreferenced contact after confirmation', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ status: '客户联系人已删除。' }),
+        });
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        const onDeleted = vi.fn();
+
+        render(
+            <CustomerContactModal
+                mode="detail"
+                customer={{ id: 'customer-1', title: '甲客户' }}
+                contact={{ id: 'contact-1', name: '李经理', phone: '13900000000', projects: [] }}
+                can={{ delete: true }}
+                onDeleted={onDeleted}
+                onClose={() => {}}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '删除联系人' }));
+
+        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith('/records/contact-1', expect.objectContaining({
+            method: 'DELETE',
+        })));
+        expect(window.confirm).toHaveBeenCalledWith('确定删除联系人“李经理”吗？\n\n删除后无法恢复。');
+        expect(onDeleted).toHaveBeenCalledWith('contact-1');
+    });
+
+    it('does not delete a contact when confirmation is cancelled', () => {
+        globalThis.fetch = vi.fn();
+        vi.spyOn(window, 'confirm').mockReturnValue(false);
+        const onDeleted = vi.fn();
+
+        render(
+            <CustomerContactModal
+                mode="detail"
+                customer={{ id: 'customer-1', title: '甲客户' }}
+                contact={{ id: 'contact-1', name: '李经理', phone: '13900000000', projects: [] }}
+                can={{ delete: true }}
+                onDeleted={onDeleted}
+                onClose={() => {}}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '删除联系人' }));
+
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+        expect(onDeleted).not.toHaveBeenCalled();
+        expect(screen.getByRole('dialog', { name: '联系人详情' })).toBeInTheDocument();
+    });
+
+    it('keeps a referenced contact open and shows the deletion error', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            json: async () => ({
+                errors: {
+                    record: ['无法删除：项目资料仍在引用该记录，请先解除关联。'],
+                },
+            }),
+        });
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
+        const onDeleted = vi.fn();
+
+        render(
+            <CustomerContactModal
+                mode="detail"
+                customer={{ id: 'customer-1', title: '甲客户' }}
+                contact={{
+                    id: 'contact-1',
+                    name: '李经理',
+                    phone: '13900000000',
+                    projects: [{ id: 'project-1', title: '北区项目' }],
+                }}
+                can={{ delete: true }}
+                onDeleted={onDeleted}
+                onClose={() => {}}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '删除联系人' }));
+
+        expect(await screen.findByText('无法删除：项目资料仍在引用该记录，请先解除关联。')).toBeInTheDocument();
+        expect(onDeleted).not.toHaveBeenCalled();
+        expect(screen.getByRole('dialog', { name: '联系人详情' })).toBeInTheDocument();
+    });
+
+    it('does not expose contact deletion without permission', () => {
+        render(
+            <CustomerContactModal
+                mode="detail"
+                customer={{ id: 'customer-1', title: '甲客户' }}
+                contact={{ id: 'contact-1', name: '李经理', phone: '13900000000', projects: [] }}
+                can={{ update: true }}
+                onClose={() => {}}
+            />,
+        );
+
+        expect(screen.queryByRole('button', { name: '删除联系人' })).not.toBeInTheDocument();
     });
 });

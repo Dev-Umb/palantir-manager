@@ -8,7 +8,11 @@ import Index from './Index';
 
 const inertia = vi.hoisted(() => ({
     userId: 42,
-    permissions: ['object.customer_contact.create', 'object.customer_contact.update'],
+    permissions: [
+        'object.customer_contact.create',
+        'object.customer_contact.update',
+        'object.customer_contact.delete',
+    ],
     post: vi.fn(),
     put: vi.fn(),
     reload: vi.fn(),
@@ -231,6 +235,7 @@ describe('customer contact detail list', () => {
         expect(within(dialog).queryByText('PRJ-001')).not.toBeInTheDocument();
         expect(within(dialog).queryByText('采购负责人')).not.toBeInTheDocument();
         expect(within(dialog).queryByText('启用')).not.toBeInTheDocument();
+        expect(within(dialog).getByRole('button', { name: '删除联系人' })).toBeInTheDocument();
     });
 
     it('opens contact creation from the contact list', async () => {

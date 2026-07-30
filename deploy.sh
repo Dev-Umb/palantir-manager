@@ -40,6 +40,7 @@ rsync -az --delete -e "ssh ${SSH_OPTS}" \
   --exclude='storage/app/public/***' \
   --exclude='storage/logs/*' \
   --exclude='storage/framework/cache/data/*' \
+  --exclude='storage/framework/down' \
   --exclude='storage/framework/sessions/*' \
   --exclude='storage/framework/testing/*' \
   --exclude='storage/framework/views/*' \

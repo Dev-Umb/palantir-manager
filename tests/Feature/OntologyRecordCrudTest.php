@@ -178,6 +178,75 @@ class OntologyRecordCrudTest extends TestCase
                 ->where('records.data.0.display.customer_id', 'CUST-HISTORY · 历史客户名称'));
     }
 
+    public function test_customer_contact_can_be_deleted_from_the_embedded_json_flow(): void
+    {
+        $this->seed(XycPrototypeSeeder::class);
+        $this->actingAs($this->userWithRole('admin'));
+        $customerObject = BusinessObject::where('key', 'customer')->firstOrFail();
+        $contactObject = BusinessObject::where('key', 'customer_contact')->firstOrFail();
+        $customer = ObjectRecord::create([
+            'business_object_id' => $customerObject->id,
+            'code' => 'CUST-CONTACT-DELETE',
+            'title' => '联系人删除客户',
+            'payload' => ['name' => '联系人删除客户'],
+        ]);
+        $contact = ObjectRecord::create([
+            'business_object_id' => $contactObject->id,
+            'code' => 'CONTACT-DELETE',
+            'title' => '待删除联系人',
+            'payload' => [
+                'name' => '待删除联系人',
+                'customer_id' => $customer->id,
+            ],
+        ]);
+
+        $this->deleteJson("/records/{$contact->id}")
+            ->assertOk()
+            ->assertJsonPath('status', '客户联系人已删除。');
+
+        $this->assertModelMissing($contact);
+    }
+
+    public function test_customer_contact_deletion_keeps_project_reference_protection(): void
+    {
+        $this->seed(XycPrototypeSeeder::class);
+        $this->actingAs($this->userWithRole('admin'));
+        $customerObject = BusinessObject::where('key', 'customer')->firstOrFail();
+        $contactObject = BusinessObject::where('key', 'customer_contact')->firstOrFail();
+        $projectObject = BusinessObject::where('key', 'project')->firstOrFail();
+        $customer = ObjectRecord::create([
+            'business_object_id' => $customerObject->id,
+            'code' => 'CUST-CONTACT-REFERENCE',
+            'title' => '联系人引用客户',
+            'payload' => ['name' => '联系人引用客户'],
+        ]);
+        $contact = ObjectRecord::create([
+            'business_object_id' => $contactObject->id,
+            'code' => 'CONTACT-REFERENCE',
+            'title' => '被引用联系人',
+            'payload' => [
+                'name' => '被引用联系人',
+                'customer_id' => $customer->id,
+            ],
+        ]);
+        ObjectRecord::create([
+            'business_object_id' => $projectObject->id,
+            'code' => 'PRJ-CONTACT-REFERENCE',
+            'title' => '联系人引用项目',
+            'payload' => [
+                'name' => '联系人引用项目',
+                'customer_id' => $customer->id,
+                'customer_contact_ids' => [$contact->id],
+            ],
+        ]);
+
+        $this->deleteJson("/records/{$contact->id}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('record');
+
+        $this->assertModelExists($contact);
+    }
+
     private function userWithRole(string $role): User
     {
         $user = User::create(['name' => $role, 'email' => "{$role}-crud@example.com", 'password' => Hash::make('password123')]);

@@ -263,7 +263,11 @@ class ExampleTest extends TestCase
         ])->assertRedirect();
 
         $project->refresh();
-        $this->assertSame($baseAmount, (float) $project->payload['invoiced_amount']);
+        $this->assertSame($baseAmount + 200000, (float) $project->payload['invoiced_amount']);
+        $this->assertSame(
+            max((float) $project->payload['contract_amount'] - $baseAmount - 200000, 0),
+            (float) $project->payload['uninvoiced_amount'],
+        );
 
         $newInvoice = ObjectRecord::whereRelation('businessObject', 'key', 'invoice')
             ->where('payload->invoice_no', 'FP-TEST-001')
@@ -272,9 +276,36 @@ class ExampleTest extends TestCase
         $this->put("/records/{$newInvoice->id}", [
             'payload' => [
                 ...$newInvoice->payload,
+                'amount' => 250000,
+            ],
+        ])->assertRedirect();
+
+        $project->refresh();
+        $this->assertSame($baseAmount + 250000, (float) $project->payload['invoiced_amount']);
+
+        $newInvoice->refresh();
+        $this->put("/records/{$newInvoice->id}", [
+            'payload' => [
+                ...$newInvoice->payload,
                 'status' => '已作废',
             ],
         ])->assertRedirect();
+
+        $project->refresh();
+        $this->assertSame($baseAmount, (float) $project->payload['invoiced_amount']);
+
+        $newInvoice->refresh();
+        $this->put("/records/{$newInvoice->id}", [
+            'payload' => [
+                ...$newInvoice->payload,
+                'status' => '已开票',
+            ],
+        ])->assertRedirect();
+
+        $project->refresh();
+        $this->assertSame($baseAmount + 250000, (float) $project->payload['invoiced_amount']);
+
+        $this->delete("/records/{$newInvoice->id}")->assertRedirect();
 
         $project->refresh();
         $this->assertSame($baseAmount, (float) $project->payload['invoiced_amount']);

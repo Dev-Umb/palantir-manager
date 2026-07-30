@@ -8,6 +8,7 @@ use App\Actions\CreateObjectRecord;
 use App\Actions\ResolveInboundMaterials;
 use App\Actions\SyncProjectContractAmount;
 use App\Actions\SyncProjectFinance;
+use App\Actions\SyncProjectInvoiceAmount;
 use App\Actions\SyncProjectNotifications;
 use App\Models\AuditLog;
 use App\Models\BusinessObject;
@@ -36,6 +37,7 @@ class OntologyController extends Controller
         private ObjectRelations $relations,
         private ProjectVisibility $projectVisibility,
         private SyncProjectContractAmount $contractAmount,
+        private SyncProjectInvoiceAmount $invoiceAmount,
         private SyncProjectFinance $projectFinance,
         private SyncProjectNotifications $projectNotifications,
         private ResolveInboundMaterials $inboundMaterials,
@@ -299,6 +301,12 @@ class OntologyController extends Controller
                 }
             }
 
+            if ($object->key === 'invoice') {
+                foreach (collect([$oldProjectId, $newProjectId])->filter()->unique()->sort() as $projectId) {
+                    $this->invoiceAmount->handle($projectId);
+                }
+            }
+
             if (in_array($object->key, ['contract', 'receivable'], true)) {
                 $this->projectNotifications->handleProjects([$oldProjectId, $newProjectId]);
             }
@@ -336,7 +344,7 @@ class OntologyController extends Controller
         return redirect()->route('objects.index', $object->key)->with('status', $status);
     }
 
-    public function destroy(Request $request, ObjectRecord $record, CreateObjectRecord $writer): RedirectResponse
+    public function destroy(Request $request, ObjectRecord $record, CreateObjectRecord $writer): RedirectResponse|JsonResponse
     {
         $object = $record->businessObject;
         abort_unless($request->user()->canDo("object.{$object->key}.delete") && ! $object->read_only, 403);
@@ -374,6 +382,10 @@ class OntologyController extends Controller
                 }
             }
 
+            if ($object->key === 'invoice') {
+                $this->invoiceAmount->handle($oldProjectId);
+            }
+
             if (in_array($object->key, ['contract', 'receivable'], true)) {
                 $this->projectNotifications->handleProjects([$oldProjectId]);
             }
@@ -390,7 +402,12 @@ class OntologyController extends Controller
             ]);
         });
 
-        return back()->with('status', "{$object->label}已删除。");
+        $status = "{$object->label}已删除。";
+        if ($request->wantsJson()) {
+            return response()->json(['status' => $status]);
+        }
+
+        return back()->with('status', $status);
     }
 
     private function authorizedRecordsQuery(BusinessObject $object, Request $request): Builder|Relation

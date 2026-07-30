@@ -37,6 +37,7 @@ export default function Index({ objects = [], currentObject, records, can, relat
     const contactCan = {
         create: (auth.permissions || []).includes('object.customer_contact.create'),
         update: (auth.permissions || []).includes('object.customer_contact.update'),
+        delete: (auth.permissions || []).includes('object.customer_contact.delete'),
     };
     const contactObject = objects.find((object) => object.key === 'customer_contact');
     const exportUrl = exportUrlFor(currentObject.key, params);
@@ -96,6 +97,14 @@ export default function Index({ objects = [], currentObject, records, can, relat
     }
 
     function contactSaved() {
+        setContactModal(null);
+        router.reload({
+            only: ['records', 'selectedRecord'],
+            preserveScroll: true,
+        });
+    }
+
+    function contactDeleted() {
         setContactModal(null);
         router.reload({
             only: ['records', 'selectedRecord'],
@@ -178,6 +187,7 @@ export default function Index({ objects = [], currentObject, records, can, relat
                     contact={contactModal.contact}
                     can={contactCan}
                     onSaved={contactSaved}
+                    onDeleted={contactDeleted}
                     onClose={() => setContactModal(null)}
                 />
             )}
