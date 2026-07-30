@@ -1,0 +1,18 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Laravel 13, Inertia React 3, PHPUnit 12, Vitest 4, Tailwind CSS 4.
+  Backend tests: PHPUnit classes only. Use SQLite in-memory unless an approved change introduces a canonical external database profile.
+  Frontend tests: Vitest and Testing Library.
+  Online regression: opt-in, fixed-target, process-only credentials, and explicit mutation authorization.
+  Workflow: substantive requirements use propose, review, and apply; routine low-risk work may be exempt until scope expands.
+
+rules:
+  proposal:
+    - Identify the user problem, scope, preserved behavior, excluded scope, and affected capabilities.
+  design:
+    - Record alternatives, risks, migration or rollback strategy, and evidence boundaries.
+  specs:
+    - Requirements use SHALL or MUST and include at least one WHEN and THEN scenario.
+  tasks:
+    - Use checkboxes and include focused tests, preserved-behavior regression, strict validation, and final quality-gate tasks.

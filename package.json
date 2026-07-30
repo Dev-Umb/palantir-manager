@@ -5,7 +5,8 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "test:ui": "vitest run"
+        "test:ui": "vitest run",
+        "test:online-regression": "node scripts/public-regression.mjs"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

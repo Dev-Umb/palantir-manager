@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadOnlineRegressionConfig } from './online-regression-config.mjs';
 
-const baseUrl = process.env.BASE_URL ?? 'https://palantir.umb.ink';
-const password = process.env.TEST_PASSWORD ?? 'password123';
-const runId = process.env.REGRESSION_RUN_ID
-  ?? `REG-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}`;
-const reportPath = process.env.REPORT_PATH ?? `docs/public-regression-${runId}.md`;
+const {
+  baseUrl,
+  password,
+  runId,
+  reportPath,
+} = loadOnlineRegressionConfig(process.env);
 const today = new Date().toISOString().slice(0, 10);
 const publicTeamLogUrl = process.env.PUBLIC_TEAM_LOG_URL ?? '';
 

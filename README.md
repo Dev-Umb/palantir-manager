@@ -41,6 +41,28 @@ php artisan boost:install
 
 Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
 
+## Change and Regression Governance
+
+Install the OpenSpec CLI used for substantive requirement changes, then verify the repository artifacts:
+
+```bash
+npm install --global @fission-ai/openspec@latest
+openspec --version
+composer openspec:validate
+```
+
+Install the repository quality gate once per checkout:
+
+```bash
+composer quality:gate:install
+```
+
+Use `composer test:narrow -- <test-file-or-filter>` during focused backend iteration,
+`npm run test:ui -- <test-file>` for focused frontend iteration, and
+`composer quality:gate` before delivery. The mutating online regression suite is
+intentionally excluded from default tests; its explicit safeguards and evidence
+rules are documented in `docs/testing/regression-and-quality-gates.md`.
+
 ## Contributing
 
 Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).

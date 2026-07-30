@@ -54,7 +54,34 @@
         ],
         "test": [
             "@php artisan config:clear --ansi @no_additional_args",
-            "@php artisan test"
+            "@test:application"
+        ],
+        "test:narrow": "@php artisan test --compact",
+        "test:unit": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --compact --testsuite=Unit"
+        ],
+        "test:feature": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --compact --testsuite=Feature"
+        ],
+        "test:application": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --compact"
+        ],
+        "quality:gate": [
+            "Composer\\Config::disableProcessTimeout",
+            "node scripts/quality-gate.mjs --all"
+        ],
+        "quality:gate:staged": [
+            "Composer\\Config::disableProcessTimeout",
+            "node scripts/quality-gate.mjs --staged"
+        ],
+        "quality:gate:install": "git config core.hooksPath .githooks",
+        "openspec:validate": "openspec validate --all --strict --no-interactive",
+        "test:online-regression": [
+            "Composer\\Config::disableProcessTimeout",
+            "npm run test:online-regression"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
