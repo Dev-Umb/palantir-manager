@@ -1,9 +1,10 @@
-import { BriefcaseBusiness, ChevronRight, Pencil, X } from 'lucide-react';
+import { ArrowLeft, BriefcaseBusiness, ChevronRight, Pencil, Plus, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useDialogFocus } from './useDialogFocus';
 
-export default function CustomerContactModal({ mode = 'detail', contactObjectId, customer, contact = null, can = {}, onSaved, onClose }) {
+export default function CustomerContactModal({ mode = 'detail', contactObjectId, customer, contacts = [], contact = null, can = {}, onSaved, onClose }) {
     const [view, setView] = useState(mode);
+    const [activeContact, setActiveContact] = useState(contact);
     const [name, setName] = useState(contact?.name || '');
     const [phone, setPhone] = useState(contact?.phone || '');
     const [errors, setErrors] = useState([]);
@@ -14,6 +15,7 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
 
     useEffect(() => {
         setView(mode);
+        setActiveContact(contact);
         setName(contact?.name || '');
         setPhone(contact?.phone || '');
         setErrors([]);
@@ -35,8 +37,8 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
         setSaving(true);
         setErrors([]);
         try {
-            const editing = view === 'edit' && contact?.id;
-            const response = await fetch(editing ? `/records/${contact.id}` : `/objects/${contactObjectId}`, {
+            const editing = view === 'edit' && activeContact?.id;
+            const response = await fetch(editing ? `/records/${activeContact.id}` : `/objects/${contactObjectId}`, {
                 method: editing ? 'PUT' : 'POST',
                 headers: {
                     Accept: 'application/json',
@@ -64,7 +66,39 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
         }
     }
 
-    const title = view === 'detail' ? '联系人详情' : view === 'edit' ? '编辑联系人' : '新增联系人';
+    function openDetail(nextContact) {
+        setActiveContact(nextContact);
+        setName(nextContact?.name || '');
+        setPhone(nextContact?.phone || '');
+        setErrors([]);
+        setView('detail');
+    }
+
+    function openCreate() {
+        setActiveContact(null);
+        setName('');
+        setPhone('');
+        setErrors([]);
+        setView('create');
+    }
+
+    function returnToListOrClose() {
+        if (mode === 'list') {
+            setView('list');
+            setErrors([]);
+            return;
+        }
+
+        onClose?.();
+    }
+
+    const title = view === 'list'
+        ? '客户联系人'
+        : view === 'detail'
+            ? '联系人详情'
+            : view === 'edit'
+                ? '编辑联系人'
+                : '新增联系人';
 
     return (
         <div className="modal-backdrop contact-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby={titleId}>
@@ -82,20 +116,38 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
                     </button>
                 </div>
 
-                {view === 'detail' ? (
+                {view === 'list' && (
+                    <div className="contact-modal-body">
+                        <ContactList
+                            contacts={contacts}
+                            canCreate={Boolean(can.create && contactObjectId)}
+                            onCreate={openCreate}
+                            onDetail={openDetail}
+                        />
+                    </div>
+                )}
+                {view === 'detail' && (
                     <>
                         <div className="contact-modal-body">
-                            <ContactDetail contact={contact} />
+                            <ContactDetail contact={activeContact} />
                         </div>
-                        {can.update && (
+                        {(mode === 'list' || can.update) && (
                             <footer className="contact-modal-footer">
-                                <button type="button" className="small-action action-button" onClick={() => setView('edit')}>
-                                    <Pencil size={14} /> 编辑联系人
-                                </button>
+                                {mode === 'list' && (
+                                    <button type="button" className="small-action secondary-button" onClick={() => setView('list')}>
+                                        <ArrowLeft size={14} /> 返回联系人列表
+                                    </button>
+                                )}
+                                {can.update && (
+                                    <button type="button" className="small-action action-button" onClick={() => setView('edit')}>
+                                        <Pencil size={14} /> 编辑联系人
+                                    </button>
+                                )}
                             </footer>
                         )}
                     </>
-                ) : (
+                )}
+                {['create', 'edit'].includes(view) && (
                     <form className="contact-modal-form" onSubmit={save}>
                         <div className="contact-modal-body contact-modal-fields">
                             <label>
@@ -109,12 +161,44 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
                             {errors.map((error, index) => <p className="form-error" key={`${error}-${index}`}>{error}</p>)}
                         </div>
                         <footer className="contact-modal-footer">
-                            <button type="button" className="small-action secondary-button" onClick={onClose}>取消</button>
+                            <button type="button" className="small-action secondary-button" onClick={returnToListOrClose}>取消</button>
                             <button type="submit" disabled={saving}>{saving ? '保存中…' : '保存联系人'}</button>
                         </footer>
                     </form>
                 )}
             </section>
+        </div>
+    );
+}
+
+function ContactList({ contacts, canCreate, onCreate, onDetail }) {
+    return (
+        <div className="contact-modal-list">
+            <div className="contact-modal-list-head">
+                <span>共 {contacts.length} 位联系人</span>
+                {canCreate && (
+                    <button type="button" className="small-action action-button" onClick={onCreate}>
+                        <Plus size={14} /> 新增联系人
+                    </button>
+                )}
+            </div>
+            {contacts.length ? (
+                <ul aria-label="客户联系人列表">
+                    {contacts.map((item) => (
+                        <li key={item.id}>
+                            <button
+                                type="button"
+                                className="contact-modal-list-item"
+                                aria-label={`查看 ${item.name || '联系人'} 详情`}
+                                onClick={() => onDetail(item)}
+                            >
+                                <span>{item.name || '未命名联系人'}</span>
+                                <span>{item.phone || '未填写电话'}</span>
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            ) : <p className="muted">暂无联系人。</p>}
         </div>
     );
 }

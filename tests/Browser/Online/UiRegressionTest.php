@@ -211,26 +211,46 @@ it('keeps every mobile route reachable inside the More panel', function (): void
 })->group('online', 'online-ui', 'online-mobile-navigation')
     ->skip(fn (): bool => getenv('ONLINE_REGRESSION_ENABLED') !== '1', 'Online regression is opt-in.');
 
-it('opens contact detail and edit states without losing the customer context', function (): void {
+it('keeps list summaries compact and opens contact list detail and edit states', function (): void {
     $page = visitOnlineAs('admin', '/objects/customer')
         ->waitForText('查看');
 
-    $opened = $page->script(<<<'JS'
+    $summary = $page->script(<<<'JS'
         () => {
-            const button = document.querySelector('.customer-contact-detail');
+            const rows = [...document.querySelectorAll('.ag-center-cols-container .ag-row')];
+            const button = document.querySelector('.list-summary-trigger');
+            const headers = [...document.querySelectorAll('.grid-header-label')];
             button?.click();
-            return Boolean(button);
+
+            return {
+                opened: Boolean(button),
+                rowHeights: rows.map((row) => Math.round(row.getBoundingClientRect().height)),
+                inlineContactControls: document.querySelectorAll('.customer-contact-detail, .customer-contact-create').length,
+                headersHaveTitles: headers.length > 0 && headers.every((header) => header.title === header.textContent.trim()),
+            };
         }
     JS);
-    expect($opened)->toBeTrue();
+    expect($summary)->toMatchArray([
+        'opened' => true,
+        'inlineContactControls' => 0,
+        'headersHaveTitles' => true,
+    ]);
+    expect($summary['rowHeights'])->not->toBeEmpty();
+    expect(array_unique($summary['rowHeights']))->toBe([44]);
 
-    $page->waitForText('联系人详情')
-        ->assertSee('关联项目')
+    $page->waitForText('客户联系人')
+        ->assertPresent('.contact-modal-list')
+        ->assertPresent('.contact-modal-list-item')
         ->assertNoJavaScriptErrors();
 
     expect($page->script('() => document.activeElement?.getAttribute("aria-label")'))->toBe('关闭联系人弹窗');
 
-    $page->click('.contact-modal-footer button')
+    $page->click('.contact-modal-list-item')
+        ->waitForText('联系人详情')
+        ->assertSee('关联项目')
+        ->assertNoJavaScriptErrors();
+
+    $page->click('.contact-modal-footer .action-button')
         ->waitForText('编辑联系人')
         ->assertPresent('.contact-modal-panel form')
         ->assertNoJavaScriptErrors();

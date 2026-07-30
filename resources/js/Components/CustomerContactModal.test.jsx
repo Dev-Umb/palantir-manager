@@ -11,6 +11,51 @@ describe('CustomerContactModal', () => {
         vi.restoreAllMocks();
     });
 
+    it('keeps contact management inside the list modal', () => {
+        render(
+            <CustomerContactModal
+                mode="list"
+                contactObjectId="contact-object"
+                customer={{ id: 'customer-1', title: '甲客户' }}
+                contacts={[
+                    { id: 'contact-1', name: '李经理', phone: '13900000000', projects: [] },
+                    { id: 'contact-2', name: '王工', phone: '', projects: [] },
+                ]}
+                can={{ create: true, update: true }}
+                onClose={() => {}}
+            />,
+        );
+
+        const listDialog = screen.getByRole('dialog', { name: '客户联系人' });
+        expect(within(listDialog).getByText('共 2 位联系人')).toBeInTheDocument();
+        expect(within(listDialog).getByRole('button', { name: '新增联系人' })).toBeInTheDocument();
+
+        fireEvent.click(within(listDialog).getByRole('button', { name: '查看 李经理 详情' }));
+
+        const detailDialog = screen.getByRole('dialog', { name: '联系人详情' });
+        expect(within(detailDialog).getByText('13900000000')).toBeInTheDocument();
+        fireEvent.click(within(detailDialog).getByRole('button', { name: '返回联系人列表' }));
+        expect(screen.getByRole('dialog', { name: '客户联系人' })).toBeInTheDocument();
+    });
+
+    it('returns to the contact list when list-based creation is cancelled', () => {
+        render(
+            <CustomerContactModal
+                mode="list"
+                contactObjectId="contact-object"
+                customer={{ id: 'customer-1', title: '甲客户' }}
+                contacts={[]}
+                can={{ create: true }}
+                onClose={() => {}}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '新增联系人' }));
+        expect(screen.getByRole('dialog', { name: '新增联系人' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '取消' }));
+        expect(screen.getByRole('dialog', { name: '客户联系人' })).toBeInTheDocument();
+    });
+
     it('shows only the contact name, phone and related project names in detail mode', () => {
         render(
             <CustomerContactModal

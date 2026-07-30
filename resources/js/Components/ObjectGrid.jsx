@@ -20,17 +20,14 @@ export default function ObjectGrid({
     records,
     fields,
     can,
-    contactCan = {},
     selectedRecordId,
     relationOptions,
     savedColumnWidths = {},
     onRecordChange,
     onColumnOrderChange,
     onColumnWidthsChange,
-    onContactDetail,
-    onContactCreate,
+    onContactOpen,
 }) {
-    const [gridApi, setGridApi] = useState(null);
     const [visibleFieldCount, setVisibleFieldCount] = useState(fields.length);
     const [saveState, setSaveState] = useState({
         status: 'idle',
@@ -78,9 +75,9 @@ export default function ObjectGrid({
             dataColumns.splice(nameIndex >= 0 ? nameIndex + 1 : dataColumns.length, 0, {
                 colId: 'customer_contacts',
                 headerName: '联系人列表',
-                width: 360,
-                minWidth: 300,
-                wrapText: true,
+                width: 300,
+                minWidth: 240,
+                maxWidth: 360,
                 sortable: false,
                 filter: false,
                 editable: false,
@@ -91,9 +88,7 @@ export default function ObjectGrid({
                     return (
                         <CustomerContactCell
                             contacts={record.contacts || []}
-                            canCreate={Boolean(contactCan.create)}
-                            onDetail={(contact) => onContactDetail?.(contact, record)}
-                            onCreate={() => onContactCreate?.(record)}
+                            onOpen={() => onContactOpen?.(record)}
                         />
                     );
                 },
@@ -113,7 +108,7 @@ export default function ObjectGrid({
             spanRows: sameRecordSpan,
             cellRenderer: (params) => params.data?.__record ? <GridActions object={object} record={params.data.__record} can={can} /> : null,
         }];
-    }, [can, contactCan.create, fields, object, onContactCreate, onContactDetail, relationOptions, rowData, savedColumnWidths]);
+    }, [can, fields, object, onContactOpen, relationOptions, rowData, savedColumnWidths]);
 
     const saveColumnOrder = useCallback((event) => {
         if (event.finished === false) return;
@@ -150,15 +145,6 @@ export default function ObjectGrid({
     useEffect(() => {
         setVisibleFieldCount(fields.length);
     }, [fields.length, object.key]);
-
-    useEffect(() => {
-        if (!gridApi || object.key !== 'customer') return;
-
-        gridApi.forEachNode((node) => {
-            node.setRowHeight(customerRowHeight(object.key, node.data?.__record, contactCan));
-        });
-        gridApi.onRowHeightChanged();
-    }, [contactCan.create, gridApi, object.key, rowData]);
 
     async function saveCell(params) {
         const field = fields.find((item) => item.key === params.colDef.field);
@@ -227,16 +213,15 @@ export default function ObjectGrid({
                     <AgGridReact
                         rowData={rowData}
                         columnDefs={columnDefs}
-                        defaultColDef={{ resizable: true, sortable: false, filter: false, wrapHeaderText: true, autoHeaderHeight: true }}
+                        defaultColDef={{ resizable: true, sortable: false, filter: false, wrapHeaderText: true, autoHeaderHeight: true, headerComponent: GridHeader }}
                         localeText={{ noRowsToShow: `暂无${businessText(object.label)}记录` }}
                         noRowsOverlayComponent={GridEmptyState}
                         noRowsOverlayComponentParams={{ objectLabel: businessText(object.label), canCreate: can.create }}
                         getRowId={({ data }) => data.id}
-                        getRowHeight={({ data }) => customerRowHeight(object.key, data?.__record, contactCan)}
+                        getRowHeight={() => 44}
                         enableCellSpan
                         maintainColumnOrder
                         onGridReady={(event) => {
-                            setGridApi(event.api);
                             setTimeout(() => updateVisibleFieldCount(event.api), 0);
                         }}
                         onCellValueChanged={saveCell}
@@ -254,17 +239,8 @@ export default function ObjectGrid({
     );
 }
 
-function customerRowHeight(objectKey, record, contactCan) {
-    if (objectKey !== 'customer' || !record) return 44;
-
-    const contactCount = Array.isArray(record.contacts) ? record.contacts.length : 0;
-    if (contactCount === 0) return contactCan.create ? 70 : 56;
-
-    const contactRowsHeight = contactCount * 42;
-    const contactGapsHeight = Math.max(0, contactCount - 1) * 5;
-    const createActionHeight = contactCan.create ? 30 : 0;
-
-    return 20 + contactRowsHeight + contactGapsHeight + createActionHeight;
+function GridHeader({ displayName }) {
+    return <span className="grid-header-label" title={displayName}>{displayName}</span>;
 }
 
 function GridEmptyState({ objectLabel, canCreate }) {
