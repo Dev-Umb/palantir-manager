@@ -40,6 +40,12 @@ describe('CustomerContactModal', () => {
         expect(within(dialog).queryByText('PRJ-001')).not.toBeInTheDocument();
         expect(within(dialog).queryByText('采购经理')).not.toBeInTheDocument();
         expect(within(dialog).queryByText('启用')).not.toBeInTheDocument();
+        expect(within(dialog).getByText('所属客户')).toBeInTheDocument();
+        expect(within(dialog).getByText('基本信息')).toBeInTheDocument();
+        expect(dialog.querySelector('.contact-modal-footer')).toContainElement(
+            within(dialog).getByRole('button', { name: '编辑联系人' }),
+        );
+        expect(dialog.querySelectorAll('.contact-modal-detail dl > div')).toHaveLength(2);
     });
 
     it('creates a contact with only name, phone and the fixed customer id', async () => {

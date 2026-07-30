@@ -204,7 +204,6 @@ describe('ObjectGrid date editing', () => {
 
         expect(await screen.findByRole('link', { name: '查看 CG-001 详情' })).not.toBeNull();
         expect(screen.getByLabelText('CG-001 更多操作')).not.toBeNull();
-        expect(screen.getByRole('link', { name: '编辑 CG-001' })).not.toBeNull();
     });
 
     it('inserts the stacked contact list immediately after the customer name', async () => {
@@ -485,8 +484,7 @@ describe('ObjectGrid date editing', () => {
         );
 
         expect((await screen.findByRole('link', { name: '查看 PRJ-001 详情' })).textContent).toContain('查看');
-        expect(screen.getByRole('link', { name: '编辑 PRJ-001' }).textContent).toContain('编辑');
-        expect(screen.getByRole('button', { name: '删除 PRJ-001' }).textContent).toContain('删除');
+        expect(screen.getByRole('button', { name: 'PRJ-001 更多操作' })).not.toBeNull();
     });
 
 });
