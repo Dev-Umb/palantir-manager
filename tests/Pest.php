@@ -29,9 +29,15 @@ function onlineRoleEmail(string $role): string
 
 function visitOnlineAs(string $role, string $path = '/')
 {
-    return visit(onlineBaseUrl().'/login')
+    $page = visit(onlineBaseUrl().'/login')
         ->fill('input[type="email"]', onlineRoleEmail($role))
-        ->fill('input[type="password"]', onlinePassword())
+        ->fill('input[type="password"]', onlinePassword());
+
+    if ($role === 'admin') {
+        $page->wait(13);
+    }
+
+    return $page
         ->press('登录')
         ->wait(1)
         ->assertPathIs('/')
