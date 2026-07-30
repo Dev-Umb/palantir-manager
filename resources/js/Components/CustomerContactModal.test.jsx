@@ -176,6 +176,35 @@ describe('CustomerContactModal', () => {
         })));
     });
 
+    it('shows contact save failures in a blocking error dialog', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            json: async () => ({
+                errors: { 'payload.phone': ['联系电话格式不正确。'] },
+            }),
+        });
+        const onClose = vi.fn();
+
+        render(
+            <CustomerContactModal
+                mode="edit"
+                customer={{ id: 'customer-1', title: '甲客户' }}
+                contact={{ id: 'contact-1', name: '李经理', phone: '错误电话', projects: [] }}
+                can={{ update: true }}
+                onSaved={() => {}}
+                onClose={onClose}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '保存联系人' }));
+
+        const errorDialog = await screen.findByRole('alertdialog', { name: '联系人保存失败' });
+        expect(within(errorDialog).getByText('联系电话格式不正确。')).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: '编辑联系人' })).toBeInTheDocument();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(onClose).not.toHaveBeenCalled();
+    });
+
     it('deletes an unreferenced contact after confirmation', async () => {
         globalThis.fetch = vi.fn().mockResolvedValue({
             ok: true,
@@ -257,7 +286,8 @@ describe('CustomerContactModal', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '删除联系人' }));
 
-        expect(await screen.findByText('无法删除：项目资料仍在引用该记录，请先解除关联。')).toBeInTheDocument();
+        const errorDialog = await screen.findByRole('alertdialog', { name: '联系人删除失败' });
+        expect(within(errorDialog).getByText('无法删除：项目资料仍在引用该记录，请先解除关联。')).toBeInTheDocument();
         expect(onDeleted).not.toHaveBeenCalled();
         expect(screen.getByRole('dialog', { name: '联系人详情' })).toBeInTheDocument();
     });

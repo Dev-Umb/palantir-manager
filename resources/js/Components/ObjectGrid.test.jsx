@@ -154,6 +154,46 @@ describe('ObjectGrid date editing', () => {
         expect(screen.queryByText('乙联系人')).toBeNull();
     });
 
+    it('commits a quick customer contact selection from the portal menu', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'project', label: '项目主档' }}
+                records={[{
+                    id: 'project-1',
+                    code: 'PRJ-001',
+                    title: '甲项目',
+                    payload: {
+                        customer_id: 'customer-a',
+                        customer_contact_ids: [],
+                    },
+                    display: { customer_contact_ids: [] },
+                }]}
+                fields={[
+                    { key: 'customer_contact_ids', label: '客户联系人', type: 'multirelation' },
+                ]}
+                can={{ update: true, delete: false }}
+                selectedRecordId={null}
+                relationOptions={{
+                    customer_contact_ids: {
+                        items: [
+                            { id: 'contact-a', label: '李经理 · 13900000000', meta: { customer_id: 'customer-a' } },
+                        ],
+                    },
+                }}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        const contactCell = await screen.findByRole('gridcell', { name: '—' });
+        fireEvent.click(contactCell);
+        fireEvent.keyDown(contactCell, { key: 'Enter', code: 'Enter' });
+        fireEvent.click(await screen.findByRole('button', { name: '李经理 · 13900000000' }));
+        fireEvent.click(screen.getByRole('button', { name: '完成选择' }));
+
+        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledOnce());
+        expect(JSON.parse(globalThis.fetch.mock.calls[0][1].body).payload.customer_contact_ids).toEqual(['contact-a']);
+    });
+
     it('does not edit a relation explicitly marked readonly', async () => {
         render(
             <ObjectGrid
@@ -505,6 +545,76 @@ describe('ObjectGrid date editing', () => {
 
         expect((await screen.findByRole('link', { name: '查看 PRJ-001 详情' })).textContent).toContain('查看');
         expect(screen.getByRole('button', { name: 'PRJ-001 更多操作' })).not.toBeNull();
+    });
+
+    it('shows a referenced project deletion failure in a dialog', async () => {
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            json: async () => ({
+                errors: {
+                    record: ['无法删除：合同台账仍在引用该项目，请先解除关联。'],
+                },
+            }),
+        });
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+        render(
+            <ObjectGrid
+                object={{ key: 'project', label: '项目资料' }}
+                records={[{
+                    id: 'project-1',
+                    code: 'PRJ-001',
+                    title: '甲项目',
+                    payload: { name: '甲项目' },
+                    display: { name: '甲项目' },
+                }]}
+                fields={[{ key: 'name', label: '项目名称', type: 'text' }]}
+                can={{ update: true, delete: true }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'PRJ-001 更多操作' }));
+        fireEvent.click(await screen.findByRole('button', { name: '删除 PRJ-001' }));
+
+        const dialog = await screen.findByRole('alertdialog', { name: '无法删除项目资料' });
+        expect(screen.getByText('无法删除：合同台账仍在引用该项目，请先解除关联。')).not.toBeNull();
+        expect(dialog).not.toBeNull();
+    });
+
+    it('renders customer cooperation history from linked projects and keeps it readonly', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'customer', label: '客户信息' }}
+                records={[{
+                    id: 'customer-1',
+                    code: 'CUST-001',
+                    title: '甲客户',
+                    payload: { cooperation_history: '旧文本' },
+                    display: { cooperation_history: '旧文本' },
+                    cooperation_projects: [{
+                        id: 'project-1',
+                        code: 'XYC-001',
+                        title: '北区项目',
+                        date: '2026-07-30',
+                    }],
+                }]}
+                fields={[{ key: 'cooperation_history', label: '合作历史', type: 'text' }]}
+                can={{ update: true, delete: false }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        const historyCell = await screen.findByRole('gridcell', { name: 'XYC-001 · 北区项目 · 2026-07-30' });
+        fireEvent.click(historyCell);
+        fireEvent.keyDown(historyCell, { key: 'Enter', code: 'Enter' });
+
+        expect(document.querySelector('.grid-inline-editor')).toBeNull();
+        expect(screen.queryByText('旧文本')).toBeNull();
     });
 
 });

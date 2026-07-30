@@ -34,4 +34,25 @@ describe('MultiComboBox historical selections', () => {
         );
         expect(screen.queryByText(/停用联系人/)).not.toBeInTheDocument();
     });
+
+    it('renders its option menu outside clipping containers', () => {
+        const { container } = render(
+            <div style={{ overflow: 'hidden' }}>
+                <MultiComboBox
+                    value={[]}
+                    items={[{ id: 'contact-1', label: '李经理 · 13900000000' }]}
+                    onChange={() => {}}
+                />
+            </div>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '未选择' }));
+
+        const menu = document.querySelector('.multi-combo-menu');
+        expect(menu).toBeInTheDocument();
+        expect(container.contains(menu)).toBe(false);
+        expect(menu).toHaveClass('ag-custom-component-popup');
+        expect(menu.style.position).toBe('fixed');
+        expect(screen.getByText('李经理 · 13900000000')).toBeInTheDocument();
+    });
 });

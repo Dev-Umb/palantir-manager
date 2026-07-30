@@ -8,7 +8,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { businessText } from '../businessLanguage';
 import ComboBox from './ComboBox';
 import CustomerContactCell from './CustomerContactCell';
+import FeedbackDialog from './FeedbackDialog';
 import { FieldControl } from './FieldControl';
+import MultiComboBox from './MultiComboBox';
 import RowActions from './RowActions';
 import { columnOrderFromState, columnWidthsFromState } from './objectGridColumnState';
 import { expandObjectRecords, isItemField, rawRowValue, sameRecordSpan, scopedRelationOptions, updateRecordField } from './objectGridRows';
@@ -33,8 +35,36 @@ export default function ObjectGrid({
         status: 'idle',
         message: can.update ? '双击单元格可编辑，修改后会自动保存' : '当前为只读视图',
     });
+    const [feedback, setFeedback] = useState(null);
     const rowData = useMemo(() => expandObjectRecords(records, fields), [fields, records]);
     const fieldKeys = useMemo(() => fields.map((field) => field.key), [fields]);
+    const destroyRecord = useCallback(async (record) => {
+        try {
+            const response = await fetch(`/records/${record.id}`, {
+                method: 'DELETE',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken(),
+                },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(firstResponseError(data, '删除失败，请重试。'));
+            }
+
+            setSaveState({ status: 'saved', message: data.status || `${businessText(object.label)}已删除` });
+            router.reload({
+                only: ['records', 'selectedRecord'],
+                preserveScroll: true,
+            });
+        } catch (error) {
+            setFeedback({
+                title: `无法删除${businessText(object.label)}`,
+                messages: [error.message || '删除失败，请重试。'],
+            });
+        }
+    }, [object.label]);
     const columnDefs = useMemo(() => {
         const dataColumns = fields.map((field) => ({
             field: field.key,
@@ -48,7 +78,10 @@ export default function ObjectGrid({
             filter: false,
             cellClass: numericField(field) ? 'numeric-cell' : undefined,
             spanRows: isItemField(field) ? false : sameRecordSpan,
-            editable: can.update && !field.readonly && !['readonly', 'lookup', 'derived', 'file'].includes(field.type),
+            editable: can.update
+                && !field.readonly
+                && !(object.key === 'customer' && field.key === 'cooperation_history')
+                && !['readonly', 'lookup', 'derived', 'file'].includes(field.type),
             cellEditor: GridEditor,
             cellEditorParams: (params) => ({
                 fieldConfig: field,
@@ -67,7 +100,9 @@ export default function ObjectGrid({
                 params.data[field.key] = params.newValue;
                 return true;
             },
-            cellRenderer: (params) => renderValue(field, params.data?.__record, params.value, relationOptions, params.data),
+            cellRenderer: (params) => object.key === 'customer' && field.key === 'cooperation_history'
+                ? <CooperationHistoryCell projects={params.data?.__record?.cooperation_projects || []} />
+                : renderValue(field, params.data?.__record, params.value, relationOptions, params.data),
         }));
 
         if (object.key === 'customer') {
@@ -106,9 +141,12 @@ export default function ObjectGrid({
             filter: false,
             resizable: false,
             spanRows: sameRecordSpan,
-            cellRenderer: (params) => params.data?.__record ? <GridActions object={object} record={params.data.__record} can={can} /> : null,
+            cellClass: 'action-cell',
+            cellRenderer: (params) => params.data?.__record
+                ? <GridActions object={object} record={params.data.__record} can={can} onDelete={destroyRecord} />
+                : null,
         }];
-    }, [can, fields, object, onContactOpen, relationOptions, rowData, savedColumnWidths]);
+    }, [can, destroyRecord, fields, object, onContactOpen, relationOptions, rowData, savedColumnWidths]);
 
     const saveColumnOrder = useCallback((event) => {
         if (event.finished === false) return;
@@ -190,8 +228,12 @@ export default function ObjectGrid({
         } catch (error) {
             onRecordChange(previous);
             setSaveState({
-                status: 'error',
-                message: `保存失败：${error.message || '请重试'}`,
+                status: 'idle',
+                message: can.update ? '双击单元格可编辑，修改后会自动保存' : '当前为只读视图',
+            });
+            setFeedback({
+                title: `“${field.label}”保存失败`,
+                messages: [error.message || '保存失败，请重试。'],
             });
         }
     }
@@ -221,6 +263,7 @@ export default function ObjectGrid({
                         getRowHeight={() => 44}
                         enableCellSpan
                         maintainColumnOrder
+                        alwaysShowHorizontalScroll
                         onGridReady={(event) => {
                             setTimeout(() => updateVisibleFieldCount(event.api), 0);
                         }}
@@ -235,6 +278,11 @@ export default function ObjectGrid({
                     />
                 </AgGridProvider>
             </div>
+            <FeedbackDialog
+                title={feedback?.title}
+                messages={feedback?.messages}
+                onClose={() => setFeedback(null)}
+            />
         </div>
     );
 }
@@ -252,7 +300,42 @@ function GridEmptyState({ objectLabel, canCreate }) {
     );
 }
 
+function CooperationHistoryCell({ projects }) {
+    if (!projects.length) return <span className="empty-value">暂无关联项目</span>;
+
+    const first = projects[0];
+    const summary = [first.code, first.title, first.date].filter(Boolean).join(' · ');
+
+    return (
+        <span className="cooperation-history-cell" title={projects.map((project) => (
+            [project.code, project.title, project.date].filter(Boolean).join(' · ')
+        )).join('\n')}>
+            <span>{summary}</span>
+            {projects.length > 1 && <b>+{projects.length - 1}</b>}
+        </span>
+    );
+}
+
 function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOptions }) {
+    if (fieldConfig.type === 'multirelation') {
+        const relation = relationOptions[fieldConfig.key] || {};
+
+        return (
+            <div className="grid-multi-combo-editor">
+                <MultiComboBox
+                    value={Array.isArray(value) ? value : []}
+                    items={relation.items || []}
+                    selectedItems={relation.selectedItems || []}
+                    searchUrl={relation.search_url}
+                    searchContext={relation.search_context}
+                    onChange={onValueChange}
+                    onClose={() => setTimeout(() => stopEditing(), 0)}
+                    startOpen
+                />
+            </div>
+        );
+    }
+
     if (['relation', 'select'].includes(fieldConfig.type)) {
         const options = optionsFor(fieldConfig, value, relationOptions);
         const relation = relationOptions[fieldConfig.key] || {};
@@ -295,7 +378,7 @@ function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOp
     );
 }
 
-function GridActions({ object, record, can }) {
+function GridActions({ object, record, can, onDelete }) {
     function approve() {
         router.post(`/requests/${record.id}/approve`, {}, { preserveScroll: true });
     }
@@ -307,7 +390,7 @@ function GridActions({ object, record, can }) {
     function destroy() {
         const label = [record.code, record.title].filter(Boolean).join(' · ');
         if (window.confirm(`确定删除“${label}”吗？\n\n删除后无法恢复。`)) {
-            router.delete(`/records/${record.id}`, { preserveScroll: true });
+            onDelete?.(record);
         }
     }
 
@@ -473,4 +556,8 @@ function textWidth(value) {
 
 function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+
+function firstResponseError(data, fallback) {
+    return Object.values(data?.errors || {}).flat()[0] || data?.message || fallback;
 }

@@ -6,6 +6,7 @@ use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\ObjectRelations;
 use Database\Seeders\XycPrototypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -205,6 +206,93 @@ class OntologyRecordCrudTest extends TestCase
             ->assertJsonPath('status', '客户联系人已删除。');
 
         $this->assertModelMissing($contact);
+    }
+
+    public function test_customer_contact_can_be_updated_from_the_embedded_json_flow(): void
+    {
+        $this->seed(XycPrototypeSeeder::class);
+        $this->actingAs($this->userWithRole('admin'));
+        $customerObject = BusinessObject::where('key', 'customer')->firstOrFail();
+        $contactObject = BusinessObject::where('key', 'customer_contact')->firstOrFail();
+        $customer = ObjectRecord::create([
+            'business_object_id' => $customerObject->id,
+            'code' => 'CUST-CONTACT-UPDATE',
+            'title' => '联系人更新客户',
+            'payload' => ['name' => '联系人更新客户'],
+        ]);
+        $contact = ObjectRecord::create([
+            'business_object_id' => $contactObject->id,
+            'code' => 'CONTACT-UPDATE',
+            'title' => '旧联系人',
+            'payload' => [
+                'name' => '旧联系人',
+                'phone' => '13800000000',
+                'customer_id' => $customer->id,
+                'position' => '历史职务',
+            ],
+        ]);
+
+        $this->putJson("/records/{$contact->id}", [
+            'payload' => [
+                'name' => '新联系人',
+                'phone' => '13900000000',
+                'customer_id' => $customer->id,
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('record.title', '新联系人')
+            ->assertJsonPath('record.payload.phone', '13900000000');
+
+        $savedPayload = $contact->fresh()->payload;
+        $this->assertSame('新联系人', $savedPayload['name']);
+        $this->assertSame('13900000000', $savedPayload['phone']);
+        $this->assertSame($customer->id, $savedPayload['customer_id']);
+        $this->assertSame('历史职务', $savedPayload['position']);
+        $this->assertSame($customer->id, $savedPayload['_snapshots']['customer_id']['id']);
+        $this->assertSame('联系人更新客户', $savedPayload['_snapshots']['customer_id']['label']);
+    }
+
+    public function test_customer_cooperation_history_is_derived_from_linked_projects(): void
+    {
+        $this->seed(XycPrototypeSeeder::class);
+        $this->actingAs($this->userWithRole('admin'));
+        $customerObject = BusinessObject::where('key', 'customer')->firstOrFail();
+        $projectObject = BusinessObject::where('key', 'project')->firstOrFail();
+        $customer = ObjectRecord::create([
+            'business_object_id' => $customerObject->id,
+            'code' => 'CUST-PROJECT-HISTORY',
+            'title' => '合作历史客户',
+            'payload' => [
+                'name' => '合作历史客户',
+                'cooperation_history' => '保留的旧文本',
+            ],
+        ]);
+        $project = ObjectRecord::create([
+            'business_object_id' => $projectObject->id,
+            'code' => 'PRJ-HISTORY',
+            'title' => '关联项目名称',
+            'payload' => [
+                'name' => '关联项目名称',
+                'project_no' => 'XYC-HISTORY-001',
+                'handover_date' => '2026-07-30',
+                'customer_id' => $customer->id,
+            ],
+        ]);
+
+        $customer->load('businessObject');
+        $relations = app(ObjectRelations::class);
+        $relations->preloadLabels(collect([$customer]), auth()->user());
+        $this->assertSame($project->id, $relations->formatRecord($customer, auth()->user())['cooperation_projects'][0]['id'] ?? null);
+
+        $this->get('/objects/customer?q=CUST-PROJECT-HISTORY')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('records.data', 1)
+                ->where('records.data.0.payload.cooperation_history', '保留的旧文本')
+                ->where('records.data.0.cooperation_projects.0.id', $project->id)
+                ->where('records.data.0.cooperation_projects.0.code', 'XYC-HISTORY-001')
+                ->where('records.data.0.cooperation_projects.0.title', '关联项目名称')
+                ->where('records.data.0.cooperation_projects.0.date', '2026-07-30'));
     }
 
     public function test_customer_contact_deletion_keeps_project_reference_protection(): void

@@ -122,7 +122,7 @@ export default function ComboBox({ value, options = [], onChange, placeholder = 
     }
 
     const menu = open && (
-        <div ref={menuRef} className="combo-menu" style={menuStyle || undefined} onBlur={close}>
+        <div ref={menuRef} className="combo-menu ag-custom-component-popup" style={menuStyle || undefined} onBlur={close}>
             <div className="combo-search">
                 <Search size={14} />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={navigate} placeholder="输入关键字搜索" autoFocus />

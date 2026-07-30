@@ -30,6 +30,9 @@ class ObjectRelations
     /** @var array<string, array<int, array<string, mixed>>> */
     private array $contactsByCustomer = [];
 
+    /** @var array<string, array<int, array<string, mixed>>> */
+    private array $projectsByCustomer = [];
+
     /** @var array<string, array{id: string, name: string, phone: string, customer_id: string}> */
     private array $contactDetailsById = [];
 
@@ -162,6 +165,7 @@ class ObjectRelations
 
         if ($record->businessObject->key === 'customer') {
             $formatted['contacts'] = $this->contactsByCustomer[$record->id] ?? [];
+            $formatted['cooperation_projects'] = $this->projectsByCustomer[$record->id] ?? [];
         }
 
         if ($record->businessObject->key === 'project') {
@@ -953,6 +957,7 @@ class ObjectRelations
             ->values();
         foreach ($customerIds as $customerId) {
             $this->contactsByCustomer[$customerId] = [];
+            $this->projectsByCustomer[$customerId] = [];
         }
 
         $contacts = $records
@@ -980,29 +985,47 @@ class ObjectRelations
             $this->projectIdsByContact[$contactId] = [];
         }
 
-        if ($contactIds->isEmpty()) {
-            return;
-        }
-
         $projects = collect();
         $projectObject = BusinessObject::where('key', 'project')->first();
-        if ($projectObject) {
-            $projectQuery = $projectObject->records()->with('businessObject')->latest();
+        if ($projectObject && $customerIds->isNotEmpty()) {
+            $customerProjectQuery = $projectObject->records()
+                ->with('businessObject')
+                ->whereIn('payload->customer_id', $customerIds->all())
+                ->latest();
             if ($user) {
-                $this->projectVisibility->scope($projectQuery, $user);
+                $this->projectVisibility->scope($customerProjectQuery, $user);
             }
 
-            $projects = $projectQuery->get()
-                ->filter(function (ObjectRecord $project) use ($contactIds) {
-                    $linkedIds = $project->payload['customer_contact_ids'] ?? [];
+            $projects = $customerProjectQuery->get();
+        }
+        if ($projectObject && $contactIds->isNotEmpty()) {
+            $contactProjectQuery = $projectObject->records()->with('businessObject')->latest();
+            if ($user) {
+                $this->projectVisibility->scope($contactProjectQuery, $user);
+            }
 
-                    return is_array($linkedIds) && collect($linkedIds)->intersect($contactIds)->isNotEmpty();
-                })
+            $projects = $projects
+                ->concat($contactProjectQuery->get()
+                    ->filter(function (ObjectRecord $project) use ($contactIds) {
+                        $linkedIds = $project->payload['customer_contact_ids'] ?? [];
+
+                        return is_array($linkedIds) && collect($linkedIds)->intersect($contactIds)->isNotEmpty();
+                    }))
+                ->unique('id')
                 ->values();
         }
 
         foreach ($projects as $project) {
             $this->labelCache[$project->id] = $this->brief($project);
+            $customerId = $project->payload['customer_id'] ?? null;
+            if (is_string($customerId) && array_key_exists($customerId, $this->projectsByCustomer)) {
+                $this->projectsByCustomer[$customerId][] = [
+                    'id' => $project->id,
+                    'code' => (string) (($project->payload['project_no'] ?? '') ?: $project->code),
+                    'title' => (string) (($project->payload['name'] ?? '') ?: $project->title),
+                    'date' => (string) (($project->payload['handover_date'] ?? '') ?: $project->created_at?->toDateString()),
+                ];
+            }
             foreach ((array) ($project->payload['customer_contact_ids'] ?? []) as $contactId) {
                 if (array_key_exists($contactId, $this->projectIdsByContact)) {
                     $this->projectIdsByContact[$contactId][] = $project->id;

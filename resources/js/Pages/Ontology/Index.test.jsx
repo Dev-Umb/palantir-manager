@@ -288,8 +288,8 @@ describe('project customer contact choices', () => {
             .find((label) => label.querySelector(':scope > span')?.textContent === '客户联系人');
         fireEvent.click(within(contactLabel).getByRole('button'));
 
-        expect(within(contactLabel).getByText('没有可选项')).toBeInTheDocument();
-        expect(within(contactLabel).queryByText('甲联系人')).not.toBeInTheDocument();
+        expect(screen.getByText('没有可选项')).toBeInTheDocument();
+        expect(screen.queryByText('甲联系人')).not.toBeInTheDocument();
     });
 
     it('shows an immediate notice when changing customer clears selected contacts', async () => {
@@ -569,6 +569,58 @@ describe('historical item relation snapshots', () => {
         expect(within(dialog).getByText('保存时的钢板名称')).toBeInTheDocument();
         expect(within(dialog).queryByText('material-87')).not.toBeInTheDocument();
     });
+});
+
+describe('customer cooperation history', () => {
+    afterEach(cleanup);
+
+    for (const mode of ['detail', 'edit']) {
+        it(`shows linked project number, name and time in ${mode} without an editable legacy field`, async () => {
+            const customer = {
+                id: 'customer-history',
+                code: 'CUST-HISTORY',
+                title: '合作客户',
+                payload: {
+                    name: '合作客户',
+                    cooperation_history: '旧文本',
+                },
+                display: {},
+                cooperation_projects: [{
+                    id: 'project-1',
+                    code: 'XYC-001',
+                    title: '北区项目',
+                    date: '2026-07-30',
+                }],
+            };
+            window.history.replaceState({}, '', `/objects/customer?mode=${mode}&record=${customer.id}`);
+
+            render(
+                <Index
+                    currentObject={{
+                        id: 8,
+                        key: 'customer',
+                        group: '业务',
+                        label: '客户信息',
+                        fields: [
+                            { key: 'name', label: '客户名称', type: 'text' },
+                            { key: 'cooperation_history', label: '合作历史', type: 'text' },
+                        ],
+                    }}
+                    objects={[]}
+                    records={{ data: [customer] }}
+                    can={{ create: true, update: true, delete: true }}
+                    relationOptions={{}}
+                    selectedRecordId={customer.id}
+                />,
+            );
+
+            const dialog = await screen.findByRole('dialog', { name: `${customer.code} · ${mode === 'edit' ? '编辑' : '详情'}` });
+            expect(within(dialog).getByText('XYC-001')).toBeInTheDocument();
+            expect(within(dialog).getByText('北区项目')).toBeInTheDocument();
+            expect(within(dialog).getByText('2026-07-30')).toBeInTheDocument();
+            expect(within(dialog).queryByDisplayValue('旧文本')).not.toBeInTheDocument();
+        });
+    }
 });
 
 function renderPage(mode, selected = record) {

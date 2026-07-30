@@ -1,5 +1,6 @@
 import { ArrowLeft, BriefcaseBusiness, ChevronRight, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import FeedbackDialog from './FeedbackDialog';
 import { useDialogFocus } from './useDialogFocus';
 
 export default function CustomerContactModal({ mode = 'detail', contactObjectId, customer, contacts = [], contact = null, can = {}, onSaved, onDeleted, onClose }) {
@@ -8,6 +9,7 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
     const [name, setName] = useState(contact?.name || '');
     const [phone, setPhone] = useState(contact?.phone || '');
     const [errors, setErrors] = useState([]);
+    const [errorTitle, setErrorTitle] = useState('联系人保存失败');
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const titleId = useId();
@@ -24,12 +26,12 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
 
     useEffect(() => {
         function closeOnEscape(event) {
-            if (event.key === 'Escape' && !saving && !deleting) onClose?.();
+            if (event.key === 'Escape' && !saving && !deleting && !errors.length) onClose?.();
         }
 
         document.addEventListener('keydown', closeOnEscape);
         return () => document.removeEventListener('keydown', closeOnEscape);
-    }, [deleting, onClose, saving]);
+    }, [deleting, errors.length, onClose, saving]);
 
     async function save(event) {
         event.preventDefault();
@@ -61,6 +63,7 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
 
             onSaved?.(data.record);
         } catch (error) {
+            setErrorTitle('联系人保存失败');
             setErrors(error instanceof ContactSaveError ? error.messages : ['保存失败，请重试。']);
         } finally {
             setSaving(false);
@@ -90,6 +93,7 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
 
             onDeleted?.(activeContact.id);
         } catch (error) {
+            setErrorTitle('联系人删除失败');
             setErrors(error instanceof ContactSaveError ? error.messages : ['删除失败，请重试。']);
         } finally {
             setDeleting(false);
@@ -160,7 +164,6 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
                     <>
                         <div className="contact-modal-body">
                             <ContactDetail contact={activeContact} />
-                            {errors.map((error, index) => <p className="form-error contact-modal-error" key={`${error}-${index}`}>{error}</p>)}
                         </div>
                         {(mode === 'list' || can.update || can.delete) && (
                             <footer className="contact-modal-footer">
@@ -194,7 +197,6 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
                                 <span>联系电话</span>
                                 <input value={phone} onChange={(event) => setPhone(event.target.value)} />
                             </label>
-                            {errors.map((error, index) => <p className="form-error contact-modal-error" key={`${error}-${index}`}>{error}</p>)}
                         </div>
                         <footer className="contact-modal-footer">
                             <button type="button" className="small-action secondary-button" onClick={returnToListOrClose}>取消</button>
@@ -203,6 +205,11 @@ export default function CustomerContactModal({ mode = 'detail', contactObjectId,
                     </form>
                 )}
             </section>
+            <FeedbackDialog
+                title={errorTitle}
+                messages={errors}
+                onClose={() => setErrors([])}
+            />
         </div>
     );
 }
