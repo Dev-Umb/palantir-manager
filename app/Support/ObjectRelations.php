@@ -137,7 +137,14 @@ class ObjectRelations
                 $payload[$field['key']] = $value;
             }
             $display[$field['key']] = match ($field['type'] ?? null) {
-                'relation', 'creatable_relation' => $this->relationDisplayLabel($payload, $field, $value),
+                'relation', 'creatable_relation' => $this->relationDisplayLabel(
+                    $payload,
+                    $field,
+                    $value,
+                    $record->businessObject->key === 'project'
+                        && ($field['key'] ?? null) === 'customer_id'
+                        && ($field['target'] ?? null) === 'customer',
+                ),
                 'multirelation' => $this->multirelationDisplayLabels($payload, $field, $value),
                 default => $value,
             };
@@ -170,10 +177,21 @@ class ObjectRelations
         return $formatted;
     }
 
-    private function relationDisplayLabel(array $payload, array $field, mixed $value): string
-    {
+    private function relationDisplayLabel(
+        array $payload,
+        array $field,
+        mixed $value,
+        bool $preferLiveLabel = false,
+    ): string {
         if (! is_string($value) || $value === '') {
             return '';
+        }
+
+        if ($preferLiveLabel) {
+            $liveLabel = $this->labelForId($value)['label'] ?? null;
+            if (is_string($liveLabel)) {
+                return $liveLabel;
+            }
         }
 
         $snapshot = $payload['_snapshots'][$field['key']] ?? null;
