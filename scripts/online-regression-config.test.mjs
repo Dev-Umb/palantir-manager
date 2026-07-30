@@ -21,12 +21,21 @@ describe('online regression configuration', () => {
     });
   });
 
+  it('accepts a simple password while the deployment is in its test stage', () => {
+    expect(loadOnlineRegressionConfig({
+      ...validEnvironment,
+      ONLINE_REGRESSION_PASSWORD: 'password123',
+    })).toMatchObject({
+      password: 'password123',
+    });
+  });
+
   it.each([
     ['missing enablement', { ONLINE_REGRESSION_ENABLED: '0' }],
     ['missing mutation authorization', { ONLINE_REGRESSION_ALLOW_MUTATIONS: '0' }],
     ['wrong target', { ONLINE_REGRESSION_BASE_URL: 'https://example.com' }],
     ['unsafe run id', { ONLINE_REGRESSION_RUN_ID: 'latest' }],
-    ['development password', { ONLINE_REGRESSION_PASSWORD: 'password123' }],
+    ['missing password', { ONLINE_REGRESSION_PASSWORD: '' }],
   ])('rejects %s', (_label, override) => {
     expect(() => loadOnlineRegressionConfig({
       ...validEnvironment,

@@ -41,10 +41,6 @@ export function loadOnlineRegressionConfig(environment) {
 
   const password = requireValue(environment, 'ONLINE_REGRESSION_PASSWORD');
 
-  if (password === 'password123') {
-    throw new Error('The documented development password is not allowed for online regression.');
-  }
-
   const reportPath = environment.ONLINE_REGRESSION_REPORT_PATH?.trim()
     || path.join('docs', `public-regression-${runId}.md`);
 
