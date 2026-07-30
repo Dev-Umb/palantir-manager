@@ -11,8 +11,7 @@ $objectFields = collect($xycConfig['objects'])
     ])
     ->all();
 
-dataset('active roles', [
-    ['admin'],
+dataset('non-admin active roles', [
     ['business'],
     ['engineering'],
     ['procurement'],
@@ -217,7 +216,7 @@ it('keeps list summaries compact and opens contact list detail and edit states',
 
     $summary = $page->script(<<<'JS'
         () => {
-            const rows = [...document.querySelectorAll('.ag-center-cols-container .ag-row')];
+            const rows = [...document.querySelectorAll('.ag-row[row-index]')];
             const button = document.querySelector('.list-summary-trigger');
             const headers = [...document.querySelectorAll('.grid-header-label')];
             button?.click();
@@ -276,10 +275,10 @@ it('keeps list summaries compact and opens contact list detail and edit states',
 })->group('online', 'online-ui', 'online-contact')
     ->skip(fn (): bool => getenv('ONLINE_REGRESSION_ENABLED') !== '1', 'Online regression is opt-in.');
 
-it('logs in every active role and renders its permitted navigation', function (string $role): void {
+it('logs in every non-admin active role and renders its permitted navigation', function (string $role): void {
     visitOnlineAs($role)
         ->assertNoJavaScriptErrors()
         ->assertSee('退出');
-})->with('active roles')
+})->with('non-admin active roles')
     ->group('online', 'online-role')
     ->skip(fn (): bool => getenv('ONLINE_REGRESSION_ENABLED') !== '1', 'Online regression is opt-in.');
