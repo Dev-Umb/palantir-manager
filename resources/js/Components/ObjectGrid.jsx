@@ -1,21 +1,37 @@
 import { Link, router } from '@inertiajs/react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
-import { CellSpanModule, CellStyleModule, ClientSideRowModelApiModule, ClientSideRowModelModule, ColumnApiModule, CustomEditorModule, DateFilterModule, LocaleModule, NumberFilterModule, RowApiModule, RowStyleModule, TextFilterModule } from 'ag-grid-community';
+import { CellSpanModule, CellStyleModule, ClientSideRowModelApiModule, ClientSideRowModelModule, ColumnApiModule, CustomEditorModule, DateFilterModule, LocaleModule, NumberFilterModule, RowApiModule, RowStyleModule, ScrollApiModule, TextFilterModule, TooltipModule } from 'ag-grid-community';
 import { AgGridProvider, AgGridReact } from 'ag-grid-react';
-import { Check, Download, Eye, EyeOff, Pencil, Trash2, XCircle } from 'lucide-react';
+import { Check, Eye, EyeOff, Pencil, Trash2, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { businessText } from '../businessLanguage';
 import ComboBox from './ComboBox';
 import CustomerContactCell from './CustomerContactCell';
 import { FieldControl } from './FieldControl';
-import { columnOrderFromState } from './objectGridColumnState';
+import RowActions from './RowActions';
+import { columnOrderFromState, columnWidthsFromState } from './objectGridColumnState';
 import { expandObjectRecords, isItemField, rawRowValue, sameRecordSpan, scopedRelationOptions, updateRecordField } from './objectGridRows';
 
-const modules = [CellSpanModule, CellStyleModule, ClientSideRowModelApiModule, ClientSideRowModelModule, ColumnApiModule, CustomEditorModule, DateFilterModule, LocaleModule, NumberFilterModule, RowApiModule, RowStyleModule, TextFilterModule];
+const modules = [CellSpanModule, CellStyleModule, ClientSideRowModelApiModule, ClientSideRowModelModule, ColumnApiModule, CustomEditorModule, DateFilterModule, LocaleModule, NumberFilterModule, RowApiModule, RowStyleModule, ScrollApiModule, TextFilterModule, TooltipModule];
 
-export default function ObjectGrid({ object, records, fields, can, contactCan = {}, selectedRecordId, relationOptions, onRecordChange, onColumnOrderChange, onContactDetail, onContactCreate, exportUrl }) {
+export default function ObjectGrid({
+    object,
+    records,
+    fields,
+    can,
+    contactCan = {},
+    selectedRecordId,
+    relationOptions,
+    savedColumnWidths = {},
+    onRecordChange,
+    onColumnOrderChange,
+    onColumnWidthsChange,
+    onContactDetail,
+    onContactCreate,
+}) {
     const [gridApi, setGridApi] = useState(null);
+    const [visibleFieldCount, setVisibleFieldCount] = useState(fields.length);
     const [saveState, setSaveState] = useState({
         status: 'idle',
         message: can.update ? '双击单元格可编辑，修改后会自动保存' : '当前为只读视图',
@@ -26,12 +42,14 @@ export default function ObjectGrid({ object, records, fields, can, contactCan = 
         const dataColumns = fields.map((field) => ({
             field: field.key,
             headerName: field.label,
-            width: columnWidth(field, object.key, rowData, relationOptions),
-            minWidth: 96,
+            width: savedColumnWidths[field.key] ?? columnWidth(field, object.key, rowData, relationOptions),
+            minWidth: columnBounds(field).min,
+            maxWidth: columnBounds(field).max,
             wrapHeaderText: true,
             autoHeaderHeight: true,
             sortable: false,
             filter: false,
+            cellClass: numericField(field) ? 'numeric-cell' : undefined,
             spanRows: isItemField(field) ? false : sameRecordSpan,
             editable: can.update && !field.readonly && !['readonly', 'lookup', 'derived', 'file'].includes(field.type),
             cellEditor: GridEditor,
@@ -85,7 +103,9 @@ export default function ObjectGrid({ object, records, fields, can, contactCan = 
         return [...dataColumns, {
             colId: 'actions',
             headerName: '操作',
-            width: object.key === 'requisition' ? 440 : can.delete ? 286 : 210,
+            width: 124,
+            minWidth: 124,
+            maxWidth: 124,
             pinned: 'right',
             sortable: false,
             filter: false,
@@ -93,7 +113,7 @@ export default function ObjectGrid({ object, records, fields, can, contactCan = 
             spanRows: sameRecordSpan,
             cellRenderer: (params) => params.data?.__record ? <GridActions object={object} record={params.data.__record} can={can} /> : null,
         }];
-    }, [can, contactCan.create, fields, object, onContactCreate, onContactDetail, relationOptions, rowData]);
+    }, [can, contactCan.create, fields, object, onContactCreate, onContactDetail, relationOptions, rowData, savedColumnWidths]);
 
     const saveColumnOrder = useCallback((event) => {
         if (event.finished === false) return;
@@ -102,6 +122,34 @@ export default function ObjectGrid({ object, records, fields, can, contactCan = 
             onColumnOrderChange?.(order);
         }
     }, [fieldKeys, onColumnOrderChange]);
+
+    const updateVisibleFieldCount = useCallback((api) => {
+        const horizontalRange = api?.getHorizontalPixelRange?.();
+        const displayedColumns = api?.getAllDisplayedColumns?.() || [];
+        const currentFields = new Set(fieldKeys);
+        const visible = displayedColumns.filter((column) => {
+            if (!currentFields.has(column.getColId())) return false;
+            if (!horizontalRange) return true;
+
+            const left = column.getLeft?.() ?? 0;
+            const right = left + (column.getActualWidth?.() ?? 0);
+
+            return right > horizontalRange.left && left < horizontalRange.right;
+        }).length;
+
+        setVisibleFieldCount(visible);
+    }, [fieldKeys]);
+
+    const saveColumnWidths = useCallback((event) => {
+        updateVisibleFieldCount(event.api);
+        if (event.finished === false || event.source !== 'uiColumnResized') return;
+
+        onColumnWidthsChange?.(columnWidthsFromState(event.api.getColumnState(), fieldKeys));
+    }, [fieldKeys, onColumnWidthsChange, updateVisibleFieldCount]);
+
+    useEffect(() => {
+        setVisibleFieldCount(fields.length);
+    }, [fields.length, object.key]);
 
     useEffect(() => {
         if (!gridApi || object.key !== 'customer') return;
@@ -170,14 +218,11 @@ export default function ObjectGrid({ object, records, fields, can, contactCan = 
                 </div>
                 <div className="object-grid-toolbar-actions">
                     <span className="grid-field-count">
-                        已平铺全部 {fields.length} 个字段，可左右滚动查看
+                        共 {fields.length} 个字段，当前可见 {visibleFieldCount} 列，可横向滚动查看全部字段
                     </span>
-                    <a className="small-action" href={exportUrl || `/objects/${object.key}/export.csv`} download>
-                        <Download size={14} /> 导出明细
-                    </a>
                 </div>
             </div>
-            <div className="object-grid ag-theme-quartz">
+            <div className={`object-grid ag-theme-quartz${rowData.length > 7 ? ' has-zebra' : ''}`}>
                 <AgGridProvider modules={modules}>
                     <AgGridReact
                         rowData={rowData}
@@ -190,9 +235,15 @@ export default function ObjectGrid({ object, records, fields, can, contactCan = 
                         getRowHeight={({ data }) => customerRowHeight(object.key, data?.__record, contactCan)}
                         enableCellSpan
                         maintainColumnOrder
-                        onGridReady={(event) => setGridApi(event.api)}
+                        onGridReady={(event) => {
+                            setGridApi(event.api);
+                            setTimeout(() => updateVisibleFieldCount(event.api), 0);
+                        }}
                         onCellValueChanged={saveCell}
                         onColumnMoved={saveColumnOrder}
+                        onColumnResized={saveColumnWidths}
+                        onBodyScroll={(event) => updateVisibleFieldCount(event.api)}
+                        onGridSizeChanged={(event) => updateVisibleFieldCount(event.api)}
                         rowClassRules={{ 'selected-row-grid': (params) => params.data?.__recordId === selectedRecordId }}
                         stopEditingWhenCellsLoseFocus
                         theme="legacy"
@@ -204,7 +255,7 @@ export default function ObjectGrid({ object, records, fields, can, contactCan = 
 }
 
 function customerRowHeight(objectKey, record, contactCan) {
-    if (objectKey !== 'customer' || !record) return undefined;
+    if (objectKey !== 'customer' || !record) return 44;
 
     const contactCount = Array.isArray(record.contacts) ? record.contacts.length : 0;
     if (contactCount === 0) return contactCan.create ? 70 : 56;
@@ -289,44 +340,45 @@ function GridActions({ object, record, can }) {
             {record.is_new_task && (
                 <span className="workflow-task-badge" aria-label="新任务">新任务</span>
             )}
-            <Link
-                className="grid-action"
-                href={`/objects/${object.key}?record=${record.id}&mode=detail`}
-                preserveScroll
-                aria-label={`查看 ${record.code} 详情`}
-            >
-                <Eye size={14} />
-                <span>查看</span>
-            </Link>
-            {can.update ? (
-                <Link
-                    className="grid-action"
-                    href={`/objects/${object.key}?record=${record.id}&mode=edit`}
-                    preserveScroll
-                    aria-label={`编辑 ${record.code}`}
-                >
-                    <Pencil size={14} />
-                    <span>编辑</span>
-                </Link>
-            ) : <span className="grid-action-disabled" title="当前角色无编辑权限"><EyeOff size={14} />只读</span>}
-            {object.key === 'requisition' && can.update && record.payload?.status === '待处理' && (
-                <>
-                    <button type="button" className="grid-action success" onClick={approve} aria-label={`通过 ${record.code}`}>
-                        <Check size={14} />
-                        <span>通过</span>
-                    </button>
-                    <button type="button" className="grid-action warning" onClick={reject} aria-label={`驳回 ${record.code}`}>
-                        <XCircle size={14} />
-                        <span>驳回</span>
-                    </button>
-                </>
-            )}
-            {can.delete && (
-                <button type="button" className="grid-action danger" onClick={destroy} aria-label={`删除 ${record.code}`}>
-                    <Trash2 size={14} />
-                    <span>删除</span>
-                </button>
-            )}
+            <RowActions
+                menuLabel={`${record.code} 更多操作`}
+                primary={(
+                    <Link
+                        className="grid-action"
+                        href={`/objects/${object.key}?record=${record.id}&mode=detail`}
+                        preserveScroll
+                        aria-label={`查看 ${record.code} 详情`}
+                    >
+                        <Eye size={14} />
+                        <span>查看</span>
+                    </Link>
+                )}
+                secondary={[
+                    can.update && (
+                        <Link key="edit" href={`/objects/${object.key}?record=${record.id}&mode=edit`} preserveScroll aria-label={`编辑 ${record.code}`}>
+                            <Pencil size={14} /> 编辑
+                        </Link>
+                    ),
+                    object.key === 'requisition' && can.update && record.payload?.status === '待处理' && (
+                        <button key="approve" type="button" onClick={approve} aria-label={`通过 ${record.code}`}>
+                            <Check size={14} /> 通过
+                        </button>
+                    ),
+                    object.key === 'requisition' && can.update && record.payload?.status === '待处理' && (
+                        <button key="reject" type="button" className="danger" onClick={reject} aria-label={`驳回 ${record.code}`}>
+                            <XCircle size={14} /> 驳回
+                        </button>
+                    ),
+                    can.delete && (
+                        <button key="delete" type="button" className="danger" onClick={destroy} aria-label={`删除 ${record.code}`}>
+                            <Trash2 size={14} /> 删除
+                        </button>
+                    ),
+                    !can.update && !can.delete && (
+                        <span key="readonly" className="row-action-readonly"><EyeOff size={14} /> 只读</span>
+                    ),
+                ].filter(Boolean)}
+            />
         </div>
     );
 }
@@ -357,7 +409,7 @@ function optionsFor(field, value, relationOptions) {
 }
 
 function renderValue(field, record, value, relationOptions, row = null) {
-    if (!value) return '';
+    if (value === null || value === undefined || value === '') return <span className="empty-value">—</span>;
     if (field.system === 'code') return <span className="mono">{value}</span>;
     if (field.system === 'title') return <span title={String(value)}>{String(value)}</span>;
     if (['relation', 'creatable_relation'].includes(field.type)) {
@@ -365,11 +417,11 @@ function renderValue(field, record, value, relationOptions, row = null) {
         const text = (snapshot?.id === value ? snapshot.label : null)
             || (isItemField(field) ? null : record?.display?.[field.key])
             || displayValueFor(field, value, relationOptions);
-        return <span title={text}>{text}</span>;
+        return text ? <span title={text}>{text}</span> : <span className="empty-value">—</span>;
     }
     if (field.type === 'multirelation') {
         const text = Array.isArray(record?.display?.[field.key]) ? record.display[field.key].join('、') : '';
-        return <span title={text}>{text}</span>;
+        return text ? <span title={text}>{text}</span> : <span className="empty-value">—</span>;
     }
     if (field.type === 'file') return <a className="relation-chip" href={record?.display?.[field.key] || value} target="_blank" rel="noreferrer">查看附件</a>;
 
@@ -385,26 +437,46 @@ function displayValueFor(field, value, relationOptions) {
 }
 
 function columnWidth(field, objectKey, rows, relationOptions) {
-    const base = {
-        date: 112,
-        number: 112,
-        select: 132,
-        relation: 220,
-        text: 150,
-        readonly: 150,
-    }[field.type] ?? 150;
+    const bounds = columnBounds(field);
     const longest = Math.max(
         textWidth(field.label),
         ...rows.map((row) => textWidth(displayText(field, row, relationOptions))),
     );
-    const preferred = Math.max(base, longest + 34);
-    const max = ['remark', 'risk'].includes(field.key) ? 420 : 320;
+    const preferred = Math.max(bounds.preferred, longest + 34);
 
     if (objectKey === 'purchase' && ['date', 'purchase_date', 'expected_arrival_date', 'actual_arrival_date'].includes(field.key)) {
         return 118;
     }
 
-    return Math.min(preferred, max);
+    return Math.min(preferred, bounds.max);
+}
+
+function columnBounds(field) {
+    if (['relation', 'multirelation', 'creatable_relation'].includes(field.type)) {
+        return { min: 220, preferred: 280, max: 360 };
+    }
+    if (field.type === 'date') {
+        return { min: 112, preferred: 120, max: 132 };
+    }
+    if (numericField(field)) {
+        return { min: 104, preferred: 118, max: 160 };
+    }
+    if (field.type === 'select') {
+        return { min: 112, preferred: 132, max: 180 };
+    }
+    if (field.system === 'code') {
+        return { min: 160, preferred: 180, max: 220 };
+    }
+    if (['remark', 'risk'].includes(field.key)) {
+        return { min: 200, preferred: 240, max: 420 };
+    }
+
+    return { min: 160, preferred: 200, max: 320 };
+}
+
+function numericField(field) {
+    return field.type === 'number'
+        || /(?:amount|count|price|qty|quantity|weight|progress|total|rate|percent)$/i.test(field.key);
 }
 
 function displayText(field, row, relationOptions) {

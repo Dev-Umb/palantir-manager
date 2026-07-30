@@ -25,7 +25,8 @@ describe('ObjectGrid date editing', () => {
         });
     });
 
-    afterEach(() => {
+    afterEach(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
         cleanup();
         vi.restoreAllMocks();
     });
@@ -182,22 +183,28 @@ describe('ObjectGrid date editing', () => {
         expect(globalThis.fetch).not.toHaveBeenCalled();
     });
 
-    it('links export to the server endpoint instead of exporting current row data', async () => {
+    it('keeps one primary row action and moves editing into the overflow menu', async () => {
         render(
             <ObjectGrid
                 object={{ key: 'purchase', label: '采购日报' }}
-                records={[]}
+                records={[{
+                    id: 'purchase-1',
+                    code: 'CG-001',
+                    title: '采购日报',
+                    payload: {},
+                    display: {},
+                }]}
                 fields={[]}
-                can={{ update: false, delete: false }}
+                can={{ update: true, delete: false }}
                 selectedRecordId={null}
                 relationOptions={{}}
                 onRecordChange={() => {}}
-                exportUrl="/objects/purchase/export.csv?q=Q235B"
             />,
         );
 
-        expect((await screen.findByRole('link', { name: '导出明细' })).getAttribute('href'))
-            .toBe('/objects/purchase/export.csv?q=Q235B');
+        expect(await screen.findByRole('link', { name: '查看 CG-001 详情' })).not.toBeNull();
+        expect(screen.getByLabelText('CG-001 更多操作')).not.toBeNull();
+        expect(screen.getByRole('link', { name: '编辑 CG-001' })).not.toBeNull();
     });
 
     it('inserts the stacked contact list immediately after the customer name', async () => {
@@ -280,7 +287,7 @@ describe('ObjectGrid date editing', () => {
             />,
         );
 
-        expect(await screen.findByText('已平铺全部 0 个字段，可左右滚动查看')).not.toBeNull();
+        expect(await screen.findByText('共 0 个字段，当前可见 0 列，可横向滚动查看全部字段')).not.toBeNull();
         expect(screen.queryByText('No Rows To Show')).toBeNull();
     });
 
@@ -409,8 +416,53 @@ describe('ObjectGrid date editing', () => {
             />,
         );
 
-        expect(await screen.findByText('已平铺全部 10 个字段，可左右滚动查看')).not.toBeNull();
+        expect(await screen.findByText(/共 10 个字段，当前可见 \d+ 列，可横向滚动查看全部字段/)).not.toBeNull();
         expect(await screen.findByRole('columnheader', { name: '字段 10' })).not.toBeNull();
+    });
+
+    it('applies saved user widths before adaptive defaults', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'project', label: '项目主档' }}
+                records={[]}
+                fields={[{ key: 'name', label: '项目名称', type: 'text' }]}
+                can={{ update: false, delete: false }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                savedColumnWidths={{ name: 286 }}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        await screen.findByRole('columnheader', { name: '项目名称' });
+        expect(document.querySelector('.ag-header-cell[col-id="name"]')?.style.width).toBe('286px');
+    });
+
+    it('shows zero and a visible empty marker without treating them as the same value', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'project', label: '项目主档' }}
+                records={[{
+                    id: 'project-1',
+                    code: 'PRJ-001',
+                    title: '甲项目',
+                    payload: { progress: 0, remark: '' },
+                    display: {},
+                }]}
+                fields={[
+                    { key: 'progress', label: '进度', type: 'number' },
+                    { key: 'remark', label: '备注', type: 'text' },
+                ]}
+                can={{ update: false, delete: false }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        expect(await screen.findByRole('gridcell', { name: '0' })).not.toBeNull();
+        expect((await screen.findByText('—')).classList.contains('empty-value')).toBe(true);
+        expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBe(44);
     });
 
     it('uses explicit text and accessible names for row actions', async () => {

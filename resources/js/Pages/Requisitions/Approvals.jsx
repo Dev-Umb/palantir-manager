@@ -2,12 +2,13 @@ import { Head, router } from '@inertiajs/react';
 import { Check, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import Layout from '../../Components/Layout';
+import RowActions from '../../Components/RowActions';
 
 export default function Approvals({ pending, processed }) {
     return (
-        <Layout title="采购OA审批" eyebrow="请购审批">
+        <Layout title="采购OA审批" eyebrow="采购OA审批">
             <Head title="采购OA审批" />
-            <section className="surface">
+            <section className="surface approval-pending">
                 <div className="section-head">
                     <div>
                         <p>待审批</p>
@@ -22,7 +23,7 @@ export default function Approvals({ pending, processed }) {
                 ) : <p className="muted">暂无待审批采购申请。</p>}
             </section>
 
-            <section className="surface">
+            <section className="surface approval-processed">
                 <div className="section-head">
                     <div>
                         <p>已处理</p>
@@ -78,12 +79,19 @@ function ApprovalCard({ record, actions = false }) {
             </dl>
             {actions && (
                 <div className="approval-actions">
-                    <button type="button" className="icon-success" onClick={approve} disabled={Boolean(decision)}>
-                        <Check size={16} /> {decision === 'approve' ? '处理中...' : '通过申请'}
-                    </button>
-                    <button type="button" className="icon-warning" onClick={reject} disabled={Boolean(decision)}>
-                        <XCircle size={16} /> {decision === 'reject' ? '处理中...' : '驳回'}
-                    </button>
+                    <RowActions
+                        menuLabel={`${record.code} 更多审批操作`}
+                        primary={(
+                            <button type="button" className="approval-primary" onClick={approve} disabled={Boolean(decision)}>
+                                <Check size={16} /> {decision === 'approve' ? '处理中...' : '通过申请'}
+                            </button>
+                        )}
+                        secondary={[
+                            <button key="reject" type="button" className="danger" onClick={reject} disabled={Boolean(decision)}>
+                                <XCircle size={16} /> {decision === 'reject' ? '处理中...' : '驳回'}
+                            </button>,
+                        ]}
+                    />
                 </div>
             )}
         </article>

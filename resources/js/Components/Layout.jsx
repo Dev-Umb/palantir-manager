@@ -13,7 +13,7 @@ const iconFor = {
     ai: Bot,
 };
 
-export default function Layout({ title, eyebrow, children, aside, immersive = false }) {
+export default function Layout({ title, eyebrow, children, aside, immersive = false, hideHeader = false }) {
     const page = usePage();
     const { auth, nav, flash, notificationUnreadCount = 0 } = page.props;
     const visibleNav = (nav || []).filter((item) => item.visible);
@@ -34,6 +34,7 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                         const itemLabel = businessText(item.label);
                         const Icon = iconFor[item.key] || LayoutDashboard;
                         const open = isActive(page.url, item.href) || (item.children || []).some((group) => group.items.some((child) => isActive(page.url, child.href, true)));
+                        const moduleGroups = (item.children || []).filter((group) => group.items?.length > 0);
                         return (
                             <div key={item.href} className="nav-group">
                                 <Link href={item.href} className={`nav-item ${open ? 'active' : ''}`}>
@@ -45,7 +46,25 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                                         </b>
                                     )}
                                 </Link>
-                                {open && item.children?.length > 0 && (
+                                {open && item.key === 'ontology' && moduleGroups.length > 0 && (
+                                    <div className="nav-module-list" aria-label="业务资料模块">
+                                        {moduleGroups.map((group) => {
+                                            const active = group.items.some((child) => isActive(page.url, child.href, true));
+
+                                            return (
+                                                <Link
+                                                    key={group.label}
+                                                    href={group.items[0].href}
+                                                    className={active ? 'active' : ''}
+                                                    aria-current={active ? 'page' : undefined}
+                                                >
+                                                    {businessText(group.label)}
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {open && item.key !== 'ontology' && item.children?.length > 0 && (
                                     <div className="nav-sublist">
                                         {item.children.map((group) => (
                                             <section key={group.label}>
@@ -85,16 +104,11 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                 </div>
             </aside>
             <main className={`workspace ${immersive ? 'workspace-immersive' : ''}`}>
-                {!immersive && (
+                {!hideHeader && (
                     <header className="workspace-head">
                         <div>
                             <p>{eyebrow}</p>
                             <h1>{title}</h1>
-                        </div>
-                        <div className="role-strip">
-                            {(auth.roles || []).map((role) => (
-                                <span key={role.id}>{role.label === '管理' ? '管理员视图' : `${role.label}视图`}</span>
-                            ))}
                         </div>
                     </header>
                 )}

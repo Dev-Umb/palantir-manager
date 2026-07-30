@@ -18,7 +18,7 @@ vi.mock('@inertiajs/react', () => ({
 }));
 
 vi.mock('../../Components/Layout', () => ({
-    default: ({ children }) => <main>{children}</main>,
+    default: ({ children, title, eyebrow }) => <main data-title={title} data-eyebrow={eyebrow}>{children}</main>,
 }));
 
 afterEach(() => {
@@ -27,6 +27,15 @@ afterEach(() => {
 });
 
 describe('RBAC role editor', () => {
+    it('uses the unified page header contract', () => {
+        const { container } = render(
+            <Index users={[]} roles={[]} permissions={{}} />,
+        );
+
+        expect(container.querySelector('main')).toHaveAttribute('data-title', '用户与权限');
+        expect(container.querySelector('main')).toHaveAttribute('data-eyebrow', '用户与权限');
+    });
+
     it('only enables a user-specific save action after roles change', () => {
         render(
             <Index

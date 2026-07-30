@@ -6,13 +6,13 @@ export default function NotificationsIndex({ notifications, unreadCount }) {
     const items = notifications?.data || [];
 
     return (
-        <Layout title="通知中心" eyebrow="项目风险提醒">
+        <Layout title="通知中心" eyebrow="通知中心">
             <Head title="通知中心" />
             <section className="surface">
                 <div className="section-head">
                     <div>
-                        <p>合同与回款</p>
-                        <h2>站内通知</h2>
+                        <p>风险提醒</p>
+                        <h2>通知记录</h2>
                         <span>当前有 {unreadCount} 条未读风险提醒，已处理风险仍保留历史记录。</span>
                     </div>
                     {unreadCount > 0 && (
@@ -64,8 +64,7 @@ export default function NotificationsIndex({ notifications, unreadCount }) {
                     <div className="empty-state">
                         <Bell size={24} />
                         <strong>目前没有需要处理的风险提醒</strong>
-                        <span>合同逾期、回款异常等风险出现时，会在这里通知你；已处理记录也会保留。</span>
-                        <Link className="secondary-button" href="/">返回经营大盘</Link>
+                        <span>合同逾期、回款异常等风险出现时，会在这里通知你。</span>
                     </div>
                 )}
 

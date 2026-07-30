@@ -215,7 +215,7 @@ export default function AiIndex({ conversations: initialConversations }) {
     }
 
     return (
-        <Layout immersive>
+        <Layout title="AI 数据助手" eyebrow="AI 数据助手" immersive>
             <Head title="AI 数据助手" />
             <div className="ai-v2-shell">
                 <header className="ai-v2-toolbar">
@@ -224,7 +224,7 @@ export default function AiIndex({ conversations: initialConversations }) {
                             <Menu size={18} />
                         </button>
                         <div>
-                            <strong>数据分析助手</strong>
+                            <strong>AI 数据助手</strong>
                             <span><ConnectionDot state={connection} />{connectionLabel(connection, activeRun)}</span>
                         </div>
                     </div>
@@ -420,6 +420,7 @@ function AiEmptyState({ onPrompt }) {
         <div className="ai-v2-empty">
             <div className="ai-empty-mark"><Bot size={22} /></div>
             <h2>今天想分析什么？</h2>
+            <p><History size={14} /> 左上角菜单可查看和继续历史会话</p>
             <div>{prompts.map((prompt) => <button key={prompt} type="button" onClick={() => onPrompt(prompt)}>{prompt}</button>)}</div>
         </div>
     );

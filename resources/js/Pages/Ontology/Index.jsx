@@ -1,11 +1,17 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Plus, X } from 'lucide-react';
+import { Download, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import Layout from '../../Components/Layout';
 import CustomerContactModal from '../../Components/CustomerContactModal';
 import { SchemaForm } from '../../Components/FieldControl';
 import LineItemsEditor, { emptyItem } from '../../Components/LineItemsEditor';
-import { columnOrderStorageKey, fieldsInColumnOrder, readColumnOrder } from '../../Components/objectGridColumnState';
+import {
+    columnOrderStorageKey,
+    columnWidthStorageKey,
+    fieldsInColumnOrder,
+    readColumnOrder,
+    readColumnWidths,
+} from '../../Components/objectGridColumnState';
 import { scopedRelationOptions } from '../../Components/objectGridRows';
 import { businessText } from '../../businessLanguage';
 
@@ -20,7 +26,9 @@ export default function Index({ objects = [], currentObject, records, can, relat
     const selectedRecord = tableRecords.find((record) => record.id === selectedRecordId) || selectedRecordProp;
     const closeHref = `/objects/${currentObject.key}`;
     const storageKey = columnOrderStorageKey(auth.user?.id ?? 'anonymous', currentObject.key);
+    const widthStorageKey = columnWidthStorageKey(auth.user?.id ?? 'anonymous', currentObject.key);
     const [columnOrder, setColumnOrder] = useState(() => readColumnOrder(storageKey));
+    const [columnWidths, setColumnWidths] = useState(() => readColumnWidths(widthStorageKey));
     const orderedFields = useMemo(
         () => fieldsInColumnOrder(currentObject.fields, columnOrder),
         [columnOrder, currentObject.fields],
@@ -42,6 +50,10 @@ export default function Index({ objects = [], currentObject, records, can, relat
         setColumnOrder(readColumnOrder(storageKey));
     }, [storageKey]);
 
+    useEffect(() => {
+        setColumnWidths(readColumnWidths(widthStorageKey));
+    }, [widthStorageKey]);
+
     function updateTableRecord(nextRecord) {
         setTableRecords((current) => current.map((record) => record.id === nextRecord.id ? nextRecord : record));
     }
@@ -56,6 +68,15 @@ export default function Index({ objects = [], currentObject, records, can, relat
         setColumnOrder(normalized);
         try {
             window.localStorage.setItem(storageKey, JSON.stringify(normalized));
+        } catch {
+            // localStorage can be unavailable in private or locked-down browser modes.
+        }
+    }
+
+    function saveColumnWidths(widths) {
+        setColumnWidths(widths);
+        try {
+            window.localStorage.setItem(widthStorageKey, JSON.stringify(widths));
         } catch {
             // localStorage can be unavailable in private or locked-down browser modes.
         }
@@ -80,30 +101,44 @@ export default function Index({ objects = [], currentObject, records, can, relat
 
     return (
         <Layout
-            title="业务资料"
-            eyebrow="客户、项目、合同等资料"
-            immersive
+            title={objectLabel}
+            eyebrow="业务资料"
+            hideHeader
         >
-            <Head title="业务资料" />
+            <Head title={objectLabel} />
             <div className="object-main">
-                    <div className="surface">
-                        <div className="section-head">
-                            <div>
-                                <p>{businessText(currentObject.group)}</p>
-                                <h2>{objectLabel}</h2>
-                            </div>
-                            <div className="section-actions">
-                                <span className="pill">数据列表</span>
+                    <ObjectSwitcher objects={objects} currentObject={currentObject} />
+                    <div className="surface object-list-surface">
+                        <div className="object-toolbar">
+                            <ObjectListControls objectKey={currentObject.key} params={params} records={records} fields={currentObject.fields} />
+                            <div className="object-toolbar-actions">
+                                <a className="secondary-button" href={exportUrl} download>
+                                    <Download size={15} /> 导出
+                                </a>
                                 {can.create && (
-                                    <Link className="small-action action-button" href={`/objects/${currentObject.key}?mode=create`}>
-                                        <Plus size={15} /> 新建
-                                    </Link>
+                                <Link className="small-action action-button" href={`/objects/${currentObject.key}?mode=create`}>
+                                    <Plus size={15} /> 新建
+                                </Link>
                                 )}
                             </div>
                         </div>
-                        <ObjectListControls objectKey={currentObject.key} params={params} records={records} fields={currentObject.fields} />
                         <Suspense fallback={<div className="table-loading">列表加载中...</div>}>
-                            <ObjectGrid key={storageKey} object={currentObject} records={tableRecords} fields={orderedFields} can={can} contactCan={contactCan} selectedRecordId={selectedRecordId} relationOptions={relationOptions} onRecordChange={updateTableRecord} onColumnOrderChange={saveColumnOrder} onContactDetail={openContactDetail} onContactCreate={openContactCreate} exportUrl={exportUrl} />
+                            <ObjectGrid
+                                key={storageKey}
+                                object={currentObject}
+                                records={tableRecords}
+                                fields={orderedFields}
+                                can={can}
+                                contactCan={contactCan}
+                                selectedRecordId={selectedRecordId}
+                                relationOptions={relationOptions}
+                                savedColumnWidths={columnWidths}
+                                onRecordChange={updateTableRecord}
+                                onColumnOrderChange={saveColumnOrder}
+                                onColumnWidthsChange={saveColumnWidths}
+                                onContactDetail={openContactDetail}
+                                onContactCreate={openContactCreate}
+                            />
                         </Suspense>
                         <ObjectPagination records={records} />
                     </div>
@@ -147,6 +182,54 @@ export default function Index({ objects = [], currentObject, records, can, relat
     );
 }
 
+function ObjectSwitcher({ objects, currentObject }) {
+    const groupObjects = currentObject.group
+        ? objects.filter((object) => object.group === currentObject.group)
+        : objects;
+    const tabObjects = groupObjects.filter((object) => object.key !== 'customer_contact');
+    const groupOptions = [...objects.reduce((groups, object) => {
+        if (object.group && !groups.has(object.group)) {
+            groups.set(object.group, object);
+        }
+
+        return groups;
+    }, new Map()).entries()];
+
+    return (
+        <div className="object-switcher-wrap">
+            <label className="object-module-mobile">
+                <span>业务模块</span>
+                <select
+                    value={currentObject.group || ''}
+                    onChange={(event) => {
+                        const firstObject = groupOptions.find(([group]) => group === event.target.value)?.[1];
+                        if (firstObject) router.visit(`/objects/${firstObject.key}`);
+                    }}
+                >
+                    {groupOptions.map(([group]) => <option key={group} value={group}>{businessText(group)}</option>)}
+                </select>
+            </label>
+            <nav className="object-switcher" aria-label="业务资料类型">
+                <div className="object-switcher-tabs">
+                    {tabObjects.map((object) => (
+                        <Link
+                            key={object.key}
+                            href={`/objects/${object.key}`}
+                            className={object.key === currentObject.key ? 'active' : ''}
+                            aria-current={object.key === currentObject.key ? 'page' : undefined}
+                        >
+                            {businessText(object.label)}
+                        </Link>
+                    ))}
+                </div>
+                <span className="object-switcher-meta">
+                    {businessText(currentObject.group)} · {tabObjects.length} 张表
+                </span>
+            </nav>
+        </div>
+    );
+}
+
 function ObjectListControls({ objectKey, params, records, fields = [] }) {
     const preserved = [...params.entries()].filter(([key]) => !['q', 'per_page', 'page', 'sort', 'direction'].includes(key));
     const sortable = fields.filter((field) => field.scope !== 'item'
@@ -157,12 +240,13 @@ function ObjectListControls({ objectKey, params, records, fields = [] }) {
             {preserved.map(([key, value], index) => (
                 <input key={`${key}-${value}-${index}`} type="hidden" name={key} value={value} />
             ))}
-            <label>
-                <span>搜索</span>
+            <label className="object-search">
+                <Search size={16} />
+                <span className="sr-only">搜索</span>
                 <input type="search" name="q" aria-label="搜索记录" defaultValue={params.get('q') || ''} placeholder="搜索编号、标题或字段内容" />
             </label>
             <label>
-                <span>每页</span>
+                <span className="sr-only">每页</span>
                 <select name="per_page" aria-label="每页条数" defaultValue={String(records.per_page || 50)}>
                     <option value="25">25 条</option>
                     <option value="50">50 条</option>
@@ -170,20 +254,20 @@ function ObjectListControls({ objectKey, params, records, fields = [] }) {
                 </select>
             </label>
             <label>
-                <span>排序</span>
+                <span className="sr-only">排序</span>
                 <select name="sort" aria-label="排序字段" defaultValue={params.get('sort') || ''}>
                     <option value="">默认（最近更新）</option>
                     {sortable.map((field) => <option value={field.key} key={field.key}>{field.label}</option>)}
                 </select>
             </label>
             <label>
-                <span>方向</span>
+                <span className="sr-only">方向</span>
                 <select name="direction" aria-label="排序方向" defaultValue={params.get('direction') === 'desc' ? 'desc' : 'asc'}>
                     <option value="asc">升序</option>
                     <option value="desc">降序</option>
                 </select>
             </label>
-            <button type="submit">查询</button>
+            <button type="submit" className="filter-button"><SlidersHorizontal size={15} /> 应用</button>
         </form>
     );
 }

@@ -2,8 +2,20 @@ export function columnOrderStorageKey(userId, objectKey) {
     return `xyc.objectGrid.columnOrder.${userId}.${objectKey}`;
 }
 
+export function columnWidthStorageKey(userId, objectKey) {
+    return `xyc.objectGrid.columnWidths.${userId}.${objectKey}`;
+}
+
 export function columnOrderFromState(state, fieldKeys) {
     return currentKeys(state.map((item) => item.colId), fieldKeys);
+}
+
+export function columnWidthsFromState(state, fieldKeys) {
+    const fields = new Set(fieldKeys);
+
+    return Object.fromEntries(state
+        .filter((item) => fields.has(item.colId) && Number.isFinite(item.width) && item.width > 0)
+        .map((item) => [item.colId, Math.round(item.width)]));
 }
 
 export function columnOrderState(savedOrder, fieldKeys) {
@@ -36,6 +48,23 @@ export function readColumnOrder(storageKey) {
         return Array.isArray(parsed) ? parsed : [];
     } catch {
         return [];
+    }
+}
+
+export function readColumnWidths(storageKey) {
+    try {
+        const value = window.localStorage.getItem(storageKey);
+        const parsed = value ? JSON.parse(value) : {};
+
+        if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+            return {};
+        }
+
+        return Object.fromEntries(Object.entries(parsed)
+            .filter(([, width]) => Number.isFinite(width) && width > 0)
+            .map(([key, width]) => [key, Math.round(width)]));
+    } catch {
+        return {};
     }
 }
 

@@ -3,7 +3,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { columnOrderStorageKey } from '../../Components/objectGridColumnState';
+import { columnOrderStorageKey, columnWidthStorageKey } from '../../Components/objectGridColumnState';
 import Index from './Index';
 
 const inertia = vi.hoisted(() => ({
@@ -12,6 +12,7 @@ const inertia = vi.hoisted(() => ({
     post: vi.fn(),
     put: vi.fn(),
     reload: vi.fn(),
+    visit: vi.fn(),
 }));
 
 const storedValues = new Map();
@@ -31,7 +32,7 @@ vi.mock('@inertiajs/react', async () => {
     return {
         Head: () => null,
         Link: ({ children, preserveScroll: _preserveScroll, ...props }) => <a {...props}>{children}</a>,
-        router: { reload: inertia.reload },
+        router: { reload: inertia.reload, visit: inertia.visit },
         usePage: () => ({ props: { auth: { user: { id: inertia.userId }, permissions: inertia.permissions } } }),
         useForm: (initial) => {
             const [data, setFormData] = React.useState(initial);
@@ -49,15 +50,23 @@ vi.mock('@inertiajs/react', async () => {
 });
 
 vi.mock('../../Components/Layout', () => ({
-    default: ({ children, immersive = false }) => <main data-immersive={String(immersive)}>{children}</main>,
+    default: ({ children, immersive = false, title, eyebrow, hideHeader = false }) => (
+        <main data-immersive={String(immersive)} data-hide-header={String(hideHeader)}>
+            {!hideHeader && <p>{eyebrow}</p>}
+            {!hideHeader && <h1>{title}</h1>}
+            {children}
+        </main>
+    ),
 }));
 
 vi.mock('../../Components/ObjectGrid', () => ({
-    default: ({ object, records, fields, onColumnOrderChange, onContactDetail, onContactCreate, exportUrl }) => (
+    default: ({ object, records, fields, savedColumnWidths, onColumnOrderChange, onColumnWidthsChange, onContactDetail, onContactCreate, exportUrl }) => (
         <div>
             <div data-testid="grid-order">{fields.map((field) => field.key).join('|')}</div>
+            <div data-testid="grid-widths">{JSON.stringify(savedColumnWidths)}</div>
             <a data-testid="server-export" href={exportUrl}>服务端导出</a>
             <button type="button" onClick={() => onColumnOrderChange?.(['note', 'deleted_field', 'phone', 'note'])}>模拟拖动列</button>
+            <button type="button" onClick={() => onColumnWidthsChange?.({ phone: 214, note: 320 })}>模拟调整列宽</button>
             {object.key === 'customer' && records[0] && (
                 <>
                     <button type="button" onClick={() => onContactCreate?.(records[0])}>模拟新增联系人</button>
@@ -90,11 +99,17 @@ const record = {
 describe('Ontology workspace layout', () => {
     afterEach(cleanup);
 
-    it('uses the full-height workspace without the redundant page heading', () => {
+    it('hides the page header and limits tabs to the active business module', () => {
         window.history.replaceState({}, '', '/objects/project');
 
         const { container } = render(
             <Index
+                objects={[
+                    { id: 2, key: 'customer', label: '客户信息', group: '主数据' },
+                    { id: 5, key: 'customer_contact', label: '客户联系人', group: '主数据' },
+                    { id: 3, key: 'project', label: '项目主档', group: '主数据' },
+                    { id: 4, key: 'contract', label: '合同台账', group: '履约' },
+                ]}
                 currentObject={{
                     id: 3,
                     key: 'project',
@@ -109,7 +124,17 @@ describe('Ontology workspace layout', () => {
             />,
         );
 
-        expect(container.querySelector('main')).toHaveAttribute('data-immersive', 'true');
+        expect(container.querySelector('main')).toHaveAttribute('data-immersive', 'false');
+        expect(container.querySelector('main')).toHaveAttribute('data-hide-header', 'true');
+        expect(screen.queryByRole('heading', { name: '项目资料' })).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '客户信息' })).toHaveAttribute('href', '/objects/customer');
+        expect(screen.getByRole('link', { name: '项目资料' })).toHaveAttribute('href', '/objects/project');
+        expect(screen.queryByRole('link', { name: '客户联系人' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: '合同台账' })).not.toBeInTheDocument();
+        expect(screen.getByText('基础资料 · 2 张表')).toBeInTheDocument();
+        expect(screen.getByLabelText('业务模块')).toHaveValue('主数据');
+        expect(screen.queryByText('数据列表')).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '新建' })).toHaveAttribute('href', '/objects/project?mode=create');
     });
 });
 
@@ -119,6 +144,10 @@ describe('Ontology personal field order', () => {
         window.localStorage.setItem(
             columnOrderStorageKey(inertia.userId, 'customer'),
             JSON.stringify(['phone', 'deleted_field', 'name']),
+        );
+        window.localStorage.setItem(
+            columnWidthStorageKey(inertia.userId, 'customer'),
+            JSON.stringify({ phone: 188 }),
         );
     });
 
@@ -163,6 +192,18 @@ describe('Ontology personal field order', () => {
             columnOrderStorageKey(inertia.userId, 'customer'),
         ))).toEqual(['note', 'phone', 'name', 'position']));
         expect(screen.getByTestId('grid-order')).toHaveTextContent('note|phone|name|position');
+    });
+
+    it('restores and persists per-user widths after the user resizes a column', async () => {
+        renderPage('create');
+
+        expect(await screen.findByTestId('grid-widths')).toHaveTextContent('{"phone":188}');
+        fireEvent.click(screen.getByRole('button', { name: '模拟调整列宽' }));
+
+        await waitFor(() => expect(JSON.parse(window.localStorage.getItem(
+            columnWidthStorageKey(inertia.userId, 'customer'),
+        ))).toEqual({ phone: 214, note: 320 }));
+        expect(screen.getByTestId('grid-widths')).toHaveTextContent('{"phone":214,"note":320}');
     });
 });
 
@@ -458,7 +499,7 @@ describe('server pagination and export', () => {
         const filterForm = screen.getByRole('search', { name: '业务数据筛选' });
         expect(filterForm.querySelector('input[name="mode"]')).toHaveValue('detail');
         expect(filterForm.querySelector('input[name="record"]')).toHaveValue('material-87');
-        expect(screen.getByTestId('server-export')).toHaveAttribute(
+        expect(screen.getByRole('link', { name: '导出' })).toHaveAttribute(
             'href',
             '/objects/material/export.csv?q=Q235B&sort=name&direction=asc',
         );

@@ -6,7 +6,7 @@ import { businessText, permissionGroupLabel } from '../../businessLanguage';
 
 export default function Index({ users, roles, permissions }) {
     return (
-        <Layout title="用户与权限" eyebrow="系统权限管理" aside={<RbacAside />}>
+        <Layout title="用户与权限" eyebrow="用户与权限" aside={<RbacAside />}>
             <Head title="用户与权限" />
             <section className="surface">
                 <div className="section-head">

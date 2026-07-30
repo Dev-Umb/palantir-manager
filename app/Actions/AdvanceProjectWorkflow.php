@@ -43,8 +43,8 @@ class AdvanceProjectWorkflow
         }
 
         if ($record->businessObject->key === 'work_order'
-            && ($oldPayload['status'] ?? null) !== '完成'
-            && ($payload['status'] ?? null) === '完成') {
+            && ($oldPayload['status'] ?? null) !== '已完成'
+            && ($payload['status'] ?? null) === '已完成') {
             $this->completeWorkOrder($record, $user, $writer);
 
             return;
@@ -130,7 +130,7 @@ class AdvanceProjectWorkflow
                 $this->object('work_order'),
                 [
                     'drawing_id' => $drawing->id,
-                    'status' => '未完成',
+                    'status' => '未开始',
                     'release_status' => '未下放',
                 ],
                 $user,

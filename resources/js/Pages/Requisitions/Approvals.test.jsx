@@ -13,7 +13,7 @@ vi.mock('@inertiajs/react', () => ({
 }));
 
 vi.mock('../../Components/Layout', () => ({
-    default: ({ children }) => <main>{children}</main>,
+    default: ({ children, title, eyebrow }) => <main data-title={title} data-eyebrow={eyebrow}>{children}</main>,
 }));
 
 afterEach(() => {
@@ -23,6 +23,13 @@ afterEach(() => {
 });
 
 describe('procurement approval decisions', () => {
+    it('uses the unified page header contract', () => {
+        const { container } = render(<Approvals pending={[]} processed={[]} />);
+
+        expect(container.querySelector('main')).toHaveAttribute('data-title', '采购OA审批');
+        expect(container.querySelector('main')).toHaveAttribute('data-eyebrow', '采购OA审批');
+    });
+
     it('requires an explicit confirmation before approving a request', () => {
         const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
 

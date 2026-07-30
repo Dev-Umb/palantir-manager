@@ -74,7 +74,7 @@ export default function Create({
     }
 
     return (
-        <Layout title="提交采购申请" eyebrow="采购申请">
+        <Layout title="提交采购申请" eyebrow="提交采购申请">
             {content}
         </Layout>
     );

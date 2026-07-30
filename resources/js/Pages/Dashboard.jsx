@@ -14,7 +14,7 @@ export default function Dashboard({ stats, boards, projectFlows, recentProjects,
     return (
         <Layout
             title="经营大盘"
-            eyebrow="全厂总览"
+            eyebrow="经营大盘"
         >
             <Head title="经营大盘" />
             <div className="kpi-grid">
@@ -64,7 +64,7 @@ export default function Dashboard({ stats, boards, projectFlows, recentProjects,
                     <div className="section-head">
                         <div>
                                 <p>{board.title === '经营大盘' ? '项目流转' : '业务情况'}</p>
-                                <h2>{board.title}</h2>
+                                <h2>{board.title === '经营大盘' ? '项目流转' : board.title}</h2>
                                 <span>{board.desc}</span>
                         </div>
                             {board.title === '经营大盘' && <Network size={20} />}
