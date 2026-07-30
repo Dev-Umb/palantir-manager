@@ -986,7 +986,9 @@ class ObjectRelations
         }
 
         $projects = collect();
-        $projectObject = BusinessObject::where('key', 'project')->first();
+        $projectObject = ($customerIds->isNotEmpty() || $contactIds->isNotEmpty())
+            ? BusinessObject::where('key', 'project')->first()
+            : null;
         if ($projectObject && $customerIds->isNotEmpty()) {
             $customerProjectQuery = $projectObject->records()
                 ->with('businessObject')
