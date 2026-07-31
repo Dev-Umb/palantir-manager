@@ -13,4 +13,4 @@
 
 - [x] 3.1 Run focused backend/frontend tests, Pint, strict OpenSpec validation, and the full quality gate.
 - [x] 3.2 Merge the validated commit to `main` without modifying the user's dirty checkout.
-- [ ] 3.3 Create production recovery points, deploy, restart workers, and run controlled online AI regression plus health checks.
+- [x] 3.3 Create production recovery points, deploy, restart workers, and run controlled online AI regression plus health checks.
