@@ -2,11 +2,16 @@
 
 namespace App\Providers;
 
+use App\Ai\Gateways\ArkOpenAiGateway;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Laravel\Ai\Ai;
+use Laravel\Ai\Providers\OpenAiProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,6 +28,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Ai::extend(
+            'ark-openai',
+            static fn (Application $app, array $config): OpenAiProvider => new OpenAiProvider(
+                new ArkOpenAiGateway($app->make(Dispatcher::class)),
+                $config,
+                $app->make(Dispatcher::class),
+            ),
+        );
+
         RateLimiter::for('login', function (Request $request): array {
             $credential = Str::lower(trim((string) $request->input('email')));
 

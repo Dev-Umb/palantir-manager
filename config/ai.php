@@ -54,7 +54,7 @@ return [
 
     'providers' => [
         'ark' => [
-            'driver' => 'openai',
+            'driver' => 'ark-openai',
             'key' => env('ARK_API_KEY'),
             'url' => env('ARK_BASE_URL', 'https://ark.cn-beijing.volces.com/api/plan/v3'),
             'store' => false,
