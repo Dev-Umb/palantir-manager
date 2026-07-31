@@ -1,5 +1,6 @@
 import ComboBox from './ComboBox';
 import CreatableComboBox from './CreatableComboBox';
+import LocalizedFileInput from './LocalizedFileInput';
 import MultiComboBox from './MultiComboBox';
 
 export function FieldControl({ field, value, onChange, relationOptions = {}, autoFocus = false }) {
@@ -7,7 +8,13 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
         return (
             <div className="file-control">
                 {typeof value === 'string' && value && <a href={value} target="_blank" rel="noreferrer">查看已上传附件</a>}
-                <input name={field.key} type="file" required={!!field.required && !value} autoFocus={autoFocus} onChange={(event) => onChange(field.key, event.target.files?.[0] || '')} />
+                <LocalizedFileInput
+                    name={field.key}
+                    file={typeof File !== 'undefined' && value instanceof File ? value : null}
+                    required={!!field.required && !value}
+                    autoFocus={autoFocus}
+                    onChange={(file) => onChange(field.key, file || '')}
+                />
             </div>
         );
     }
@@ -133,10 +140,17 @@ export function SchemaForm({ fields, data, setData, submitLabel = '保存', proc
     return (
         <div className="form-grid">
             {editable.map((field) => (
-                <label key={field.key} className={fieldLayoutClass(field)}>
-                    <span>{field.label}{field.required && <b>*</b>}</span>
-                    <FieldControl field={field} value={data[field.key]} onChange={(key, value) => setData(key, value)} relationOptions={relationOptions} />
-                </label>
+                field.type === 'file' ? (
+                    <div key={field.key} className={`form-field ${fieldLayoutClass(field)}`}>
+                        <span>{field.label}{field.required && <b>*</b>}</span>
+                        <FieldControl field={field} value={data[field.key]} onChange={(key, value) => setData(key, value)} relationOptions={relationOptions} />
+                    </div>
+                ) : (
+                    <label key={field.key} className={fieldLayoutClass(field)}>
+                        <span>{field.label}{field.required && <b>*</b>}</span>
+                        <FieldControl field={field} value={data[field.key]} onChange={(key, value) => setData(key, value)} relationOptions={relationOptions} />
+                    </label>
+                )
             ))}
             {children}
             <div className="form-actions">

@@ -7,12 +7,13 @@ KEY=~/.ssh/cloud_server_ed25519
 HOST=ubuntu@62.234.53.54
 REMOTE=/var/www/palantir
 SSH_OPTS="-o BindInterface=en0 -i ${KEY}"
+ASSET_CACHE_MARKER='max-age=31536000, immutable'
 
-echo "==> 1/4 本地构建与测试"
+echo "==> 1/5 本地构建与测试"
 npm run build
 php artisan test
 
-echo "==> 2/4 rsync 同步代码到服务器（不覆盖 .env / storage 上传件）"
+echo "==> 2/5 rsync 同步代码到服务器（不覆盖 .env / storage 上传件）"
 rsync -az --delete -e "ssh ${SSH_OPTS}" \
   --exclude='.env*' \
   --exclude='.git' \
@@ -46,9 +47,17 @@ rsync -az --delete -e "ssh ${SSH_OPTS}" \
   --exclude='storage/framework/views/*' \
   ./ ${HOST}:${REMOTE}/
 
-echo "==> 3/4 服务器：同步元数据、清缓存、重启服务"
+echo "==> 3/5 检查 nginx 静态资源压缩与缓存配置（只读，不自动修改）"
+if ssh ${SSH_OPTS} ${HOST} "sudo nginx -T 2>/dev/null | grep -Fq '${ASSET_CACHE_MARKER}'"; then
+  echo "nginx 已启用指纹资源长缓存配置。"
+else
+  echo "nginx 尚未启用 deploy/nginx/palantir-assets.conf。部署后请先备份现有站点配置，再手动安装并 include 该片段，执行 sudo nginx -t 成功后方可 reload。"
+fi
+
+echo "==> 4/5 服务器：同步元数据、清缓存、重启服务"
 ssh ${SSH_OPTS} ${HOST} "cd ${REMOTE} && \
 php artisan optimize:clear && \
+php artisan migrate --force && \
 php artisan db:seed --class=XycPrototypeSeeder --force && \
 php artisan route:cache && \
 php artisan config:cache && \
@@ -61,6 +70,6 @@ sudo find ${REMOTE}/storage ${REMOTE}/bootstrap/cache -type d -exec chmod g+s {}
 sudo systemctl restart php8.4-fpm && \
 sudo systemctl reload nginx"
 
-echo "==> 4/4 部署后检查（预期未登录返回 302 /login）"
+echo "==> 5/5 部署后检查（预期未登录返回 302 /login）"
 curl -I https://palantir.umb.ink
 echo "部署完成。"

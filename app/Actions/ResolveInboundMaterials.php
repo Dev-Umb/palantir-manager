@@ -12,7 +12,10 @@ use Illuminate\Validation\ValidationException;
 
 class ResolveInboundMaterials
 {
-    public function __construct(private MaterialNames $materialNames) {}
+    public function __construct(
+        private AllocateObjectCode $codes,
+        private MaterialNames $materialNames,
+    ) {}
 
     public function handle(array $payload, ?User $user = null): array
     {
@@ -109,7 +112,7 @@ class ResolveInboundMaterials
         array $item,
         ?User $user,
     ): ObjectRecord {
-        $code = $this->nextCode($object);
+        $code = $this->codes->handle($object);
         $payload = [
             'material_code' => $code,
             'name' => $name,
@@ -139,21 +142,5 @@ class ResolveInboundMaterials
         ]);
 
         return $record;
-    }
-
-    private function nextCode(BusinessObject $object): string
-    {
-        $prefix = "{$object->code_prefix}-".now()->format('Ymd').'-';
-        $last = $object->records()
-            ->where('code', 'like', "{$prefix}%")
-            ->pluck('code')
-            ->map(function (string $code) use ($prefix): int {
-                preg_match('/^'.preg_quote($prefix, '/').'(\d+)$/', $code, $match);
-
-                return (int) ($match[1] ?? 0);
-            })
-            ->max() ?? 0;
-
-        return sprintf('%s%03d', $prefix, $last + 1);
     }
 }

@@ -1,5 +1,6 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
 import ComboBox from '../../Components/ComboBox';
+import LocalizedFileInput from '../../Components/LocalizedFileInput';
 
 const statuses = ['开始生产', '生产中', '异常暂停', '完成任务'];
 const processes = ['切割', '焊接', '总装', '打磨', '其他'];
@@ -23,7 +24,7 @@ export default function Create({
         unit: '件',
         exception_type: '无',
         part_name: '',
-        work_date: new Date().toISOString().slice(0, 10),
+        work_date: localDateValue(),
         remark: '',
         attachment: null,
         shortage_material_id: materials[0]?.id || '',
@@ -103,13 +104,30 @@ export default function Create({
                         </section>
                     )}
                     <label className="wide"><span>{hasException ? '异常说明' : '备注（可选）'}</span><textarea required={hasException} value={form.data.remark} onChange={(event) => form.setData('remark', event.target.value)} placeholder={hasException ? '简单说明现场情况' : '没有需要说明的内容可以不填'} /></label>
-                    <label className="wide"><span>现场照片（可选）</span><input accept=".pdf,.jpg,.jpeg,.png" type="file" onChange={(event) => form.setData('attachment', event.target.files[0] || null)} /></label>
+                    <div className="wide form-field">
+                        <span>现场照片（可选）</span>
+                        <LocalizedFileInput
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            emptyLabel="暂未选择照片"
+                            file={form.data.attachment}
+                            selectLabel="选择照片"
+                            onChange={(file) => form.setData('attachment', file)}
+                        />
+                    </div>
                     {Object.values(form.errors).map((error) => <p key={error} className="form-error">{error}</p>)}
                     <button className="wide shop-floor-submit" type="submit" disabled={form.processing}>{form.processing ? '提交中...' : form.data.exception_type === '缺料' ? '提交报工并申请采购' : '提交现场报工'}</button>
                 </form>
             </section>
         </main>
     );
+}
+
+export function localDateValue(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
 }
 
 function option(item) {

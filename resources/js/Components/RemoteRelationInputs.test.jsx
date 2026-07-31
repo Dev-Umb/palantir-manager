@@ -26,6 +26,26 @@ async function flushSearch() {
 }
 
 describe('remote relation inputs', () => {
+    it('keeps existing attachment access while localizing replacement selection', () => {
+        const onChange = vi.fn();
+
+        render(
+            <FieldControl
+                field={{ key: 'attachment', label: '附件', type: 'file' }}
+                value="/attachments/existing"
+                onChange={onChange}
+            />,
+        );
+
+        expect(screen.getByRole('link', { name: '查看已上传附件' }))
+            .toHaveAttribute('href', '/attachments/existing');
+        expect(screen.getByRole('button', { name: '选择文件' })).toBeInTheDocument();
+
+        const replacement = new File(['replacement'], '替换附件.pdf', { type: 'application/pdf' });
+        fireEvent.change(screen.getByLabelText('选择文件'), { target: { files: [replacement] } });
+        expect(onChange).toHaveBeenCalledWith('attachment', replacement);
+    });
+
     it('searches relation options on the server with the current form context', async () => {
         global.fetch.mockResolvedValue({
             ok: true,
