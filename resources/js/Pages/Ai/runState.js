@@ -40,6 +40,17 @@ export function applyRunEvent(run, event) {
         next.activity = [...(run.activity || []), { ...payload, type: event.type, seq: event.seq }];
     }
 
+    if (event.type === 'run.retrying' && payload.reset_output) {
+        next.status = 'queued';
+        next.answer = '';
+        next.artifacts = [];
+        next.sources = [];
+        next.provenance = [];
+        next.data_quality = [];
+        next.error = null;
+        next.failure_category = null;
+    }
+
     if (event.type === 'run.started') next.status = 'running';
     if (event.type === 'run.completed') next.status = 'completed';
     if (event.type === 'run.cancelled') next.status = 'cancelled';

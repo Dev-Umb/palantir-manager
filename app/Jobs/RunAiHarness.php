@@ -10,7 +10,10 @@ use App\Models\AiRun;
 use App\Models\AuditLog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Laravel\Ai\Streaming\Events\Error as ErrorEvent;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall as ToolCallEvent;
@@ -160,23 +163,28 @@ class RunAiHarness implements ShouldQueue
 
             $this->audit($run, 'ai.run.completed');
         } catch (Throwable $exception) {
-            report($exception);
             $failure = $failures->classify($exception);
-            if ($answer === '' && $failure['recoverable'] && $this->attempts() < $this->tries) {
-                $attempt = $this->attempts();
+            $attempt = $this->attempts();
+            $this->reportAttemptFailure($run, $exception, $failure, $attempt);
+            if ($failure['recoverable'] && $attempt < $this->tries) {
                 $run->update([
                     'status' => 'queued',
+                    'answer' => null,
                     'artifacts' => [],
                     'sources' => [],
+                    'provenance' => [],
                     'data_quality' => [],
                     'error' => null,
                     'failure_category' => null,
+                    'finished_at' => null,
                 ]);
                 $events->publish($run, 'run.retrying', [
                     'label' => 'AI 服务暂时不可用，正在重试',
                     'status' => 'running',
                     'attempt' => $attempt + 1,
                     'failure_category' => $failure['category'],
+                    'reset_output' => true,
+                    ...Arr::only($failure, ['provider_status', 'provider_response_excerpt']),
                 ]);
                 $this->release($this->backoff()[$attempt - 1] ?? 3);
 
@@ -192,6 +200,22 @@ class RunAiHarness implements ShouldQueue
             $events->publish($run, 'run.failed', $run->error);
             $this->audit($run, 'ai.run.failed');
         }
+    }
+
+    private function reportAttemptFailure(AiRun $run, Throwable $exception, array $failure, int $attempt): void
+    {
+        if (! $exception instanceof RequestException) {
+            report($exception);
+
+            return;
+        }
+
+        Log::warning('AI provider request failed', [
+            'run_id' => $run->id,
+            'attempt' => $attempt,
+            'failure_category' => $failure['category'],
+            ...Arr::only($failure, ['provider_status', 'provider_response_excerpt']),
+        ]);
     }
 
     public function failed(?Throwable $exception): void

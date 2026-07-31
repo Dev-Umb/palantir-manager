@@ -74,4 +74,40 @@ describe('AI run event reducer', () => {
         expect(working.activity[0].label).toBe('正在读取项目主档');
         expect(completed.status).toBe('completed');
     });
+
+    it('replaces partial output when a recoverable attempt retries', () => {
+        const run = normalizeRun({
+            id: 'run-1',
+            status: 'running',
+            answer: '正在准备表单',
+            artifacts: [{ id: 'form-1', type: 'form' }],
+            sources: [{ object_key: 'project' }],
+            provenance: [{ query_hash: 'query-1' }],
+            data_quality: [{ message: 'partial' }],
+            error: { message: '旧错误' },
+            failure_category: 'provider_error',
+            last_event_seq: 4,
+            events: [{ type: 'activity.updated', seq: 1, payload: { label: '正在理解问题' } }],
+        });
+
+        const retried = applyRunEvent(run, {
+            run_id: 'run-1',
+            seq: 5,
+            type: 'run.retrying',
+            payload: { label: 'AI 服务暂时不可用，正在重试', status: 'running', reset_output: true },
+        });
+
+        expect(retried.status).toBe('queued');
+        expect(retried.answer).toBe('');
+        expect(retried.artifacts).toEqual([]);
+        expect(retried.sources).toEqual([]);
+        expect(retried.provenance).toEqual([]);
+        expect(retried.data_quality).toEqual([]);
+        expect(retried.error).toBeNull();
+        expect(retried.failure_category).toBeNull();
+        expect(retried.activity.map((item) => item.label)).toEqual([
+            '正在理解问题',
+            'AI 服务暂时不可用，正在重试',
+        ]);
+    });
 });
