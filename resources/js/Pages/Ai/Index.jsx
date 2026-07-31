@@ -215,7 +215,7 @@ export default function AiIndex({ conversations: initialConversations }) {
     }
 
     return (
-        <Layout title="AI 数据助手" eyebrow="AI 数据助手" immersive>
+        <Layout title="AI 数据助手" eyebrow="AI 数据助手" immersive hideHeader>
             <Head title="AI 数据助手" />
             <div className="ai-v2-shell">
                 <header className="ai-v2-toolbar">
