@@ -467,7 +467,7 @@ a.risk-row:hover { background: #fbfcfd; }
 .chain-item b, .chain-group b { font-weight: 650; line-height: 1.5; }
 
 .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; }
-.form-grid label { display: grid; gap: 6px; }
+.form-grid label, .form-grid .form-field { display: grid; gap: 6px; }
 .form-grid span { color: var(--muted); font-size: 12px; font-weight: 650; }
 .form-grid b { color: var(--red); margin-left: 2px; }
 input, select, textarea {
@@ -483,7 +483,11 @@ textarea { min-height: 90px; resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--steel); box-shadow: 0 0 0 3px rgba(47,111,159,.12); }
 .file-control { display: grid; gap: 8px; }
 .file-control a { color: var(--steel); font-weight: 650; }
-.file-control input { padding: 7px 10px; }
+.localized-file-input { display: grid; gap: 7px; }
+.localized-file-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.localized-file-actions button { width: auto; }
+.localized-file-name { color: var(--ink); overflow-wrap: anywhere; }
+.localized-file-name.empty { color: var(--muted); font-weight: 500; }
 .range-control { display: flex; align-items: center; gap: 12px; min-height: 38px; }
 .range-control input[type="range"] { flex: 1; padding: 0; accent-color: var(--steel); }
 .range-control output { min-width: 46px; color: var(--ink); font-weight: 750; text-align: right; }
@@ -1309,22 +1313,6 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
     font-size: 11px;
     line-height: 1.5;
 }
-.file-control input[type="file"] {
-    padding: 6px;
-    border: 1px dashed #aebbc8;
-    background: #f8fafc;
-}
-.file-control input[type="file"]::file-selector-button {
-    margin-right: 10px;
-    padding: 7px 10px;
-    border: 0;
-    border-radius: 6px;
-    color: #fff;
-    background: var(--steel);
-    font-weight: 650;
-    cursor: pointer;
-}
-
 @media (max-width: 980px) {
     .app-shell, .auth-panel, .workspace-grid, .split { grid-template-columns: 1fr; }
     .rail { min-height: auto; }

@@ -14,6 +14,7 @@ use Illuminate\Validation\ValidationException;
 class CreateObjectRecord
 {
     public function __construct(
+        private AllocateObjectCode $codes,
         private SyncProjectContractAmount $contractAmount,
         private SyncProjectInvoiceAmount $invoiceAmount,
         private SyncProjectFinance $projectFinance,
@@ -123,19 +124,7 @@ class CreateObjectRecord
 
     public function nextCode(BusinessObject $object): string
     {
-        $date = now()->format('Ymd');
-        $prefix = "{$object->code_prefix}-{$date}-";
-        $last = $object->records()
-            ->where('code', 'like', "{$prefix}%")
-            ->pluck('code')
-            ->map(function (string $code) use ($prefix) {
-                preg_match('/^'.preg_quote($prefix, '/').'(\d+)$/', $code, $match);
-
-                return (int) ($match[1] ?? 0);
-            })
-            ->max() ?? 0;
-
-        return sprintf('%s%03d', $prefix, $last + 1);
+        return $this->codes->handle($object);
     }
 
     private function title(BusinessObject $object, array $payload): string

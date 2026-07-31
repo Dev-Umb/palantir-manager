@@ -206,12 +206,15 @@ class RequisitionController extends Controller
     {
         $data = $request->validate([
             'requester' => ['required', 'string'],
-            'material_id' => ['required', 'string'],
+            'material_id' => ['required', 'string', 'uuid'],
             'qty' => ['required', 'numeric', 'min:0.01'],
             'unit' => ['nullable', 'string'],
-            'project_id' => ['nullable', 'string'],
+            'project_id' => ['nullable', 'string', 'uuid'],
             'urgency' => ['required', 'string'],
             'reason' => ['nullable', 'string', 'max:500'],
+        ], [
+            'material_id.uuid' => '关联记录格式不正确',
+            'project_id.uuid' => '关联记录格式不正确',
         ]);
 
         if ($publicForm && filled($data['project_id'] ?? null)) {
@@ -242,10 +245,13 @@ class RequisitionController extends Controller
     {
         Validator::make(['payload' => $payload], [
             'payload.requester' => ['required', 'string'],
-            'payload.material_id' => ['required', 'string'],
+            'payload.material_id' => ['required', 'string', 'uuid'],
             'payload.qty' => ['required', 'numeric', 'min:0.01'],
             'payload.unit' => ['nullable', 'string'],
-            'payload.project_id' => ['nullable', 'string'],
+            'payload.project_id' => ['nullable', 'string', 'uuid'],
+        ], [
+            'payload.material_id.uuid' => '关联记录格式不正确',
+            'payload.project_id.uuid' => '关联记录格式不正确',
         ])->validate();
     }
 }

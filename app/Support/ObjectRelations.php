@@ -8,6 +8,7 @@ use App\Models\ObjectRecord;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ObjectRelations
@@ -366,7 +367,17 @@ class ObjectRelations
                 continue;
             }
 
-            $ids = collect($multiple ? $value : [$value])
+            $submittedIds = collect($multiple ? $value : [$value]);
+            $hasMalformedId = $submittedIds->contains(
+                fn (mixed $id): bool => ! is_string($id) || ($id !== '' && ! Str::isUuid($id)),
+            );
+            if ($hasMalformedId) {
+                $errors["payload.{$field['key']}"] = '关联记录格式不正确';
+
+                continue;
+            }
+
+            $ids = $submittedIds
                 ->filter(fn ($id) => is_string($id) && $id !== '')
                 ->unique()
                 ->values();
@@ -489,10 +500,21 @@ class ObjectRelations
         $errors = [];
         foreach ($fields->groupBy('target') as $targetKey => $targetFields) {
             $target = BusinessObject::where('key', $targetKey)->first();
-            $ids = collect($payload['items'] ?? [])
-                ->flatMap(fn (array $item) => $targetFields->pluck('key')
-                    ->map(fn (string $key) => $item[$key] ?? null))
-                ->filter(fn ($value) => is_string($value) && $value !== '')
+            $submittedIds = collect($payload['items'] ?? [])
+                ->flatMap(function (array $item, int|string $index) use ($targetFields, &$errors): Collection {
+                    return $targetFields->pluck('key')
+                        ->map(function (string $key) use ($item, $index, &$errors): mixed {
+                            $value = $item[$key] ?? null;
+                            if ($value !== null && $value !== ''
+                                && (! is_string($value) || ! Str::isUuid($value))) {
+                                $errors["payload.items.{$index}.{$key}"] = '关联记录格式不正确';
+                            }
+
+                            return $value;
+                        });
+                });
+            $ids = $submittedIds
+                ->filter(fn (mixed $value): bool => is_string($value) && Str::isUuid($value))
                 ->unique()
                 ->values();
             $records = $target
@@ -503,6 +525,10 @@ class ObjectRelations
                 foreach (($payload['items'] ?? []) as $index => $item) {
                     $value = $item[$field['key']] ?? null;
                     if ($value === null || $value === '') {
+                        continue;
+                    }
+
+                    if (isset($errors["payload.items.{$index}.{$field['key']}"])) {
                         continue;
                     }
 

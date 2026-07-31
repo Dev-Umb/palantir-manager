@@ -30,7 +30,10 @@ vi.mock('../../Components/ComboBox', () => ({
     default: ({ searchUrl = '' }) => <div data-testid="combo" data-search-url={searchUrl} />,
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+});
 
 describe('shop floor reporting', () => {
     it('uses simple status buttons and reveals purchase fields for material shortages', () => {
@@ -67,5 +70,33 @@ describe('shop floor reporting', () => {
 
         expect(screen.getByText('无需登录 · 扫码即填')).toBeInTheDocument();
         expect(screen.getByText('提交后可继续填写下一条')).toBeInTheDocument();
+    });
+
+    it('uses the local calendar date instead of the UTC date', () => {
+        const originalTimezone = process.env.TZ;
+        process.env.TZ = 'Asia/Taipei';
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-07-30T18:00:00.000Z'));
+
+        render(<Create projects={[]} teams={[]} materials={[]} />);
+
+        expect(screen.getByLabelText('报工日期')).toHaveValue('2026-07-31');
+        process.env.TZ = originalTimezone;
+    });
+
+    it('shows and clears the selected attachment with Chinese controls', () => {
+        render(<Create projects={[]} teams={[]} materials={[]} />);
+        const input = screen.getByLabelText('选择照片');
+        const attachment = new File(['photo'], '现场照片.png', { type: 'image/png' });
+
+        expect(input).toHaveAttribute('accept', '.pdf,.jpg,.jpeg,.png');
+        expect(screen.getByText('暂未选择照片')).toBeInTheDocument();
+
+        fireEvent.change(input, { target: { files: [attachment] } });
+        expect(screen.getByText('现场照片.png')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: '清除' }));
+        expect(screen.getByText('暂未选择照片')).toBeInTheDocument();
+        expect(screen.queryByText('现场照片.png')).not.toBeInTheDocument();
     });
 });

@@ -9,6 +9,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['key', 'label', 'group', 'code_prefix', 'title_field', 'fields', 'roles', 'read_only', 'sort_order'])]
 class BusinessObject extends Model
 {
+    /**
+     * @param  mixed  $value
+     * @param  string|null  $field
+     */
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        $bindingField = $field ?? (ctype_digit((string) $value) ? $this->getKeyName() : 'key');
+
+        return $this->newQuery()->where($bindingField, $value)->first();
+    }
+
     protected function casts(): array
     {
         return [
