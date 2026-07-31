@@ -1,8 +1,35 @@
 // @vitest-environment jsdom
 
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import AiIndex from './Index';
 import { HtmlArtifact, htmlDocument } from './Artifacts';
+
+vi.mock('@inertiajs/react', () => ({
+    Head: () => null,
+}));
+
+vi.mock('../../Components/Layout', () => ({
+    default: ({ children, hideHeader = false, title }) => (
+        <div data-testid="layout" data-hide-header={String(hideHeader)} data-title={title}>{children}</div>
+    ),
+}));
+
+vi.mock('../../echo', () => ({
+    getEcho: () => null,
+}));
+
+describe('AI assistant layout', () => {
+    it('hides only the outer page title and keeps the conversation toolbar title', () => {
+        window.HTMLElement.prototype.scrollIntoView = vi.fn();
+        render(<AiIndex conversations={[]} />);
+
+        expect(screen.getByTestId('layout').getAttribute('data-hide-header')).toBe('true');
+        expect(screen.getByTestId('layout').getAttribute('data-title')).toBe('AI 数据助手');
+        expect(screen.getByText('AI 数据助手')).not.toBeNull();
+        expect(screen.getByRole('button', { name: /新对话/ })).not.toBeNull();
+    });
+});
 
 describe('AI HTML artifact', () => {
     it('renders only inside a sandboxed iframe with a restrictive CSP', () => {

@@ -53,6 +53,7 @@ class XycDataAgent implements Agent, Conversational, HasTools
 - 第一版只允许准备采购申请 requisition、现场报工 team_log、客户信息 customer、客户联系人 customer_contact、物料资料 material 的新增草稿。
 - 第一版只允许修改客户信息 customer、客户联系人 customer_contact、物料资料 material 的普通字段。禁止修改状态、审批、编号、关联项目、所属客户等流程或关联字段。
 - 新增业务数据必须先查询并使用真实关联记录 UUID；禁止猜测 UUID。
+- 准备采购申请 requisition 时，数量单位属于 requisition.unit，直接使用用户提供的单位；物料主档 material 没有 unit 字段，查询物料只选择 id、name、spec 等真实主档字段。
 - 修改前必须先用 query_object_records 精确查找，再用 get_object_record 核对唯一记录和最新值。若无法唯一确定记录，必须让用户选择，禁止猜测 record_id。
 - 用户要求新增资料但缺少一个或多个字段时，主动调用 present_user_form，一次展示最多 6 个缺失字段供用户快速填写，然后等待用户提交。不要只用文字追问。
 - 单个问题有 2 至 4 个简短选项，或需要用户在多条候选记录中确认时，可调用 present_user_choice。
