@@ -210,7 +210,7 @@ it('keeps every mobile route reachable inside the More panel', function (): void
 })->group('online', 'online-ui', 'online-mobile-navigation')
     ->skip(fn (): bool => getenv('ONLINE_REGRESSION_ENABLED') !== '1', 'Online regression is opt-in.');
 
-it('keeps list summaries compact and opens contact list detail and edit states', function (): void {
+it('creates contacts inline while keeping list summaries compact and preserving detail states', function (): void {
     $page = visitOnlineAs('admin', '/objects/customer')
         ->waitForText('查看');
 
@@ -219,24 +219,30 @@ it('keeps list summaries compact and opens contact list detail and edit states',
             const rows = [...document.querySelectorAll('.ag-row[row-index]')];
             const button = document.querySelector('.list-summary-trigger');
             const headers = [...document.querySelectorAll('.grid-header-label')];
-            button?.click();
-
             return {
                 opened: Boolean(button),
                 rowHeights: rows.map((row) => Math.round(row.getBoundingClientRect().height)),
-                inlineContactControls: document.querySelectorAll('.customer-contact-detail, .customer-contact-create').length,
+                inlineContactControls: document.querySelectorAll('.customer-contact-create').length,
                 headersHaveTitles: headers.length > 0 && headers.every((header) => header.title === header.textContent.trim()),
             };
         }
     JS);
     expect($summary)->toMatchArray([
         'opened' => true,
-        'inlineContactControls' => 0,
         'headersHaveTitles' => true,
     ]);
+    expect($summary['inlineContactControls'])->toBeGreaterThan(0);
     expect($summary['rowHeights'])->not->toBeEmpty();
     expect(array_unique($summary['rowHeights']))->toBe([44]);
 
+    $page->click('.customer-contact-create')
+        ->waitForText('新增联系人')
+        ->assertPresent('.contact-modal-form')
+        ->assertSee('所属客户')
+        ->assertNoJavaScriptErrors()
+        ->click('.contact-modal-head .icon-link');
+
+    $page->click('.list-summary-trigger');
     $page->waitForText('客户联系人')
         ->assertPresent('.contact-modal-list')
         ->assertPresent('.contact-modal-list-item')

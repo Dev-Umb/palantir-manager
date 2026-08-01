@@ -277,6 +277,7 @@ describe('ObjectGrid date editing', () => {
 
     it('inserts the one-line contact summary immediately after the customer name', async () => {
         const onContactOpen = vi.fn();
+        const onContactCreate = vi.fn();
 
         render(
             <ObjectGrid
@@ -299,18 +300,23 @@ describe('ObjectGrid date editing', () => {
                 relationOptions={{}}
                 onRecordChange={() => {}}
                 onContactOpen={onContactOpen}
+                onContactCreate={onContactCreate}
+                canCreateContact
             />,
         );
 
         const headers = (await screen.findAllByRole('columnheader')).map((header) => header.textContent.trim());
         expect(headers.indexOf('联系人列表')).toBe(headers.indexOf('客户名称') + 1);
         expect(await screen.findByText('李经理 · 13900000000')).not.toBeNull();
-        expect(screen.queryByRole('button', { name: '新增联系人' })).toBeNull();
+        expect(screen.getByRole('button', { name: '为甲客户新增联系人' })).not.toBeNull();
         expect(screen.queryByRole('button', { name: /查看李经理详情/ })).toBeNull();
         expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBe(44);
 
         fireEvent.click(screen.getByRole('button', { name: '李经理 · 13900000000，共 1 项' }));
         expect(onContactOpen).toHaveBeenCalledWith(expect.objectContaining({ id: 'customer-1' }));
+
+        fireEvent.click(screen.getByRole('button', { name: '为甲客户新增联系人' }));
+        expect(onContactCreate).toHaveBeenCalledWith(expect.objectContaining({ id: 'customer-1' }));
     });
 
     it('keeps the customer row height fixed when the contact count changes', async () => {

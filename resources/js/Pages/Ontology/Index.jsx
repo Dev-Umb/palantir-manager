@@ -158,6 +158,8 @@ export default function Index({ objects = [], currentObject, records, can, relat
                                 onColumnOrderChange={saveColumnOrder}
                                 onColumnWidthsChange={saveColumnWidths}
                                 onContactOpen={openContactList}
+                                onContactCreate={openContactCreate}
+                                canCreateContact={Boolean(contactCan.create && contactObject)}
                             />
                         </Suspense>
                         <ObjectPagination records={records} />

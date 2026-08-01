@@ -29,6 +29,8 @@ export default function ObjectGrid({
     onColumnOrderChange,
     onColumnWidthsChange,
     onContactOpen,
+    onContactCreate,
+    canCreateContact = false,
 }) {
     const [visibleFieldCount, setVisibleFieldCount] = useState(fields.length);
     const [saveState, setSaveState] = useState({
@@ -123,7 +125,10 @@ export default function ObjectGrid({
                     return (
                         <CustomerContactCell
                             contacts={record.contacts || []}
+                            customerName={record.title || '当前客户'}
+                            canCreate={canCreateContact}
                             onOpen={() => onContactOpen?.(record)}
+                            onCreate={() => onContactCreate?.(record)}
                         />
                     );
                 },
@@ -146,7 +151,7 @@ export default function ObjectGrid({
                 ? <GridActions object={object} record={params.data.__record} can={can} onDelete={destroyRecord} />
                 : null,
         }];
-    }, [can, destroyRecord, fields, object, onContactOpen, relationOptions, rowData, savedColumnWidths]);
+    }, [can, canCreateContact, destroyRecord, fields, object, onContactCreate, onContactOpen, relationOptions, rowData, savedColumnWidths]);
 
     const saveColumnOrder = useCallback((event) => {
         if (event.finished === false) return;
