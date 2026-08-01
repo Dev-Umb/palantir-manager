@@ -121,7 +121,7 @@ return [
                 $field('remark', '备注'),
                 $date('handover_date', '项目对接日期'),
                 $field('contract_qty', '合同数量', 'readonly'),
-                $number('weight', '预估重量（吨）'),
+                $number('weight', '合同重量（吨）'),
                 $number('signed_weight', '累计签收重量', ['min' => 0]),
                 $number('contract_amount', '合同金额', ['min' => 0]),
                 $number('occurred_amount', '已发生金额', ['min' => 0]),

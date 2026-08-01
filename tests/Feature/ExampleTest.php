@@ -538,7 +538,19 @@ class ExampleTest extends TestCase
                         && $field['label'] === '末次回款日期'
                         && $field['type'] === 'date',
                 ))
+                ->where('currentObject.fields', fn ($fields): bool => collect($fields)->contains(
+                    fn (array $field): bool => $field['key'] === 'weight'
+                        && $field['label'] === '合同重量（吨）'
+                        && $field['type'] === 'number',
+                ))
                 ->missing('relationChain'));
+
+        foreach (['drawing', 'work_order'] as $objectKey) {
+            $weightField = collect(BusinessObject::where('key', $objectKey)->firstOrFail()->fields)
+                ->firstWhere('key', 'weight');
+
+            $this->assertSame('预估重量（吨）', $weightField['label']);
+        }
     }
 
     public function test_removed_bin_card_object_is_not_synced(): void
