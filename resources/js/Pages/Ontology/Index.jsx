@@ -187,7 +187,7 @@ export default function Index({ objects = [], currentObject, records, can, relat
                     <RecordDetail object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} contactCan={contactCan} onContactDetail={openContactDetail} onContactCreate={openContactCreate} can={can} />
                 </Modal>
             )}
-            {mode === 'edit' && can.update && selectedRecord && (
+            {mode === 'edit' && can.update && selectedRecord && selectedRecord.can_update !== false && (
                 <EditRecordModal key={selectedRecord.id} object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} closeHref={closeHref} canManageCustomers={can.manage_customers} />
             )}
             {contactModal && (
@@ -259,8 +259,8 @@ function ObjectSwitcher({ objects, currentObject }) {
 function ObjectListControls({ objectKey, params, records, fields = [], relationOptions = {}, actions = null }) {
     const preserved = [...params.entries()].filter(([key]) => !['q', 'per_page', 'page', 'sort', 'direction', 'filter_logic'].includes(key) && !key.startsWith('filters['));
     const sortable = fields.filter((field) => field.scope !== 'item'
-        && !['relation', 'multirelation', 'creatable_relation', 'file', 'files'].includes(field.type));
-    const filterable = fields.filter((field) => field.scope !== 'item' && !['file', 'files', 'multirelation'].includes(field.type));
+        && !['relation', 'multirelation', 'multiaccount', 'creatable_relation', 'file', 'files'].includes(field.type));
+    const filterable = fields.filter((field) => field.scope !== 'item' && !['file', 'files', 'multirelation', 'multiaccount'].includes(field.type));
     const initialFilters = filterRowsFromParams(params, filterable);
     const [filters, setFilters] = useState(initialFilters.length ? initialFilters : []);
     const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -790,7 +790,7 @@ function defaults(fields, params = null) {
     const itemFields = fields.filter((field) => field.scope === 'item');
     const payload = fields.reduce((data, field) => {
         if (field.scope !== 'item' && !field.readonly && !['readonly', 'lookup', 'derived'].includes(field.type)) {
-            data[field.key] = field.default ?? (field.type === 'multirelation' ? [] : '');
+            data[field.key] = field.default ?? (['multirelation', 'multiaccount'].includes(field.type) ? [] : '');
         }
         return data;
     }, {});
@@ -808,7 +808,7 @@ function cellValue(field, record, relationOptions) {
     const value = record.display?.[field.key] ?? record.payload?.[field.key];
     if (!value) return '';
     if (field.type === 'relation') return <span className="relation-chip">{value}</span>;
-    if (field.type === 'multirelation') return (Array.isArray(value) ? value : []).map((label, index) => <span className="relation-chip" key={`${label}-${index}`}>{label}</span>);
+    if (['multirelation', 'multiaccount'].includes(field.type)) return (Array.isArray(value) ? value : []).map((label, index) => <span className="relation-chip" key={`${label}-${index}`}>{label}</span>);
     if (field.type === 'file') return <a className="relation-chip" href={value} target="_blank" rel="noreferrer">查看附件</a>;
     if (field.type === 'files') return (Array.isArray(value) ? value : []).map((url, index) => <a className="relation-chip" href={url} target="_blank" rel="noreferrer" key={`${url}-${index}`}>附件 {index + 1}</a>);
     return String(value);

@@ -8,6 +8,7 @@ $field = fn (string $key, string $label, string $type = 'text', array $extra = [
 $code = fn (string $key, string $label) => $field($key, $label, 'readonly', ['system' => 'code']);
 $relation = fn (string $key, string $label, string $target, array $extra = []) => $field($key, $label, 'relation', array_merge(['target' => $target], $extra));
 $multirelation = fn (string $key, string $label, string $target, array $extra = []) => $field($key, $label, 'multirelation', array_merge(['target' => $target], $extra));
+$multiaccount = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'multiaccount', $extra);
 $creatableRelation = fn (string $key, string $label, string $target, array $extra = []) => $field($key, $label, 'creatable_relation', array_merge(['target' => $target], $extra));
 $select = fn (string $key, string $label, array $options, array $extra = []) => $field($key, $label, 'select', array_merge(['options' => $options], $extra));
 $date = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'date', $extra);
@@ -114,6 +115,7 @@ return [
                 $relation('customer_id', '客户名称', 'customer', ['required' => true]),
                 $code('project_no', '项目编号'),
                 $field('business_owner_user_id', '负责业务员', 'account'),
+                $multiaccount('informed_business_user_ids', '知会人员'),
                 $select('overall_status', '总体状态', $projectStatuses, ['default' => '投标中']),
                 $field('contract_status', '合同状态', 'readonly'),
                 $date('first_shipment_date', '首次发货日期'),

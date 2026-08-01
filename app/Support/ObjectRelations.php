@@ -165,6 +165,7 @@ class ObjectRelations
                 ),
                 'multirelation' => $this->multirelationDisplayLabels($payload, $field, $value),
                 'account' => $this->accountLabel($value),
+                'multiaccount' => $this->accountLabels($value),
                 default => $value,
             };
         }
@@ -178,6 +179,11 @@ class ObjectRelations
             'created_at' => $record->created_at?->toISOString(),
             'is_new_task' => $this->workflowTasks->visibleTo($record, $user),
         ];
+
+        if ($record->businessObject->key === 'project' && $user) {
+            $formatted['can_update'] = $this->projectVisibility->allowsProjectUpdate($user, $record);
+            $formatted['is_informed_project'] = $this->projectVisibility->isInformedProject($user, $record);
+        }
 
         if ($record->businessObject->key === 'customer') {
             $formatted['contacts'] = $this->contactsByCustomer[$record->id] ?? [];
@@ -270,8 +276,14 @@ class ObjectRelations
                 $payload = $record->payload ?? [];
 
                 return collect($record->businessObject?->fields ?? [])
-                    ->filter(fn (array $field): bool => ($field['type'] ?? null) === 'account')
-                    ->map(fn (array $field): mixed => $payload[$field['key']] ?? null)
+                    ->filter(fn (array $field): bool => in_array($field['type'] ?? null, ['account', 'multiaccount'], true))
+                    ->flatMap(function (array $field) use ($payload): array {
+                        $value = $payload[$field['key']] ?? null;
+
+                        return ($field['type'] ?? null) === 'multiaccount' && is_array($value)
+                            ? $value
+                            : [$value];
+                    })
                     ->filter(fn (mixed $id): bool => filter_var($id, FILTER_VALIDATE_INT) !== false)
                     ->map(fn (mixed $id): int => (int) $id)
                     ->all();
@@ -346,6 +358,21 @@ class ObjectRelations
         }
 
         return $this->accountLabelCache[$id];
+    }
+
+    /** @return array<int, string> */
+    private function accountLabels(mixed $value): array
+    {
+        return collect(is_array($value) ? $value : [])
+            ->map(fn (mixed $id): string => $this->accountLabel($id))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    public function accountDisplayValue(mixed $value, bool $multiple = false): string|array
+    {
+        return $multiple ? $this->accountLabels($value) : $this->accountLabel($value);
     }
 
     public function chain(?ObjectRecord $record, ?Collection $objects = null): ?array

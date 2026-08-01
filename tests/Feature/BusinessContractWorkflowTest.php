@@ -67,6 +67,99 @@ class BusinessContractWorkflowTest extends TestCase
         $this->assertDatabaseCount('object_records', 4);
     }
 
+    public function test_project_owner_and_admin_manage_valid_informed_business_users(): void
+    {
+        $owner = $this->userWithRole('business', '负责业务员');
+        $informed = $this->userWithRole('business', '知会业务员');
+        $admin = $this->userWithRole('admin', '管理员');
+        $nonBusiness = $this->userWithRole('finance', '财务');
+        $project = $this->project($owner);
+
+        $this->actingAs($owner)->put("/records/{$project->id}", [
+            'payload' => [...$project->payload, 'informed_business_user_ids' => [(string) $informed->id, (string) $informed->id]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame([(string) $informed->id], $project->fresh()->payload['informed_business_user_ids']);
+
+        $this->actingAs($admin)->put("/records/{$project->id}", [
+            'payload' => [...$project->fresh()->payload, 'informed_business_user_ids' => [(string) $owner->id, (string) $informed->id]],
+        ])->assertRedirect();
+        $this->assertSame([(string) $owner->id, (string) $informed->id], $project->fresh()->payload['informed_business_user_ids']);
+
+        $this->actingAs($admin)->put("/records/{$project->id}", [
+            'payload' => [...$project->fresh()->payload, 'informed_business_user_ids' => [(string) $nonBusiness->id]],
+        ])->assertSessionHasErrors('payload.informed_business_user_ids');
+        $this->assertSame([(string) $owner->id, (string) $informed->id], $project->fresh()->payload['informed_business_user_ids']);
+
+        $this->actingAs($nonBusiness)->put("/records/{$project->id}", [
+            'payload' => [...$project->fresh()->payload, 'contract_amount' => 120000, 'informed_business_user_ids' => []],
+        ])->assertRedirect();
+        $this->assertSame([(string) $owner->id, (string) $informed->id], $project->fresh()->payload['informed_business_user_ids']);
+
+        $this->actingAs($owner)->get('/objects/project')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('currentObject.fields', fn ($fields): bool => ! (collect($fields)
+                    ->firstWhere('key', 'informed_business_user_ids')['readonly'] ?? false))
+                ->where('relationOptions.informed_business_user_ids.items', fn ($items): bool => collect($items)
+                    ->pluck('id')
+                    ->contains((string) $informed->id)));
+    }
+
+    public function test_informed_business_user_sees_only_the_project_as_read_only_with_an_indicator(): void
+    {
+        $owner = $this->userWithRole('business', '负责业务员');
+        $informed = $this->userWithRole('business', '知会业务员');
+        $unrelated = $this->userWithRole('business', '无关业务员');
+        $finance = $this->userWithRole('finance', '财务');
+        $project = $this->project($owner, overrides: [
+            'informed_business_user_ids' => [(string) $informed->id],
+        ]);
+        ObjectRecord::create([
+            'business_object_id' => $this->object('contract')->id,
+            'code' => 'HT-'.str()->uuid(),
+            'title' => 'HT-知会隔离',
+            'created_by' => $owner->id,
+            'payload' => [
+                'project_id' => $project->id,
+                'customer_id' => $project->payload['customer_id'],
+                'status' => '未签署',
+                'amount' => 100000,
+            ],
+        ]);
+
+        $this->actingAs($informed)->get('/objects/project')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('records.data', 1)
+                ->where('records.data.0.id', $project->id)
+                ->where('records.data.0.can_update', false)
+                ->where('records.data.0.is_informed_project', true)
+                ->where('records.data.0.display.informed_business_user_ids.0', '知会业务员'));
+
+        $this->actingAs($informed)->put("/records/{$project->id}", [
+            'payload' => [...$project->payload, 'remark' => '越权修改'],
+        ])->assertForbidden();
+        $this->assertSame('', $project->fresh()->payload['remark']);
+
+        $this->actingAs($informed)->get('/objects/contract')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('records.data', 0));
+        $this->actingAs($unrelated)->get('/objects/project')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('records.data', 0));
+
+        $this->actingAs($owner)->get('/objects/project')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('records.data.0.can_update', true)
+                ->where('records.data.0.is_informed_project', false));
+        $this->actingAs($finance)->get('/objects/project')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('records.data.0.can_update', true)
+                ->where('records.data.0.is_informed_project', false));
+    }
+
     public function test_finance_edits_all_project_financial_fields_while_business_cannot_tamper_with_them(): void
     {
         Carbon::setTestNow('2026-08-01 10:30:00');
@@ -209,9 +302,11 @@ class BusinessContractWorkflowTest extends TestCase
         $admin = $this->userWithRole('admin', '管理员');
         $finance = $this->userWithRole('finance', '财务');
         $business = $this->userWithRole('business', '业务员');
+        $informed = $this->userWithRole('business', '知会业务员');
         $bid = $this->project($business, '投标提醒项目', [
             'overall_status' => '投标中',
             'overall_status_changed_at' => now()->subDays(15)->toISOString(),
+            'informed_business_user_ids' => [(string) $informed->id],
         ]);
         $payment = $this->project($business, '回款提醒项目', [
             'overall_status' => '已拿到加工函',
@@ -241,6 +336,7 @@ class BusinessContractWorkflowTest extends TestCase
 
         $this->assertTrue(ProjectNotification::query()->where('user_id', $admin->id)->exists());
         $this->assertTrue(ProjectNotification::query()->where('user_id', $finance->id)->where('type', ProjectNotification::TYPE_PAYMENT)->exists());
+        $this->assertFalse(ProjectNotification::query()->where('user_id', $informed->id)->exists());
     }
 
     public function test_project_filters_support_top_level_and_or_logic(): void

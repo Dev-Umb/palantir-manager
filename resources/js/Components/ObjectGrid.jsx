@@ -36,7 +36,7 @@ export default function ObjectGrid({
     const [visibleFieldCount, setVisibleFieldCount] = useState(fields.length);
     const [saveState, setSaveState] = useState({
         status: 'idle',
-        message: can.update ? '双击单元格可编辑，修改后会自动保存' : '当前为只读视图',
+        message: can.update ? '双击有编辑权限的单元格可修改，修改后会自动保存' : '当前为只读视图',
     });
     const [feedback, setFeedback] = useState(null);
     const rowData = useMemo(() => expandObjectRecords(records, fields), [fields, records]);
@@ -81,7 +81,8 @@ export default function ObjectGrid({
             filter: false,
             cellClass: numericField(field) ? 'numeric-cell' : undefined,
             spanRows: isItemField(field) ? false : sameRecordSpan,
-            editable: can.update
+            editable: (params) => can.update
+                && params.data?.__record?.can_update !== false
                 && !field.readonly
                 && !(object.key === 'customer' && field.key === 'cooperation_history')
                 && !['readonly', 'lookup', 'derived', 'file', 'files'].includes(field.type),
@@ -235,7 +236,7 @@ export default function ObjectGrid({
             onRecordChange(previous);
             setSaveState({
                 status: 'idle',
-                message: can.update ? '双击单元格可编辑，修改后会自动保存' : '当前为只读视图',
+                message: can.update ? '双击有编辑权限的单元格可修改，修改后会自动保存' : '当前为只读视图',
             });
             setFeedback({
                 title: `“${field.label}”保存失败`,
@@ -323,7 +324,7 @@ function CooperationHistoryCell({ projects }) {
 }
 
 function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOptions }) {
-    if (fieldConfig.type === 'multirelation') {
+    if (['multirelation', 'multiaccount'].includes(fieldConfig.type)) {
         const relation = relationOptions[fieldConfig.key] || {};
 
         return (
@@ -334,6 +335,7 @@ function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOp
                     selectedItems={relation.selectedItems || []}
                     searchUrl={relation.search_url}
                     searchContext={relation.search_context}
+                    searchPlaceholder={fieldConfig.type === 'multiaccount' ? '输入业务员姓名' : undefined}
                     onChange={onValueChange}
                     onClose={() => setTimeout(() => stopEditing(), 0)}
                     startOpen
@@ -385,6 +387,7 @@ function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOp
 }
 
 function GridActions({ object, record, can, onDelete }) {
+    const canUpdate = can.update && record.can_update !== false;
     function approve() {
         router.post(`/requests/${record.id}/approve`, {}, { preserveScroll: true });
     }
@@ -419,7 +422,7 @@ function GridActions({ object, record, can, onDelete }) {
                     </Link>
                 )}
                 secondary={[
-                    can.update && (
+                    canUpdate && (
                         <Link key="edit" href={`/objects/${object.key}?record=${record.id}&mode=edit`} preserveScroll aria-label={`编辑 ${record.code}`}>
                             <Pencil size={14} /> 编辑
                         </Link>
@@ -439,7 +442,7 @@ function GridActions({ object, record, can, onDelete }) {
                             <Trash2 size={14} /> 删除
                         </button>
                     ),
-                    !can.update && !can.delete && (
+                    !canUpdate && !can.delete && (
                         <span key="readonly" className="row-action-readonly"><EyeOff size={14} /> 只读</span>
                     ),
                 ].filter(Boolean)}
@@ -475,6 +478,14 @@ function optionsFor(field, value, relationOptions) {
 
 function renderValue(object, field, record, value, relationOptions, row = null) {
     if (value === null || value === undefined || value === '') return <span className="empty-value">—</span>;
+    if (object.key === 'project' && field.key === 'name' && record?.is_informed_project) {
+        return (
+            <span className="informed-project-cell" title={String(value)}>
+                <b className="informed-project-badge">知会项目</b>
+                <span>{String(value)}</span>
+            </span>
+        );
+    }
     if (field.system === 'code') return <span className="mono">{value}</span>;
     if (field.system === 'title') return <span title={String(value)}>{String(value)}</span>;
     if (['relation', 'creatable_relation'].includes(field.type)) {
@@ -485,7 +496,7 @@ function renderValue(object, field, record, value, relationOptions, row = null) 
         const text = relationGridText(object.key, field, relationText);
         return text ? <span title={text}>{text}</span> : <span className="empty-value">—</span>;
     }
-    if (field.type === 'multirelation') {
+    if (['multirelation', 'multiaccount'].includes(field.type)) {
         const text = Array.isArray(record?.display?.[field.key]) ? record.display[field.key].join('、') : '';
         return text ? <span title={text}>{text}</span> : <span className="empty-value">—</span>;
     }
@@ -504,6 +515,11 @@ function renderValue(object, field, record, value, relationOptions, row = null) 
 }
 
 function displayValueFor(field, value, relationOptions) {
+    if (field.type === 'multiaccount') {
+        const labels = new Map((relationOptions[field.key]?.items || []).map((item) => [String(item.id), item.label]));
+
+        return (Array.isArray(value) ? value : []).map((id) => labels.get(String(id)) || String(id));
+    }
     if (!['relation', 'creatable_relation'].includes(field.type)) return value;
 
     const option = relationOptions[field.key]?.items?.find((item) => item.id === value);
@@ -527,7 +543,7 @@ function columnWidth(field, objectKey, rows, relationOptions) {
 }
 
 export function columnBounds(field) {
-    if (['relation', 'multirelation', 'creatable_relation'].includes(field.type)) {
+    if (['relation', 'multirelation', 'multiaccount', 'creatable_relation'].includes(field.type)) {
         return { min: MIN_DATA_COLUMN_WIDTH, preferred: 280, max: 360 };
     }
     if (field.type === 'date') {

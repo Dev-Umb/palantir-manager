@@ -88,7 +88,7 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
         return <ComboBox value={value === null || value === undefined ? '' : String(value)} options={options} onChange={(next) => onChange(field.key, next)} autoFocus={autoFocus} />;
     }
 
-    if (field.type === 'multirelation') {
+    if (['multirelation', 'multiaccount'].includes(field.type)) {
         const options = relationOptions[field.key] || {};
 
         return (
@@ -98,6 +98,7 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
                 selectedItems={options.selectedItems || []}
                 searchUrl={options.search_url}
                 searchContext={options.search_context}
+                searchPlaceholder={field.type === 'multiaccount' ? '输入业务员姓名' : undefined}
                 onChange={(next) => onChange(field.key, next)}
             />
         );
@@ -195,7 +196,7 @@ export function SchemaForm({ fields, data, setData, submitLabel = '保存', proc
 }
 
 function fieldLayoutClass(field) {
-    if (['file', 'files', 'multirelation'].includes(field.type)) return 'wide';
+    if (['file', 'files', 'multirelation', 'multiaccount'].includes(field.type)) return 'wide';
     if (['remark', 'risk', 'reason', 'address', 'cooperation_history', 'description'].includes(field.key)) return 'wide';
 
     return '';

@@ -526,13 +526,18 @@ class ExampleTest extends TestCase
                 ])
                 ->has('relationOptions.customer_id.items', 3)
                 ->where('selectedRecordId', null)
-                ->has('currentObject.fields', 26)
+                ->has('currentObject.fields', 27)
                 ->where('currentObject.fields.0.key', 'name')
                 ->where('currentObject.fields.0.label', '项目名称')
                 ->where('currentObject.fields.1.key', 'customer_contact_ids')
                 ->where('currentObject.fields.1.label', '客户联系人')
                 ->where('currentObject.fields.2.key', 'customer_id')
                 ->where('currentObject.fields.2.label', '客户名称')
+                ->where('currentObject.fields', fn ($fields): bool => collect($fields)->contains(
+                    fn (array $field): bool => $field['key'] === 'informed_business_user_ids'
+                        && $field['label'] === '知会人员'
+                        && $field['type'] === 'multiaccount',
+                ))
                 ->where('currentObject.fields', fn ($fields): bool => collect($fields)->contains(
                     fn (array $field): bool => $field['key'] === 'last_payment_date'
                         && $field['label'] === '末次回款日期'

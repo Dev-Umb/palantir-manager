@@ -19,7 +19,10 @@ class ProjectVisibility
         }
 
         if (in_array('business', $roles, true)) {
-            return $query->where('payload->business_owner_user_id', (string) $user->id);
+            return $query->where(function (Builder $query) use ($user): void {
+                $query->where('payload->business_owner_user_id', (string) $user->id)
+                    ->orWhereJsonContains('payload->informed_business_user_ids', (string) $user->id);
+            });
         }
 
         return $query->whereRaw('1 = 0');
@@ -43,7 +46,7 @@ class ProjectVisibility
             return $query;
         }
 
-        $projectIds = $this->visibleProjectIds($user);
+        $projectIds = $this->ownedProjectIds($user);
 
         return $query->where(function (Builder $query) use ($projectField, $projectIds, $user): void {
             if ($projectIds) {
@@ -89,6 +92,33 @@ class ProjectVisibility
         )->exists();
     }
 
+    public function allowsProjectUpdate(User $user, ObjectRecord $project): bool
+    {
+        $roles = $this->roles($user);
+        if (in_array('admin', $roles, true) || in_array('finance', $roles, true)) {
+            return true;
+        }
+
+        return in_array('business', $roles, true)
+            && (string) ($project->payload['business_owner_user_id'] ?? '') === (string) $user->id;
+    }
+
+    public function isInformedProject(User $user, ObjectRecord $project): bool
+    {
+        if (! in_array('business', $this->roles($user), true)
+            || (string) ($project->payload['business_owner_user_id'] ?? '') === (string) $user->id) {
+            return false;
+        }
+
+        return in_array(
+            (string) $user->id,
+            array_map('strval', is_array($project->payload['informed_business_user_ids'] ?? null)
+                ? $project->payload['informed_business_user_ids']
+                : []),
+            true,
+        );
+    }
+
     /** @return array<int, string> */
     public function visibleProjectIds(User $user): array
     {
@@ -100,6 +130,26 @@ class ProjectVisibility
         return $this->scope($project->records(), $user)
             ->pluck('id')
             ->all();
+    }
+
+    /** @return array<int, string> */
+    private function ownedProjectIds(User $user): array
+    {
+        $project = BusinessObject::where('key', 'project')->first();
+        if (! $project) {
+            return [];
+        }
+
+        $query = $project->records();
+        $roles = $this->roles($user);
+        if (in_array('admin', $roles, true) || in_array('finance', $roles, true)) {
+            return $query->pluck('id')->all();
+        }
+        if (in_array('business', $roles, true)) {
+            return $query->where('payload->business_owner_user_id', (string) $user->id)->pluck('id')->all();
+        }
+
+        return [];
     }
 
     /** @return array<int, string> */

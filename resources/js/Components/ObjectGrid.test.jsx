@@ -22,6 +22,52 @@ describe('ObjectGrid column resizing', () => {
     });
 });
 
+describe('ObjectGrid informed projects', () => {
+    beforeEach(() => {
+        globalThis.ResizeObserver = class {
+            observe() {}
+            unobserve() {}
+            disconnect() {}
+        };
+        globalThis.fetch = vi.fn();
+    });
+
+    afterEach(() => {
+        cleanup();
+        vi.restoreAllMocks();
+    });
+
+    it('labels an informed project and keeps its cells and edit action read-only', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'project', label: '业务项目' }}
+                records={[{
+                    id: 'project-informed',
+                    code: 'PRJ-001',
+                    title: '知会测试项目',
+                    payload: { name: '知会测试项目' },
+                    display: { name: '知会测试项目' },
+                    can_update: false,
+                    is_informed_project: true,
+                }]}
+                fields={[{ key: 'name', label: '项目名称', type: 'text' }]}
+                can={{ update: true, delete: false }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        expect(await screen.findByText('知会项目')).not.toBeNull();
+        expect(screen.queryByLabelText('编辑 PRJ-001')).toBeNull();
+
+        const nameCell = await screen.findByRole('gridcell', { name: /知会测试项目/ });
+        fireEvent.doubleClick(nameCell);
+        expect(document.querySelector('.grid-inline-editor')).toBeNull();
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+});
+
 describe('ObjectGrid date editing', () => {
     beforeEach(() => {
         globalThis.ResizeObserver = class {

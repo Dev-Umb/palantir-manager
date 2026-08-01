@@ -87,8 +87,15 @@ class OntologyController extends Controller
 
         $relationOptions = $this->relations->optionsFor($current, null, $request->user(), $selected);
         if ($current->key === 'project') {
+            $businessAccounts = $this->workspace->businessAccountOptions()->all();
             $relationOptions['business_owner_user_id'] = [
-                'items' => $this->workspace->businessAccountOptions()->all(),
+                'items' => $businessAccounts,
+                'selectedItems' => [],
+            ];
+            $relationOptions['informed_business_user_ids'] = [
+                'items' => collect($businessAccounts)
+                    ->map(fn (array $account): array => [...$account, 'id' => (string) $account['id']])
+                    ->all(),
                 'selectedItems' => [],
             ];
         }
@@ -163,7 +170,9 @@ class OntologyController extends Controller
                                 'title' => $record->title,
                                 default => in_array($field['type'] ?? null, ['relation', 'creatable_relation', 'multirelation'], true)
                                     ? $this->relations->relationDisplayValue($container, $field)
-                                    : ($container[$field['key']] ?? null),
+                                    : (($field['type'] ?? null) === 'multiaccount'
+                                        ? $this->relations->accountDisplayValue($container[$field['key']] ?? null, true)
+                                        : ($container[$field['key']] ?? null)),
                             };
 
                             return $this->safeCsvCell($value);
@@ -245,6 +254,9 @@ class OntologyController extends Controller
         abort_unless($request->user()->canDo("object.{$object->key}.update")
             && $this->workspace->writableFieldKeys($object, $request->user()) !== [], 403);
         abort_unless($this->projectVisibility->allowsRecord($request->user(), $record), 403);
+        if ($object->key === 'project') {
+            abort_unless($this->projectVisibility->allowsProjectUpdate($request->user(), $record), 403);
+        }
 
         $payload = $this->applySystemPayload(
             $object,
@@ -612,6 +624,7 @@ class OntologyController extends Controller
     {
         $type = $field['type'] ?? 'text';
         $allowed = match (true) {
+            in_array($type, ['file', 'files', 'multirelation', 'multiaccount'], true) => [],
             in_array($type, ['number', 'range'], true) => ['equals', 'not_equals', 'greater_than', 'greater_or_equal', 'less_than', 'less_or_equal', 'between', 'is_empty', 'is_not_empty'],
             $type === 'date' => ['equals', 'before', 'on_or_before', 'after', 'on_or_after', 'between', 'is_empty', 'is_not_empty'],
             in_array($type, ['select', 'relation', 'account'], true) => ['equals', 'not_equals', 'is_empty', 'is_not_empty'],
@@ -630,7 +643,7 @@ class OntologyController extends Controller
 
         $field = collect($object->fields ?? [])->first(fn (array $candidate) => ($candidate['key'] ?? null) === $sort
             && ($candidate['scope'] ?? null) !== 'item'
-            && ! in_array($candidate['type'] ?? null, ['relation', 'multirelation', 'creatable_relation', 'file'], true)
+            && ! in_array($candidate['type'] ?? null, ['relation', 'multirelation', 'multiaccount', 'creatable_relation', 'file'], true)
         );
         if (! $field) {
             return;
@@ -737,12 +750,14 @@ class OntologyController extends Controller
                 continue;
             }
 
-            if ($field['type'] === 'multirelation') {
+            if (in_array($field['type'], ['multirelation', 'multiaccount'], true)) {
                 $rules["payload.{$field['key']}"] = [
                     ! empty($field['required']) ? 'required' : 'nullable',
                     'array',
                 ];
-                $rules["payload.{$field['key']}.*"] = ['string', 'distinct'];
+                $rules["payload.{$field['key']}.*"] = ($field['type'] ?? null) === 'multiaccount'
+                    ? ['string']
+                    : ['string', 'distinct'];
             } else {
                 $rules["payload.{$field['key']}"] = $this->fieldRules($object, $field);
             }
@@ -814,7 +829,14 @@ class OntologyController extends Controller
             }
         }
         foreach ($this->relations->relationFields($object) as $field) {
-            if (($field['type'] ?? null) === 'multirelation' && isset($payload[$field['key']]) && is_array($payload[$field['key']])) {
+            if (($field['type'] ?? null) === 'multirelation'
+                && isset($payload[$field['key']]) && is_array($payload[$field['key']])) {
+                $payload[$field['key']] = array_values(array_unique($payload[$field['key']]));
+            }
+        }
+        foreach ($object->fields ?? [] as $field) {
+            if (($field['type'] ?? null) === 'multiaccount'
+                && isset($payload[$field['key']]) && is_array($payload[$field['key']])) {
                 $payload[$field['key']] = array_values(array_unique($payload[$field['key']]));
             }
         }
@@ -995,6 +1017,7 @@ class OntologyController extends Controller
             ]);
         }
         $this->guardBusinessOwner($payload['business_owner_user_id']);
+        $this->guardInformedBusinessUsers($payload['informed_business_user_ids'] ?? []);
 
         $payload['overall_status'] = $payload['overall_status'] ?? '投标中';
         $this->guardProjectContractState($payload);
@@ -1014,6 +1037,9 @@ class OntologyController extends Controller
         $oldPayload = $project->payload ?? [];
         if (($oldPayload['business_owner_user_id'] ?? null) !== ($payload['business_owner_user_id'] ?? null)) {
             $this->guardBusinessOwner($payload['business_owner_user_id'] ?? null);
+        }
+        if (($oldPayload['informed_business_user_ids'] ?? []) !== ($payload['informed_business_user_ids'] ?? [])) {
+            $this->guardInformedBusinessUsers($payload['informed_business_user_ids'] ?? []);
         }
         $this->guardProjectContractState($payload);
         $this->guardShipmentDates($payload);
@@ -1111,6 +1137,31 @@ class OntologyController extends Controller
         if (! $valid) {
             throw ValidationException::withMessages([
                 'payload.business_owner_user_id' => '负责业务员必须选择具有业务角色的账号。',
+            ]);
+        }
+    }
+
+    private function guardInformedBusinessUsers(mixed $userIds): void
+    {
+        if (! is_array($userIds)) {
+            throw ValidationException::withMessages([
+                'payload.informed_business_user_ids' => '知会人员必须是有效的多选列表。',
+            ]);
+        }
+
+        $ids = collect($userIds)
+            ->filter(fn (mixed $userId): bool => filter_var($userId, FILTER_VALIDATE_INT) !== false)
+            ->map(fn (mixed $userId): int => (int) $userId)
+            ->unique()
+            ->values();
+        $validCount = User::query()
+            ->whereIn('id', $ids->all())
+            ->whereHas('roles', fn ($query) => $query->where('name', 'business'))
+            ->count();
+
+        if ($ids->count() !== count($userIds) || $validCount !== $ids->count()) {
+            throw ValidationException::withMessages([
+                'payload.informed_business_user_ids' => '知会人员必须选择具有业务角色的账号。',
             ]);
         }
     }

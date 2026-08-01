@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { comboMenuStyleFromRect, shouldCloseComboForPointer } from './comboBoxMenuPosition';
 import { useRemoteOptions } from './useRemoteOptions';
 
-export default function MultiComboBox({ value = [], items = [], selectedItems = [], onChange, onClose, startOpen = false, searchUrl = '', searchContext = {} }) {
+export default function MultiComboBox({ value = [], items = [], selectedItems = [], onChange, onClose, startOpen = false, searchUrl = '', searchContext = {}, searchPlaceholder = '输入联系人姓名或手机号' }) {
     const [open, setOpen] = useState(startOpen);
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(-1);
@@ -111,7 +111,7 @@ export default function MultiComboBox({ value = [], items = [], selectedItems = 
                         setActiveIndex(-1);
                     }}
                     onKeyDown={navigate}
-                    placeholder="输入联系人姓名或手机号"
+                    placeholder={searchPlaceholder}
                     autoFocus
                 />
             </div>

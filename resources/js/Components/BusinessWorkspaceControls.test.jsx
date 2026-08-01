@@ -40,6 +40,22 @@ describe('business workspace field controls', () => {
 
         expect(screen.getByRole('button')).toHaveTextContent('业务员甲');
     });
+
+    it('supports selecting multiple informed business accounts', () => {
+        const onChange = vi.fn();
+        render(<FieldControl
+            field={{ key: 'informed_business_user_ids', type: 'multiaccount' }}
+            value={['12']}
+            relationOptions={{ informed_business_user_ids: { items: [{ id: '12', label: '业务员甲' }, { id: '13', label: '业务员乙' }] } }}
+            onChange={onChange}
+        />);
+
+        fireEvent.click(screen.getByRole('button', { name: /业务员甲/ }));
+        expect(screen.getByPlaceholderText('输入业务员姓名')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /业务员乙/ }));
+
+        expect(onChange).toHaveBeenCalledWith('informed_business_user_ids', ['12', '13']);
+    });
 });
 
 describe('project customer manager', () => {
