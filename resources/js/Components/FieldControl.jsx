@@ -4,6 +4,29 @@ import LocalizedFileInput from './LocalizedFileInput';
 import MultiComboBox from './MultiComboBox';
 
 export function FieldControl({ field, value, onChange, relationOptions = {}, autoFocus = false }) {
+    if (field.type === 'files') {
+        const existing = Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
+        const pending = Array.isArray(value) ? value.filter((item) => typeof File !== 'undefined' && item instanceof File) : [];
+
+        return (
+            <div className="file-control multiple-file-control">
+                {existing.length > 0 && (
+                    <div className="attachment-list">
+                        {existing.map((url, index) => <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer">附件 {index + 1}</a>)}
+                    </div>
+                )}
+                {pending.length > 0 && <small>本次新增 {pending.length} 个附件，保存后叠加到历史附件。</small>}
+                <input
+                    name={field.key}
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(event) => onChange(field.key, Array.from(event.target.files || []))}
+                />
+            </div>
+        );
+    }
+
     if (field.type === 'file') {
         return (
             <div className="file-control">
@@ -53,6 +76,16 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
                 autoFocus={autoFocus}
             />
         );
+    }
+
+    if (field.type === 'account') {
+        const items = relationOptions[field.key]?.items || [];
+        const options = [
+            { value: '', label: '未选择' },
+            ...items.map((item) => ({ value: String(item.id), label: item.label })),
+        ];
+
+        return <ComboBox value={value === null || value === undefined ? '' : String(value)} options={options} onChange={(next) => onChange(field.key, next)} autoFocus={autoFocus} />;
     }
 
     if (field.type === 'multirelation') {
@@ -140,7 +173,7 @@ export function SchemaForm({ fields, data, setData, submitLabel = '保存', proc
     return (
         <div className="form-grid">
             {editable.map((field) => (
-                field.type === 'file' ? (
+                ['file', 'files'].includes(field.type) ? (
                     <div key={field.key} className={`form-field ${fieldLayoutClass(field)}`}>
                         <span>{field.label}{field.required && <b>*</b>}</span>
                         <FieldControl field={field} value={data[field.key]} onChange={(key, value) => setData(key, value)} relationOptions={relationOptions} />
@@ -162,7 +195,7 @@ export function SchemaForm({ fields, data, setData, submitLabel = '保存', proc
 }
 
 function fieldLayoutClass(field) {
-    if (['file', 'multirelation'].includes(field.type)) return 'wide';
+    if (['file', 'files', 'multirelation'].includes(field.type)) return 'wide';
     if (['remark', 'risk', 'reason', 'address', 'cooperation_history', 'description'].includes(field.key)) return 'wide';
 
     return '';

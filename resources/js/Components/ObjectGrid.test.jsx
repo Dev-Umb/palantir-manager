@@ -194,6 +194,35 @@ describe('ObjectGrid date editing', () => {
         expect(JSON.parse(globalThis.fetch.mock.calls[0][1].body).payload.customer_contact_ids).toEqual(['contact-a']);
     });
 
+    it('shows only the customer name in the project table while preserving other relation labels', async () => {
+        const record = {
+            id: 'project-1',
+            code: 'PRJ-001',
+            title: '甲项目',
+            payload: { customer_id: 'customer-1' },
+            display: { customer_id: 'CUST-001 · 甲客户' },
+        };
+        const field = { key: 'customer_id', label: '客户名称', type: 'relation', target: 'customer' };
+        const commonProps = {
+            records: [record],
+            fields: [field],
+            can: { update: true, delete: false },
+            selectedRecordId: null,
+            relationOptions: { customer_id: { items: [{ id: 'customer-1', label: 'CUST-001 · 甲客户' }] } },
+            onRecordChange: () => {},
+        };
+
+        const { unmount } = render(<ObjectGrid object={{ key: 'project', label: '业务项目' }} {...commonProps} />);
+
+        expect(await screen.findByRole('gridcell', { name: '甲客户' })).not.toBeNull();
+        expect(screen.queryByText('CUST-001 · 甲客户')).toBeNull();
+
+        unmount();
+        render(<ObjectGrid object={{ key: 'contract', label: '合同表' }} {...commonProps} />);
+
+        expect(await screen.findByRole('gridcell', { name: 'CUST-001 · 甲客户' })).not.toBeNull();
+    });
+
     it('does not edit a relation explicitly marked readonly', async () => {
         render(
             <ObjectGrid

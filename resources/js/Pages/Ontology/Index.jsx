@@ -1,8 +1,9 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Download, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { Download, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Layout from '../../Components/Layout';
 import CustomerContactModal from '../../Components/CustomerContactModal';
+import ProjectCustomerManager from '../../Components/ProjectCustomerManager';
 import { SchemaForm } from '../../Components/FieldControl';
 import LineItemsEditor, { emptyItem } from '../../Components/LineItemsEditor';
 import {
@@ -123,17 +124,25 @@ export default function Index({ objects = [], currentObject, records, can, relat
                     <ObjectSwitcher objects={objects} currentObject={currentObject} />
                     <div className="surface object-list-surface">
                         <div className="object-toolbar">
-                            <ObjectListControls objectKey={currentObject.key} params={params} records={records} fields={currentObject.fields} />
-                            <div className="object-toolbar-actions">
-                                <a className="secondary-button" href={exportUrl} download>
-                                    <Download size={15} /> 导出
-                                </a>
-                                {can.create && (
-                                <Link className="small-action action-button" href={`/objects/${currentObject.key}?mode=create`}>
-                                    <Plus size={15} /> 新建
-                                </Link>
+                            <ObjectListControls
+                                objectKey={currentObject.key}
+                                params={params}
+                                records={records}
+                                fields={currentObject.fields}
+                                relationOptions={relationOptions}
+                                actions={(
+                                    <div className="object-toolbar-actions">
+                                        <a className="secondary-button" href={exportUrl} download>
+                                            <Download size={15} /> 导出
+                                        </a>
+                                        {can.create && (
+                                            <Link className="small-action action-button" href={`/objects/${currentObject.key}?mode=create`}>
+                                                <Plus size={15} /> 新建
+                                            </Link>
+                                        )}
+                                    </div>
                                 )}
-                            </div>
+                            />
                         </div>
                         <Suspense fallback={<div className="table-loading">列表加载中...</div>}>
                             <ObjectGrid
@@ -166,17 +175,18 @@ export default function Index({ objects = [], currentObject, records, can, relat
                             errors={createForm.errors}
                             submitLabel={`新建${objectLabel}`}
                             relationOptions={relationOptions}
+                            canManageCustomers={can.manage_customers}
                         />
                     </form>
                 </Modal>
             )}
             {mode === 'detail' && selectedRecord && (
                 <Modal title={`${selectedRecord.code} · 详情`} closeHref={closeHref}>
-                    <RecordDetail object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} contactCan={contactCan} onContactDetail={openContactDetail} onContactCreate={openContactCreate} />
+                    <RecordDetail object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} contactCan={contactCan} onContactDetail={openContactDetail} onContactCreate={openContactCreate} can={can} />
                 </Modal>
             )}
             {mode === 'edit' && can.update && selectedRecord && (
-                <EditRecordModal key={selectedRecord.id} object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} closeHref={closeHref} />
+                <EditRecordModal key={selectedRecord.id} object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} closeHref={closeHref} canManageCustomers={can.manage_customers} />
             )}
             {contactModal && (
                 <CustomerContactModal
@@ -200,7 +210,7 @@ function ObjectSwitcher({ objects, currentObject }) {
     const groupObjects = currentObject.group
         ? objects.filter((object) => object.group === currentObject.group)
         : objects;
-    const tabObjects = groupObjects.filter((object) => object.key !== 'customer_contact');
+    const tabObjects = groupObjects;
     const groupOptions = [...objects.reduce((groups, object) => {
         if (object.group && !groups.has(object.group)) {
             groups.set(object.group, object);
@@ -244,46 +254,198 @@ function ObjectSwitcher({ objects, currentObject }) {
     );
 }
 
-function ObjectListControls({ objectKey, params, records, fields = [] }) {
-    const preserved = [...params.entries()].filter(([key]) => !['q', 'per_page', 'page', 'sort', 'direction'].includes(key));
+function ObjectListControls({ objectKey, params, records, fields = [], relationOptions = {}, actions = null }) {
+    const preserved = [...params.entries()].filter(([key]) => !['q', 'per_page', 'page', 'sort', 'direction', 'filter_logic'].includes(key) && !key.startsWith('filters['));
     const sortable = fields.filter((field) => field.scope !== 'item'
-        && !['relation', 'multirelation', 'creatable_relation', 'file'].includes(field.type));
+        && !['relation', 'multirelation', 'creatable_relation', 'file', 'files'].includes(field.type));
+    const filterable = fields.filter((field) => field.scope !== 'item' && !['file', 'files', 'multirelation'].includes(field.type));
+    const initialFilters = filterRowsFromParams(params, filterable);
+    const [filters, setFilters] = useState(initialFilters.length ? initialFilters : []);
+    const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+    const filterPopoverRef = useRef(null);
+
+    useEffect(() => {
+        if (!filterPanelOpen) {
+            return undefined;
+        }
+
+        function closeFilterPanel(event) {
+            if (event.type === 'keydown' && event.key !== 'Escape') {
+                return;
+            }
+
+            if (event.type === 'mousedown' && filterPopoverRef.current?.contains(event.target)) {
+                return;
+            }
+
+            setFilterPanelOpen(false);
+        }
+
+        document.addEventListener('mousedown', closeFilterPanel);
+        document.addEventListener('keydown', closeFilterPanel);
+
+        return () => {
+            document.removeEventListener('mousedown', closeFilterPanel);
+            document.removeEventListener('keydown', closeFilterPanel);
+        };
+    }, [filterPanelOpen]);
+
+    function updateFilter(index, key, value) {
+        setFilters((current) => current.map((filter, position) => position === index ? { ...filter, [key]: value } : filter));
+    }
 
     return (
-        <form className="object-list-controls" method="get" action={`/objects/${objectKey}`} role="search" aria-label="业务数据筛选">
+        <form className="object-list-controls advanced-filter-form" method="get" action={`/objects/${objectKey}`} role="search" aria-label="业务数据筛选">
             {preserved.map(([key, value], index) => (
                 <input key={`${key}-${value}-${index}`} type="hidden" name={key} value={value} />
             ))}
-            <label className="object-search">
-                <Search size={16} />
-                <span className="sr-only">搜索</span>
-                <input type="search" name="q" aria-label="搜索记录" defaultValue={params.get('q') || ''} placeholder="搜索编号、标题或字段内容" />
-            </label>
-            <label>
-                <span className="sr-only">每页</span>
-                <select name="per_page" aria-label="每页条数" defaultValue={String(records.per_page || 50)}>
-                    <option value="25">25 条</option>
-                    <option value="50">50 条</option>
-                    <option value="100">100 条</option>
-                </select>
-            </label>
-            <label>
-                <span className="sr-only">排序</span>
-                <select name="sort" aria-label="排序字段" defaultValue={params.get('sort') || ''}>
-                    <option value="">默认（最近更新）</option>
-                    {sortable.map((field) => <option value={field.key} key={field.key}>{field.label}</option>)}
-                </select>
-            </label>
-            <label>
-                <span className="sr-only">方向</span>
-                <select name="direction" aria-label="排序方向" defaultValue={params.get('direction') === 'desc' ? 'desc' : 'asc'}>
-                    <option value="asc">升序</option>
-                    <option value="desc">降序</option>
-                </select>
-            </label>
-            <button type="submit" className="filter-button"><SlidersHorizontal size={15} /> 应用</button>
+            <div className="object-list-primary">
+                <label className="object-search">
+                    <Search size={16} />
+                    <span className="sr-only">搜索</span>
+                    <input type="search" name="q" aria-label="搜索记录" defaultValue={params.get('q') || ''} placeholder="搜索编号、标题或字段内容" />
+                </label>
+                <label>
+                    <span className="sr-only">每页</span>
+                    <select name="per_page" aria-label="每页条数" defaultValue={String(records.per_page || 50)}>
+                        <option value="25">25 条</option>
+                        <option value="50">50 条</option>
+                        <option value="100">100 条</option>
+                    </select>
+                </label>
+                <label>
+                    <span className="sr-only">排序</span>
+                    <select name="sort" aria-label="排序字段" defaultValue={params.get('sort') || ''}>
+                        <option value="">默认（最近更新）</option>
+                        {sortable.map((field) => <option value={field.key} key={field.key}>{field.label}</option>)}
+                    </select>
+                </label>
+                <label>
+                    <span className="sr-only">方向</span>
+                    <select name="direction" aria-label="排序方向" defaultValue={params.get('direction') === 'desc' ? 'desc' : 'asc'}>
+                        <option value="asc">升序</option>
+                        <option value="desc">降序</option>
+                    </select>
+                </label>
+                <button type="submit" className="filter-button"><SlidersHorizontal size={15} /> 应用</button>
+                <div className="advanced-filter-popover-shell" ref={filterPopoverRef}>
+                    <button
+                        type="button"
+                        className={`advanced-filter-trigger${initialFilters.length ? ' active' : ''}`}
+                        aria-expanded={filterPanelOpen}
+                        aria-controls="advanced-filter-panel"
+                        onClick={() => setFilterPanelOpen((open) => !open)}
+                    >
+                        <SlidersHorizontal size={15} /> {initialFilters.length ? `${initialFilters.length} 筛选` : '筛选'}
+                    </button>
+                    <div
+                        className="advanced-filter-panel"
+                        id="advanced-filter-panel"
+                        role="dialog"
+                        aria-label="设置筛选条件"
+                        hidden={!filterPanelOpen}
+                    >
+                        <div className="advanced-filter-title">
+                            <strong>设置筛选条件</strong>
+                            <button type="button" className="icon-link" aria-label="关闭筛选条件" onClick={() => setFilterPanelOpen(false)}><X size={17} /></button>
+                        </div>
+                        <div className="advanced-filter-logic">
+                            <span>条件关系</span>
+                            <select name="filter_logic" aria-label="条件关系" defaultValue={params.get('filter_logic') === 'or' ? 'or' : 'and'}>
+                                <option value="and">全部满足（AND）</option>
+                                <option value="or">任一满足（OR）</option>
+                            </select>
+                        </div>
+                        <div className="advanced-filter-rows">
+                            {filters.map((filter, index) => {
+                                const field = filterable.find((candidate) => candidate.key === filter.field) || filterable[0];
+                                const operators = filterOperators(field);
+                                return (
+                                    <div className="advanced-filter-row" key={`${index}-${filter.field}`}>
+                                        <select name={`filters[${index}][field]`} value={field?.key || ''} onChange={(event) => updateFilter(index, 'field', event.target.value)} aria-label={`筛选字段 ${index + 1}`}>
+                                            {filterable.map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.label}</option>)}
+                                        </select>
+                                        <select name={`filters[${index}][operator]`} value={operators.some((option) => option.value === filter.operator) ? filter.operator : operators[0]?.value} onChange={(event) => updateFilter(index, 'operator', event.target.value)} aria-label={`筛选条件 ${index + 1}`}>
+                                            {operators.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                        </select>
+                                        <FilterValueInput field={field} operator={filter.operator} name={`filters[${index}][value]`} value={filter.value} onChange={(value) => updateFilter(index, 'value', value)} relationOptions={relationOptions} />
+                                        <button type="button" className="icon-link" aria-label={`删除筛选条件 ${index + 1}`} onClick={() => setFilters((current) => current.filter((_, position) => position !== index))}><Trash2 size={15} /></button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="advanced-filter-actions">
+                            <button type="button" className="advanced-filter-add" onClick={() => setFilters((current) => [...current, emptyFilter(filterable)])}>
+                                <Plus size={15} /> 添加条件
+                            </button>
+                            <div>
+                                {initialFilters.length > 0 && <a className="small-action secondary-button" href={clearFilterUrl(objectKey, params)}>清空筛选</a>}
+                                <button type="submit" className="small-action action-button" onClick={() => setFilterPanelOpen(false)}>应用筛选</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {actions}
+            </div>
         </form>
     );
+}
+
+function filterRowsFromParams(params, fields) {
+    const rows = new Map();
+    for (const [key, value] of params.entries()) {
+        const match = key.match(/^filters\[(\d+)]\[(field|operator|value)]$/);
+        if (!match) continue;
+        const index = Number(match[1]);
+        rows.set(index, { ...(rows.get(index) || {}), [match[2]]: value });
+    }
+
+    return [...rows.values()].filter((row) => fields.some((field) => field.key === row.field));
+}
+
+function emptyFilter(fields) {
+    const field = fields[0];
+    return { field: field?.key || '', operator: filterOperators(field)[0]?.value || 'contains', value: '' };
+}
+
+function filterOperators(field) {
+    if (['number', 'range'].includes(field?.type)) return [
+        ['equals', '等于'], ['not_equals', '不等于'], ['greater_than', '大于'], ['greater_or_equal', '大于等于'], ['less_than', '小于'], ['less_or_equal', '小于等于'], ['between', '介于'], ['is_empty', '为空'], ['is_not_empty', '不为空'],
+    ].map(([value, label]) => ({ value, label }));
+    if (field?.type === 'date') return [
+        ['equals', '等于'], ['before', '早于'], ['on_or_before', '早于或等于'], ['after', '晚于'], ['on_or_after', '晚于或等于'], ['between', '日期区间'], ['is_empty', '为空'], ['is_not_empty', '不为空'],
+    ].map(([value, label]) => ({ value, label }));
+    if (['select', 'relation', 'account'].includes(field?.type)) return [
+        { value: 'equals', label: '等于' }, { value: 'not_equals', label: '不等于' }, { value: 'is_empty', label: '为空' }, { value: 'is_not_empty', label: '不为空' },
+    ];
+    return [
+        { value: 'contains', label: '包含' }, { value: 'not_contains', label: '不包含' }, { value: 'equals', label: '等于' }, { value: 'not_equals', label: '不等于' }, { value: 'is_empty', label: '为空' }, { value: 'is_not_empty', label: '不为空' },
+    ];
+}
+
+function FilterValueInput({ field, operator, name, value, onChange, relationOptions }) {
+    if (['is_empty', 'is_not_empty'].includes(operator)) return <input type="hidden" name={name} value="1" />;
+    if (operator === 'between') {
+        const [start = '', end = ''] = String(value || '').split('..', 2);
+        const type = field?.type === 'date' ? 'date' : 'number';
+        return <div className="filter-range"><input type={type} value={start} onChange={(event) => onChange(`${event.target.value}..${end}`)} aria-label={`${field?.label}起始值`} /><span>至</span><input type={type} value={end} onChange={(event) => onChange(`${start}..${event.target.value}`)} aria-label={`${field?.label}结束值`} /><input type="hidden" name={name} value={value || ''} /></div>;
+    }
+    if (field?.type === 'select') {
+        return <select name={name} value={value || ''} onChange={(event) => onChange(event.target.value)}><option value="">请选择</option>{(field.options || []).map((option) => <option key={option} value={option}>{option}</option>)}</select>;
+    }
+    if (['relation', 'account'].includes(field?.type)) {
+        const options = relationOptions[field.key]?.items || [];
+        return <select name={name} value={value || ''} onChange={(event) => onChange(event.target.value)}><option value="">请选择</option>{options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>;
+    }
+    return <input name={name} type={field?.type === 'date' ? 'date' : field?.type === 'number' || field?.type === 'range' ? 'number' : 'text'} value={value || ''} onChange={(event) => onChange(event.target.value)} placeholder="筛选值" />;
+}
+
+function clearFilterUrl(objectKey, params) {
+    const next = new URLSearchParams();
+    for (const [key, value] of params.entries()) {
+        if (key !== 'filter_logic' && !key.startsWith('filters[') && key !== 'page') next.append(key, value);
+    }
+    return `/objects/${objectKey}${next.toString() ? `?${next}` : ''}`;
 }
 
 function ObjectPagination({ records }) {
@@ -304,16 +466,17 @@ function ObjectPagination({ records }) {
 
 function exportUrlFor(objectKey, params) {
     const exportParams = new URLSearchParams();
-    for (const key of ['q', 'sort', 'direction']) {
-        const value = params.get(key);
-        if (value) exportParams.set(key, value);
+    for (const [key, value] of params.entries()) {
+        if (['q', 'sort', 'direction', 'filter_logic'].includes(key) || key.startsWith('filters[')) {
+            exportParams.append(key, value);
+        }
     }
     const query = exportParams.toString();
 
     return `/objects/${objectKey}/export.csv${query ? `?${query}` : ''}`;
 }
 
-function EditRecordModal({ object, record, fields, relationOptions, closeHref }) {
+function EditRecordModal({ object, record, fields, relationOptions, closeHref, canManageCustomers = false }) {
     const updateForm = useForm({ payload: payloadForEdit(record.payload, fields) });
 
     function update(event) {
@@ -335,6 +498,7 @@ function EditRecordModal({ object, record, fields, relationOptions, closeHref })
                     submitLabel="保存"
                     relationOptions={relationOptions}
                     recordDisplay={record.display}
+                    canManageCustomers={canManageCustomers}
                 />
             </form>
         </Modal>
@@ -370,7 +534,7 @@ function Modal({ title, closeHref, children }) {
     );
 }
 
-function RecordForm({ objectKey, record = null, fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {} }) {
+function RecordForm({ objectKey, record = null, fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {}, canManageCustomers = false }) {
     const itemFields = fields.filter((field) => field.scope === 'item');
     const formFields = objectKey === 'customer'
         ? fields.filter((field) => field.key !== 'cooperation_history')
@@ -413,6 +577,13 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
             {objectKey === 'customer' && (
                 <CustomerProjectHistory projects={record?.cooperation_projects || []} />
             )}
+            {objectKey === 'project' && canManageCustomers && (
+                <ProjectCustomerManager
+                    customerId={payload.customer_id}
+                    onCustomerSelected={(customerId) => setField('customer_id', customerId)}
+                    onContactSelected={(contactId) => setField('customer_contact_ids', [...new Set([...(payload.customer_contact_ids || []), contactId])])}
+                />
+            )}
             {itemFields.length > 0 && (
                 <LineItemsEditor
                     fields={itemFields}
@@ -435,7 +606,7 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
     );
 }
 
-function RecordDetail({ object, record, fields, relationOptions, contactCan, onContactDetail, onContactCreate }) {
+function RecordDetail({ object, record, fields, relationOptions, contactCan, onContactDetail, onContactCreate, can = {} }) {
     const commonFields = fields.filter((field) => field.scope !== 'item'
         && !(object.key === 'project' && field.key === 'customer_contact_ids')
         && !(object.key === 'customer' && field.key === 'cooperation_history'));
@@ -464,8 +635,37 @@ function RecordDetail({ object, record, fields, relationOptions, contactCan, onC
                 <LineItemsDetail fields={itemFields} items={record.payload?.items || []} relationOptions={relationOptions} />
             )}
             {object.key === 'project' && <ProjectContacts contacts={record.contacts || []} />}
+            {object.key === 'project' && can.sync_contract_amount && <ContractAmountSync project={record} />}
             {object.key === 'customer' && <CustomerContacts customer={record} contacts={record.contacts || []} can={contactCan} onDetail={onContactDetail} onCreate={onContactCreate} />}
         </>
+    );
+}
+
+function ContractAmountSync({ project }) {
+    const [syncing, setSyncing] = useState(false);
+    const source = project.payload?.contract_amount_source === 'contract_sync' ? '合同表汇总' : '财务手工维护';
+    const syncedAt = project.payload?.contract_amount_synced_at;
+
+    async function sync() {
+        if (!window.confirm('确定以合同表最新金额汇总覆盖项目合同金额吗？')) return;
+        setSyncing(true);
+        try {
+            const response = await fetch(`/projects/${project.id}/contract-amount/sync`, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+            });
+            if (!response.ok) throw new Error('同步失败');
+            router.reload({ only: ['records', 'selectedRecord'], preserveScroll: true });
+        } finally {
+            setSyncing(false);
+        }
+    }
+
+    return (
+        <section className="contract-sync-card">
+            <div><strong>合同金额维护来源：{source}</strong><span>最后同步：{syncedAt ? new Date(syncedAt).toLocaleString('zh-CN') : '尚未主动同步'}</span></div>
+            <button type="button" className="secondary-button small-action" onClick={sync} disabled={syncing}><RefreshCw size={14} /> {syncing ? '同步中…' : '从合同表重新同步'}</button>
+        </section>
     );
 }
 
@@ -608,6 +808,7 @@ function cellValue(field, record, relationOptions) {
     if (field.type === 'relation') return <span className="relation-chip">{value}</span>;
     if (field.type === 'multirelation') return (Array.isArray(value) ? value : []).map((label, index) => <span className="relation-chip" key={`${label}-${index}`}>{label}</span>);
     if (field.type === 'file') return <a className="relation-chip" href={value} target="_blank" rel="noreferrer">查看附件</a>;
+    if (field.type === 'files') return (Array.isArray(value) ? value : []).map((url, index) => <a className="relation-chip" href={url} target="_blank" rel="noreferrer" key={`${url}-${index}`}>附件 {index + 1}</a>);
     return String(value);
 }
 

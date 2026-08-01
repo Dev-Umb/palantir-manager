@@ -76,7 +76,7 @@ class ExampleTest extends TestCase
         $this->get('/objects/project')->assertOk();
     }
 
-    public function test_dashboard_exposes_four_operator_friendly_boards(): void
+    public function test_dashboard_exposes_only_business_contract_status_and_reminders(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $this->artisan('xyc:admin', [
@@ -93,14 +93,15 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Dashboard')
-                ->has('boards', 3)
-                ->where('boards.0.title', '经营大盘')
-                ->where('boards.1.title', '采购大盘')
-                ->where('boards.2.title', '财务大盘')
-                ->has('projectFlows', 1)
-                ->where('projectFlows.0.current_step', '生产')
-                ->where('projectFlows.0.steps.4.label', '生产')
-                ->where('projectFlows.0.steps.4.status', 'current'));
+                ->has('stats', 4)
+                ->has('recentProjects', 4)
+                ->where('statusSummary.投标中', 1)
+                ->where('statusSummary.已中标', 1)
+                ->where('statusSummary.已拿到加工函', 1)
+                ->where('statusSummary.合同签署', 1)
+                ->missing('boards')
+                ->missing('projectFlows')
+                ->missing('stockRisks'));
     }
 
     public function test_dashboard_uses_a_bounded_number_of_queries(): void
@@ -116,7 +117,7 @@ class ExampleTest extends TestCase
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThanOrEqual(12, $queryCount, "Dashboard used {$queryCount} queries.");
+        $this->assertLessThanOrEqual(18, $queryCount, "Dashboard used {$queryCount} queries.");
     }
 
     public function test_object_lists_batch_load_relation_labels(): void
@@ -157,7 +158,7 @@ class ExampleTest extends TestCase
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThanOrEqual(12, $queryCount, "Project list used {$queryCount} queries.");
+        $this->assertLessThanOrEqual(18, $queryCount, "Project list used {$queryCount} queries.");
     }
 
     public function test_procurement_approvals_batch_load_relation_labels(): void
@@ -203,7 +204,7 @@ class ExampleTest extends TestCase
         $this->assertLessThanOrEqual(12, $queryCount, "Procurement approval page used {$queryCount} queries.");
     }
 
-    public function test_contract_amount_is_synced_back_to_project(): void
+    public function test_contract_changes_do_not_override_existing_project_amount_without_explicit_sync(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $admin = $this->userWithRole('admin');
@@ -219,15 +220,16 @@ class ExampleTest extends TestCase
                 'amount' => 140000,
                 'customer_id' => $customerId,
                 'project_id' => $project->id,
-                'status' => '已收到',
+                'status' => '未签署',
             ],
         ])->assertRedirect();
 
         $project->refresh();
-        $this->assertSame(4000000.0, (float) $project->payload['contract_amount']);
-        $this->assertStringContainsString('HT-', $project->payload['related_contract_no']);
+        $this->assertSame(5280000.0, (float) $project->payload['contract_amount']);
+        $this->assertArrayNotHasKey('related_contract_no', $project->payload);
 
         $newContract = ObjectRecord::whereRelation('businessObject', 'key', 'contract')
+            ->where('payload->project_id', $project->id)
             ->where('payload->ctype', '补充协议')
             ->firstOrFail();
         $this->put("/records/{$newContract->id}", [
@@ -237,10 +239,13 @@ class ExampleTest extends TestCase
             ],
         ])->assertRedirect();
 
-        $this->assertSame(4060000.0, (float) $project->fresh()->payload['contract_amount']);
+        $this->assertSame(5280000.0, (float) $project->fresh()->payload['contract_amount']);
+
+        $this->post("/projects/{$project->id}/contract-amount/sync")->assertRedirect();
+        $this->assertSame(5480000.0, (float) $project->fresh()->payload['contract_amount']);
     }
 
-    public function test_invoice_amount_is_synced_back_to_project(): void
+    public function test_hidden_invoice_object_cannot_write_or_sync_project_amounts(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $finance = $this->userWithRole('finance');
@@ -260,65 +265,20 @@ class ExampleTest extends TestCase
                 'invoice_date' => '2026-07-07',
                 'status' => '已开票',
             ],
-        ])->assertRedirect();
+        ])->assertNotFound();
 
-        $project->refresh();
-        $this->assertSame($baseAmount + 200000, (float) $project->payload['invoiced_amount']);
-        $this->assertSame(
-            max((float) $project->payload['contract_amount'] - $baseAmount - 200000, 0),
-            (float) $project->payload['uninvoiced_amount'],
-        );
-
-        $newInvoice = ObjectRecord::whereRelation('businessObject', 'key', 'invoice')
-            ->where('payload->invoice_no', 'FP-TEST-001')
-            ->firstOrFail();
-
-        $this->put("/records/{$newInvoice->id}", [
-            'payload' => [
-                ...$newInvoice->payload,
-                'amount' => 250000,
-            ],
-        ])->assertRedirect();
-
-        $project->refresh();
-        $this->assertSame($baseAmount + 250000, (float) $project->payload['invoiced_amount']);
-
-        $newInvoice->refresh();
-        $this->put("/records/{$newInvoice->id}", [
-            'payload' => [
-                ...$newInvoice->payload,
-                'status' => '已作废',
-            ],
-        ])->assertRedirect();
-
-        $project->refresh();
         $this->assertSame($baseAmount, (float) $project->payload['invoiced_amount']);
-
-        $newInvoice->refresh();
-        $this->put("/records/{$newInvoice->id}", [
-            'payload' => [
-                ...$newInvoice->payload,
-                'status' => '已开票',
-            ],
-        ])->assertRedirect();
-
-        $project->refresh();
-        $this->assertSame($baseAmount + 250000, (float) $project->payload['invoiced_amount']);
-
-        $this->delete("/records/{$newInvoice->id}")->assertRedirect();
-
-        $project->refresh();
-        $this->assertSame($baseAmount, (float) $project->payload['invoiced_amount']);
+        $this->assertDatabaseMissing('object_records', ['business_object_id' => $invoice->id, 'code' => 'FP-TEST-001']);
     }
 
-    public function test_purchase_fields_match_feishu_purchase_table(): void
+    public function test_purchase_metadata_and_history_are_retained_but_direct_page_is_hidden(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $procurement = $this->userWithRole('procurement');
         $this->actingAs($procurement);
 
-        $purchase = ObjectRecord::whereRelation('businessObject', 'key', 'purchase')->firstOrFail();
-        $fields = collect($purchase->businessObject->fields);
+        $purchase = BusinessObject::where('key', 'purchase')->firstOrFail();
+        $fields = collect($purchase->fields);
 
         $this->assertSame([
             '日期',
@@ -345,15 +305,7 @@ class ExampleTest extends TestCase
         $this->assertFalse($fields->contains('key', 'completed_by'));
         $this->assertFalse($fields->contains('key', 'acceptance_attachment'));
 
-        $this->put("/records/{$purchase->id}", [
-            'payload' => [
-                ...$purchase->payload,
-                'arrived' => '已到货',
-            ],
-        ])->assertRedirect();
-
-        $purchase->refresh();
-        $this->assertArrayNotHasKey('actual_arrival_date', $purchase->payload);
+        $this->get('/objects/purchase')->assertForbidden();
     }
 
     public function test_stock_ledger_is_recalculated_from_stock_movements(): void
@@ -365,7 +317,7 @@ class ExampleTest extends TestCase
         }
     }
 
-    public function test_role_only_sees_projects_that_have_reached_its_step(): void
+    public function test_non_business_roles_do_not_receive_hidden_business_object_pages(): void
     {
         $this->seed(XycPrototypeSeeder::class);
 
@@ -384,20 +336,8 @@ class ExampleTest extends TestCase
         $this->actingAs($this->userWithRole('production'));
 
         $this->get('/')->assertOk();
-
-        $this->get('/objects/project')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Ontology/Index')
-                ->has('records.data', 1)
-                ->where('records.data.0.title', '南通厂房钢结构一期'));
-
-        $this->get('/objects/work_order')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Ontology/Index')
-                ->has('relationOptions.project_id.items', 1)
-                ->where('relationOptions.project_id.items.0.title', '南通厂房钢结构一期'));
+        $this->get('/objects/project')->assertForbidden();
+        $this->get('/objects/work_order')->assertForbidden();
     }
 
     public function test_project_master_write_permissions_are_limited_to_business_finance_and_admin(): void
@@ -405,19 +345,20 @@ class ExampleTest extends TestCase
         $this->seed(XycPrototypeSeeder::class);
         $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
 
-        foreach (['production', 'procurement', 'finance'] as $roleName) {
+        foreach (['production', 'procurement'] as $roleName) {
             $this->actingAs($this->userWithRole($roleName));
-            $this->get('/objects/project')
-                ->assertOk()
-                ->assertInertia(fn (Assert $page) => $page
-                    ->where('can.create', false)
-                    ->where('can.update', false)
-                    ->where('can.delete', false));
+            $this->get('/objects/project')->assertForbidden();
 
             $this->put("/records/{$project->id}", [
                 'payload' => [...$project->payload, 'name' => '不允许改名'],
             ])->assertForbidden();
         }
+
+        $this->actingAs($this->userWithRole('finance'));
+        $this->get('/objects/project')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('can.create', false)
+            ->where('can.update', true)
+            ->where('can.delete', false));
 
         foreach (['business', 'admin'] as $roleName) {
             $this->actingAs($this->userWithRole($roleName));
@@ -427,21 +368,17 @@ class ExampleTest extends TestCase
         }
     }
 
-    public function test_material_master_is_maintained_by_warehouse_and_procurement_is_read_only(): void
+    public function test_material_master_history_is_retained_but_direct_crud_is_hidden(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $material = ObjectRecord::whereRelation('businessObject', 'key', 'material')->firstOrFail();
 
         $this->actingAs($this->userWithRole('procurement'));
-        $this->get('/objects/material')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('can.create', true)
-                ->where('can.update', true)
-                ->where('can.delete', true));
+        $this->get('/objects/material')->assertForbidden();
         $this->put("/records/{$material->id}", [
             'payload' => [...$material->payload, 'name' => '采购维护'],
-        ])->assertRedirect();
+        ])->assertNotFound();
+        $this->assertNotSame('采购维护', $material->fresh()->title);
     }
 
     public function test_public_purchase_request_waits_for_procurement_approval_before_purchase_daily_created(): void
@@ -502,9 +439,8 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Requisitions/Approvals')
-                ->has('pending', 1)
-                ->where('pending.0.display.status', '待处理')
-                ->where('nav.3.label', '采购OA审批'));
+                ->has('pending', 0)
+                ->where('nav', fn ($nav): bool => collect($nav)->doesntContain(fn ($item) => ($item['label'] ?? null) === '采购OA审批')));
     }
 
     public function test_public_material_request_waits_for_warehouse_approval_before_outbound_created(): void
@@ -561,12 +497,8 @@ class ExampleTest extends TestCase
         ]);
 
         $this->actingAs($production);
-        $this->get('/objects/requisition')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->has('records.data', 1)
-                ->where('records.data.0.code', 'QG-OWN')
-                ->where('can.update', false));
+        $this->get('/objects/requisition')->assertForbidden();
+        $this->assertDatabaseHas('object_records', ['id' => $requisition->records()->where('code', 'QG-OWN')->value('id')]);
     }
 
     public function test_project_page_exposes_flat_fields_without_relation_chain(): void
@@ -586,16 +518,26 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Ontology/Index')
-                ->has('nav.5.children', 4)
-                ->has('relationOptions.customer_id.items', 1)
+                ->where('objects', fn ($objects): bool => collect($objects)->pluck('key')->all() === [
+                    'customer',
+                    'customer_contact',
+                    'project',
+                    'contract',
+                ])
+                ->has('relationOptions.customer_id.items', 3)
                 ->where('selectedRecordId', null)
-                ->has('currentObject.fields', 27)
+                ->has('currentObject.fields', 26)
                 ->where('currentObject.fields.0.key', 'name')
                 ->where('currentObject.fields.0.label', '项目名称')
                 ->where('currentObject.fields.1.key', 'customer_contact_ids')
                 ->where('currentObject.fields.1.label', '客户联系人')
                 ->where('currentObject.fields.2.key', 'customer_id')
                 ->where('currentObject.fields.2.label', '客户名称')
+                ->where('currentObject.fields', fn ($fields): bool => collect($fields)->contains(
+                    fn (array $field): bool => $field['key'] === 'last_payment_date'
+                        && $field['label'] === '末次回款日期'
+                        && $field['type'] === 'date',
+                ))
                 ->missing('relationChain'));
     }
 

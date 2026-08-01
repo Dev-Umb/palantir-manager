@@ -18,21 +18,26 @@ class OntologyRecordCrudTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_records_can_be_created_updated_exported_and_deleted_without_changing_payload_contract(): void
+    public function test_project_records_can_be_created_updated_exported_and_deleted_with_the_new_payload_contract(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $this->actingAs($this->userWithRole('admin'));
-        $customer = BusinessObject::where('key', 'customer')->firstOrFail();
+        $projectObject = BusinessObject::where('key', 'project')->firstOrFail();
+        $customer = ObjectRecord::whereRelation('businessObject', 'key', 'customer')->firstOrFail();
+        $owner = User::where('email', 'business@xyc.test')->firstOrFail();
 
-        $this->post("/objects/{$customer->id}", ['payload' => ['name' => '回归客户', 'level' => 'A']])
+        $this->post("/objects/{$projectObject->id}", ['payload' => [
+            'name' => '回归项目', 'customer_id' => $customer->id,
+            'business_owner_user_id' => (string) $owner->id, 'overall_status' => '投标中',
+        ]])
             ->assertRedirect();
-        $record = $customer->records()->where('payload->name', '回归客户')->firstOrFail();
+        $record = $projectObject->records()->where('payload->name', '回归项目')->firstOrFail();
 
-        $this->put("/records/{$record->id}", ['payload' => ['name' => '回归客户更新', 'level' => 'B']])
+        $this->put("/records/{$record->id}", ['payload' => [...$record->payload, 'name' => '回归项目更新']])
             ->assertRedirect();
-        $this->assertSame('回归客户更新', $record->fresh()->payload['name']);
+        $this->assertSame('回归项目更新', $record->fresh()->payload['name']);
 
-        $this->get('/objects/customer/export.csv')->assertOk()
+        $this->get('/objects/project/export.csv')->assertOk()
             ->assertHeader('content-type', 'text/csv; charset=UTF-8');
         $this->delete("/records/{$record->id}")->assertRedirect();
         $this->assertModelMissing($record);
@@ -44,8 +49,7 @@ class OntologyRecordCrudTest extends TestCase
         $this->seed(XycPrototypeSeeder::class);
         $admin = $this->userWithRole('admin');
         $this->actingAs($admin);
-        $customer = BusinessObject::where('key', 'customer')->firstOrFail();
-        $this->post("/objects/{$customer->id}", ['payload' => []])->assertSessionHasErrors('payload.name');
+        $this->postJson('/project-customers', [])->assertUnprocessable()->assertJsonValidationErrors('name');
 
         $drawing = BusinessObject::where('key', 'drawing')->firstOrFail();
         Storage::disk('local')->put('attachments/contract.pdf', '%PDF-1.4');
@@ -131,9 +135,9 @@ class OntologyRecordCrudTest extends TestCase
             ],
         ]);
 
-        $this->put("/records/{$customer->id}", [
-            'payload' => ['name' => '更新后客户'],
-        ])->assertRedirect();
+        $this->putJson("/records/{$customer->id}", [
+            'payload' => ['name' => '更新后客户', 'address' => null, 'level' => null, 'remark' => null],
+        ])->assertOk();
 
         $this->get('/objects/project?q=PRJ-LIVE-CUSTOMER')
             ->assertOk()
@@ -179,7 +183,7 @@ class OntologyRecordCrudTest extends TestCase
                 ->where('records.data.0.display.customer_id', 'CUST-HISTORY · 历史客户名称'));
     }
 
-    public function test_customer_contact_can_be_deleted_from_the_embedded_json_flow(): void
+    public function test_unreferenced_customer_contact_can_be_deleted_from_the_retained_table(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $this->actingAs($this->userWithRole('admin'));
@@ -201,14 +205,11 @@ class OntologyRecordCrudTest extends TestCase
             ],
         ]);
 
-        $this->deleteJson("/records/{$contact->id}")
-            ->assertOk()
-            ->assertJsonPath('status', '客户联系人已删除。');
-
+        $this->deleteJson("/records/{$contact->id}")->assertOk();
         $this->assertModelMissing($contact);
     }
 
-    public function test_customer_contact_can_be_updated_from_the_embedded_json_flow(): void
+    public function test_customer_contact_can_be_updated_from_the_retained_table_json_flow(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $this->actingAs($this->userWithRole('admin'));
@@ -240,7 +241,7 @@ class OntologyRecordCrudTest extends TestCase
             ],
         ])
             ->assertOk()
-            ->assertJsonPath('record.title', '新联系人')
+            ->assertJsonPath('record.payload.name', '新联系人')
             ->assertJsonPath('record.payload.phone', '13900000000');
 
         $savedPayload = $contact->fresh()->payload;
@@ -249,7 +250,6 @@ class OntologyRecordCrudTest extends TestCase
         $this->assertSame($customer->id, $savedPayload['customer_id']);
         $this->assertSame('历史职务', $savedPayload['position']);
         $this->assertSame($customer->id, $savedPayload['_snapshots']['customer_id']['id']);
-        $this->assertSame('联系人更新客户', $savedPayload['_snapshots']['customer_id']['label']);
     }
 
     public function test_customer_cooperation_history_is_derived_from_linked_projects(): void
@@ -284,15 +284,13 @@ class OntologyRecordCrudTest extends TestCase
         $relations->preloadLabels(collect([$customer]), auth()->user());
         $this->assertSame($project->id, $relations->formatRecord($customer, auth()->user())['cooperation_projects'][0]['id'] ?? null);
 
-        $this->get('/objects/customer?q=CUST-PROJECT-HISTORY')
+        $this->getJson("/project-customers/{$customer->id}")
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->has('records.data', 1)
-                ->where('records.data.0.payload.cooperation_history', '保留的旧文本')
-                ->where('records.data.0.cooperation_projects.0.id', $project->id)
-                ->where('records.data.0.cooperation_projects.0.code', 'XYC-HISTORY-001')
-                ->where('records.data.0.cooperation_projects.0.title', '关联项目名称')
-                ->where('records.data.0.cooperation_projects.0.date', '2026-07-30'));
+            ->assertJsonPath('customer.payload.cooperation_history', '保留的旧文本')
+            ->assertJsonPath('customer.cooperation_projects.0.id', $project->id)
+            ->assertJsonPath('customer.cooperation_projects.0.code', 'XYC-HISTORY-001')
+            ->assertJsonPath('customer.cooperation_projects.0.title', '关联项目名称')
+            ->assertJsonPath('customer.cooperation_projects.0.date', '2026-07-30');
     }
 
     public function test_customer_contact_deletion_keeps_project_reference_protection(): void

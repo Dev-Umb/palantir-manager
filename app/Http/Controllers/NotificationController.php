@@ -39,7 +39,7 @@ class NotificationController extends Controller
                 return [
                     'id' => $notification->id,
                     'type' => $notification->type,
-                    'type_label' => $notification->type === ProjectNotification::TYPE_CONTRACT ? '合同逾期' : '回款逾期',
+                    'type_label' => $this->typeLabel($notification->type),
                     'message' => $this->message($notification),
                     'status' => $notification->status,
                     'read_at' => $notification->read_at?->toISOString(),
@@ -107,9 +107,24 @@ class NotificationController extends Controller
             ?? $notification->project?->code
             ?? '已删除项目';
 
-        return $notification->type === ProjectNotification::TYPE_CONTRACT
-            ? "项目「{$projectName}」创建已满三个月，尚未关联合同。"
-            : "项目「{$projectName}」创建已满三个月，尚未发生回款。";
+        return match ($notification->type) {
+            ProjectNotification::TYPE_BID => "项目「{$projectName}」投标状态已停留 15 天，请跟进中标结果。",
+            ProjectNotification::TYPE_PROCESSING_LETTER => "项目「{$projectName}」中标后已满 15 天，请跟进加工函。",
+            ProjectNotification::TYPE_SIGNATURE => "项目「{$projectName}」取得加工函后合同仍未全部签署，请继续催签。",
+            ProjectNotification::TYPE_PAYMENT => "项目「{$projectName}」回款仍未完成，请跟进本期催款。",
+            default => "项目「{$projectName}」存在待处理提醒。",
+        };
+    }
+
+    private function typeLabel(string $type): string
+    {
+        return match ($type) {
+            ProjectNotification::TYPE_BID => '投标提醒',
+            ProjectNotification::TYPE_PROCESSING_LETTER => '加工函提醒',
+            ProjectNotification::TYPE_SIGNATURE => '合同签署提醒',
+            ProjectNotification::TYPE_PAYMENT => '回款提醒',
+            default => '业务提醒',
+        };
     }
 
     private function auditRead(Request $request, ProjectNotification $notification): void

@@ -126,12 +126,67 @@ describe('Ontology workspace layout', () => {
         expect(screen.queryByRole('heading', { name: '项目资料' })).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: '客户信息' })).toHaveAttribute('href', '/objects/customer');
         expect(screen.getByRole('link', { name: '项目资料' })).toHaveAttribute('href', '/objects/project');
-        expect(screen.queryByRole('link', { name: '客户联系人' })).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '客户联系人' })).toHaveAttribute('href', '/objects/customer_contact');
         expect(screen.queryByRole('link', { name: '合同台账' })).not.toBeInTheDocument();
-        expect(screen.getByText('基础资料 · 2 张表')).toBeInTheDocument();
+        expect(screen.getByText('基础资料 · 3 张表')).toBeInTheDocument();
         expect(screen.getByLabelText('业务模块')).toHaveValue('主数据');
         expect(screen.queryByText('数据列表')).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: '新建' })).toHaveAttribute('href', '/objects/project?mode=create');
+    });
+});
+
+describe('Ontology multi-condition filters', () => {
+    afterEach(cleanup);
+
+    it('restores URL-backed OR filters and allows adding another typed condition', () => {
+        window.history.replaceState({}, '', '/objects/project?filter_logic=or&filters%5B0%5D%5Bfield%5D=overall_status&filters%5B0%5D%5Boperator%5D=equals&filters%5B0%5D%5Bvalue%5D=%E5%B7%B2%E4%B8%AD%E6%A0%87');
+        render(<Index
+            objects={[{ id: 3, key: 'project', label: '业务项目', group: '业务与合同' }]}
+            currentObject={{ id: 3, key: 'project', label: '业务项目', group: '业务与合同', fields: [
+                { key: 'overall_status', label: '总体状态', type: 'select', options: ['投标中', '已中标'] },
+                { key: 'contract_amount', label: '合同金额', type: 'number' },
+            ] }}
+            records={{ data: [], per_page: 50 }}
+            can={{ create: false, update: true, delete: false }}
+            relationOptions={{}}
+        />);
+
+        expect(screen.queryByRole('dialog', { name: '设置筛选条件' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /1 筛选/ }));
+        expect(screen.getByRole('dialog', { name: '设置筛选条件' })).toBeInTheDocument();
+        expect(screen.getByDisplayValue('任一满足（OR）')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('已中标')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /添加条件/ }));
+        expect(screen.getAllByLabelText(/筛选字段/)).toHaveLength(2);
+    });
+
+    it('groups search, sorting, filters and record actions in one toolbar row', () => {
+        window.history.replaceState({}, '', '/objects/project');
+        const { container } = render(<Index
+            objects={[{ id: 3, key: 'project', label: '业务项目', group: '业务与合同' }]}
+            currentObject={{ id: 3, key: 'project', label: '业务项目', group: '业务与合同', fields: [
+                { key: 'overall_status', label: '总体状态', type: 'select', options: ['投标中', '已中标'] },
+            ] }}
+            records={{ data: [], per_page: 50 }}
+            can={{ create: true, update: true, delete: false }}
+            relationOptions={{}}
+        />);
+
+        const primaryRow = container.querySelector('.object-list-primary');
+        expect(primaryRow).toContainElement(screen.getByRole('searchbox', { name: '搜索记录' }));
+        expect(primaryRow).toContainElement(screen.getByRole('combobox', { name: '排序字段' }));
+        expect(primaryRow).toContainElement(screen.getByRole('button', { name: /应用/ }));
+        expect(primaryRow).toContainElement(screen.getByRole('button', { name: '筛选' }));
+        expect(primaryRow).toContainElement(screen.getByRole('link', { name: /导出/ }));
+        expect(primaryRow).toContainElement(screen.getByRole('link', { name: /新建/ }));
+        expect(screen.queryByRole('dialog', { name: '设置筛选条件' })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+
+        const dialog = screen.getByRole('dialog', { name: '设置筛选条件' });
+        expect(dialog).toBeInTheDocument();
+        expect(within(dialog).getByRole('button', { name: /添加条件/ })).toBeInTheDocument();
+        expect(within(dialog).getByRole('button', { name: '应用筛选' })).toBeInTheDocument();
     });
 });
 

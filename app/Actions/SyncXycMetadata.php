@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 class SyncXycMetadata
 {
+    public function __construct(private SyncProjectContractAmount $contractSync) {}
+
     public function handle(?Closure $afterPrune = null): void
     {
         DB::transaction(function () use ($afterPrune): void {
@@ -98,6 +100,7 @@ class SyncXycMetadata
         $this->syncDrawingStatuses();
         $this->syncProjectReferencePayloads();
         $this->syncShipmentStages();
+        $this->syncBusinessContractWorkspace();
     }
 
     /** @param Collection<string, Permission> $permissionByKey */
@@ -305,6 +308,60 @@ class SyncXycMetadata
             ->each(fn ($record) => $record->update([
                 'payload' => [...($record->payload ?? []), 'stage' => '发货签收'],
             ]));
+    }
+
+    private function syncBusinessContractWorkspace(): void
+    {
+        $businessUserIds = Role::query()
+            ->where('name', 'business')
+            ->first()?->users()
+            ->pluck('users.id')
+            ->map(fn (int $id): string => (string) $id)
+            ->all() ?? [];
+        $businessUserLookup = array_flip($businessUserIds);
+        $projectObject = BusinessObject::query()->where('key', 'project')->first();
+        $contractObject = BusinessObject::query()->where('key', 'contract')->first();
+
+        $projectObject?->records()->each(function ($project) use ($businessUserLookup): void {
+            $payload = $project->payload ?? [];
+            $before = $payload;
+            $payload['overall_status'] = match ($payload['overall_status'] ?? null) {
+                '投标中', '已中标', '已拿到加工函', '合同签署', '已完成' => $payload['overall_status'],
+                default => '投标中',
+            };
+            $payload['overall_status_changed_at'] ??= now()->toISOString();
+            $payload['contract_status'] ??= '未签署';
+            $payload['collection_count'] = (int) ($payload['collection_count'] ?? 0);
+            if (! array_key_exists('business_owner_user_id', $payload)
+                && $project->created_by
+                && isset($businessUserLookup[(string) $project->created_by])) {
+                $payload['business_owner_user_id'] = (string) $project->created_by;
+            }
+            if (is_numeric($payload['contract_amount'] ?? null)
+                && ! isset($payload['contract_amount_source'])) {
+                $payload['contract_amount_source'] = 'manual';
+            }
+            if ($payload !== $before) {
+                $project->update(['payload' => $payload]);
+            }
+        });
+
+        $contractObject?->records()->each(function ($contract): void {
+            $payload = $contract->payload ?? [];
+            $status = $payload['status'] ?? '未签署';
+            if (! in_array($status, ['未签署', '已有加工函', '已签署'], true)) {
+                $payload['legacy_status'] = $status;
+                $payload['status'] = '未签署';
+            }
+            foreach (['processing_letter_attachments', 'contract_attachments', 'statement_attachments'] as $key) {
+                $payload[$key] = collect($payload[$key] ?? [])->filter(fn ($path): bool => is_string($path) && $path !== '')->values()->all();
+            }
+            $contract->update(['payload' => $payload]);
+        });
+
+        $projectObject?->records()->pluck('id')->each(
+            fn (string $projectId) => $this->contractSync->handle($projectId),
+        );
     }
 
     /** @param Collection<int, string> $configuredKeys */

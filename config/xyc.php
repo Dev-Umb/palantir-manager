@@ -13,9 +13,8 @@ $select = fn (string $key, string $label, array $options, array $extra = []) => 
 $date = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'date', $extra);
 $number = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'number', $extra);
 $file = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'file', $extra);
-$projectStages = ['合同录入', '技术确认', '正在对接', '采购执行', '生产加工', '成品发货', '对账回款', '项目完成', '异常', '设计出图', '发货签收'];
-$projectStatuses = ['进行中', '预警', '暂停', '已完成', '已终止'];
-$ownerRoles = ['业务', '技术', '采购', '生产', '财务', '厂长', '系统'];
+$files = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'files', $extra);
+$projectStatuses = ['投标中', '已中标', '已拿到加工函', '合同签署', '已完成'];
 $units = ['张', '支', '根', 'kg', '吨', '桶', '盒'];
 
 return [
@@ -108,49 +107,50 @@ return [
             ],
         ],
         [
-            'key' => 'project', 'label' => '项目主档', 'group' => '主数据', 'code_prefix' => 'XYC', 'title_field' => 'name', 'roles' => ['business', 'procurement', 'production_manager', 'production', 'finance'], 'write_roles' => ['business'],
+            'key' => 'project', 'label' => '业务项目', 'group' => '业务与合同', 'code_prefix' => 'XYC', 'title_field' => 'name', 'roles' => ['business', 'finance'], 'write_roles' => ['business', 'finance'],
             'fields' => [
                 $field('name', '项目名称', 'text', ['required' => true]),
                 $multirelation('customer_contact_ids', '客户联系人', 'customer_contact'),
                 $relation('customer_id', '客户名称', 'customer', ['required' => true]),
                 $code('project_no', '项目编号'),
-                $select('stage', '当前阶段', $projectStages),
-                $select('overall_status', '总体状态', $projectStatuses),
-                $field('related_contract_no', '关联合同编号', 'readonly'),
-                $date('delivery_date', '交付日期'),
-                $select('owner_role', '责任岗位', $ownerRoles),
+                $field('business_owner_user_id', '负责业务员', 'account'),
+                $select('overall_status', '总体状态', $projectStatuses, ['default' => '投标中']),
+                $field('contract_status', '合同状态', 'readonly'),
+                $date('first_shipment_date', '首次发货日期'),
+                $date('last_shipment_date', '末次发货日期'),
                 $field('remark', '备注'),
                 $date('handover_date', '项目对接日期'),
-                $field('manager', '业务经理'),
                 $field('contract_qty', '合同数量', 'readonly'),
                 $number('weight', '预估重量（吨）'),
-                $field('signed_weight', '累计签收重量', 'readonly'),
-                $field('contract_amount', '合同金额', 'readonly'),
-                $field('occurred_amount', '已发生金额', 'readonly'),
-                $field('paid_amount', '已回款金额', 'readonly'),
-                $field('unpaid_amount', '未回款金额', 'readonly'),
-                $field('reconciled_amount', '对账金额', 'readonly'),
-                $field('invoiced_amount', '开票金额', 'readonly'),
-                $field('uninvoiced_amount', '未开票金额', 'readonly'),
-                $field('payment_progress', '回款进度', 'readonly'),
-                $field('payment_status', '回款状态', 'readonly'),
-                $field('last_payment_date', '最后回款日期', 'readonly'),
-                $number('collection_count', '催款次数'),
+                $number('signed_weight', '累计签收重量', ['min' => 0]),
+                $number('contract_amount', '合同金额', ['min' => 0]),
+                $number('occurred_amount', '已发生金额', ['min' => 0]),
+                $number('paid_amount', '已回款金额', ['min' => 0]),
+                $date('last_payment_date', '末次回款日期'),
+                $number('unpaid_amount', '未回款金额', ['min' => 0]),
+                $number('reconciled_amount', '对账金额', ['min' => 0]),
+                $number('invoiced_amount', '开票金额', ['min' => 0]),
+                $number('uninvoiced_amount', '未开票金额', ['min' => 0]),
+                $number('payment_progress', '回款进度', ['min' => 0, 'max' => 100]),
+                $select('payment_status', '回款状态', ['未回款', '部分回款', '已回款']),
+                $field('collection_count', '催款次数', 'readonly'),
                 $field('risk', '当前风险点'),
             ],
         ],
         [
-            'key' => 'contract', 'label' => '客户与合同', 'group' => '履约', 'code_prefix' => 'HT', 'title_field' => 'code', 'roles' => ['business'],
+            'key' => 'contract', 'label' => '合同表', 'group' => '业务与合同', 'code_prefix' => 'HT', 'title_field' => 'code', 'roles' => ['business'], 'write_roles' => [],
             'fields' => [
                 $code('contract_no', '合同编号'),
                 $relation('customer_id', '客户', 'customer', ['required' => true]),
                 $relation('project_id', '项目名称', 'project', ['required' => true]),
                 $field('project_no', '项目编号', 'readonly'),
-                $select('status', '合同状态', ['已收到', '未收到']),
+                $select('status', '合同状态', ['未签署', '已有加工函', '已签署'], ['default' => '未签署']),
                 $select('ctype', '合同类型', ['销售合同', '加工合同', '补充协议']),
                 $number('amount', '合同金额', ['required' => true]),
                 $date('signed_date', '签订日期'),
-                $field('business_owner', '业务负责人'),
+                $files('processing_letter_attachments', '加工函附件'),
+                $files('contract_attachments', '合同附件'),
+                $files('statement_attachments', '对账单附件'),
                 $field('contract_chase_record', '合同催要记录'),
                 $number('contract_qty', '合同数量'),
                 $field('remark', '备注'),

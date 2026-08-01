@@ -3,17 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Actions\AcknowledgeWorkflowTask;
-use App\Actions\AdvanceProjectWorkflow;
 use App\Actions\CreateObjectRecord;
 use App\Actions\ResolveInboundMaterials;
 use App\Actions\SyncProjectContractAmount;
 use App\Actions\SyncProjectFinance;
-use App\Actions\SyncProjectInvoiceAmount;
 use App\Actions\SyncProjectNotifications;
 use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\User;
+use App\Support\BusinessWorkspace;
 use App\Support\MaterialNames;
 use App\Support\ObjectRelations;
 use App\Support\ProjectVisibility;
@@ -37,20 +36,22 @@ class OntologyController extends Controller
         private ObjectRelations $relations,
         private ProjectVisibility $projectVisibility,
         private SyncProjectContractAmount $contractAmount,
-        private SyncProjectInvoiceAmount $invoiceAmount,
         private SyncProjectFinance $projectFinance,
         private SyncProjectNotifications $projectNotifications,
         private ResolveInboundMaterials $inboundMaterials,
         private MaterialNames $materialNames,
-        private AdvanceProjectWorkflow $projectWorkflow,
         private AcknowledgeWorkflowTask $workflowTasks,
+        private BusinessWorkspace $workspace,
     ) {}
 
     public function index(Request $request, ?string $object = null): Response|RedirectResponse
     {
         $permissions = $request->user()->permissionKeys();
         $can = fn (string $permission) => in_array($permission, $permissions, true);
-        $objects = BusinessObject::orderBy('sort_order')->get();
+        $objects = BusinessObject::query()
+            ->whereIn('key', BusinessWorkspace::RETAINED_OBJECT_KEYS)
+            ->orderBy('sort_order')
+            ->get();
         $visible = $objects->filter(fn (BusinessObject $item) => $can("object.{$item->key}.view"))->values();
         abort_if($visible->isEmpty(), 403);
 
@@ -59,10 +60,6 @@ class OntologyController extends Controller
             : $visible->first();
 
         abort_unless($current, 403);
-
-        if ($current->key === 'customer_contact') {
-            return redirect()->route('objects.index', 'customer');
-        }
 
         $recordsQuery = $this->authorizedRecordsQuery($current, $request)
             ->with('businessObject')
@@ -77,6 +74,7 @@ class OntologyController extends Controller
             $selected->refresh();
         }
         $this->applySearch($recordsQuery, $current, $this->searchQuery($request));
+        $this->applyFilters($recordsQuery, $current, $request);
         $this->applySort($recordsQuery, $current, $request);
         $records = $recordsQuery
             ->paginate($this->perPage($request))
@@ -87,17 +85,36 @@ class OntologyController extends Controller
         }
         $this->relations->preloadLabels($recordsForLabels, $request->user());
 
+        $relationOptions = $this->relations->optionsFor($current, null, $request->user(), $selected);
+        if ($current->key === 'project') {
+            $relationOptions['business_owner_user_id'] = [
+                'items' => $this->workspace->businessAccountOptions()->all(),
+                'selectedItems' => [],
+            ];
+        }
+        $currentForUser = $current->toArray();
+        $currentForUser['fields'] = $this->workspace->fieldsForUser($current, $request->user());
+
         return Inertia::render('Ontology/Index', [
-            'objects' => $visible,
-            'currentObject' => $current,
+            'objects' => $visible->map(function (BusinessObject $object) use ($request): array {
+                $data = $object->toArray();
+                $data['fields'] = $this->workspace->fieldsForUser($object, $request->user());
+
+                return $data;
+            }),
+            'currentObject' => $currentForUser,
             'records' => $records->through(fn (ObjectRecord $record) => $this->relations->formatRecord($record, $request->user())),
-            'relationOptions' => $this->relations->optionsFor($current, $objects, $request->user(), $selected),
+            'relationOptions' => $relationOptions,
             'selectedRecordId' => $selected?->id,
             'selectedRecord' => $selected ? $this->relations->formatRecord($selected, $request->user()) : null,
             'can' => [
-                'create' => $can("object.{$current->key}.create") && ! $current->read_only,
-                'update' => $can("object.{$current->key}.update") && ! $current->read_only,
-                'delete' => $can("object.{$current->key}.delete") && ! $current->read_only,
+                'create' => $can("object.{$current->key}.create") && $this->canCreate($current, $request->user()),
+                'update' => $can("object.{$current->key}.update") && $this->workspace->writableFieldKeys($current, $request->user()) !== [],
+                'delete' => $can("object.{$current->key}.delete") && $this->workspace->canDelete($current, $request->user()),
+                'sync_contract_amount' => $current->key === 'project'
+                    && ($this->workspace->isAdmin($request->user()) || $this->workspace->isFinance($request->user())),
+                'manage_customers' => $current->key === 'project'
+                    && ($this->workspace->isAdmin($request->user()) || $this->workspace->isBusiness($request->user())),
             ],
         ]);
     }
@@ -105,12 +122,14 @@ class OntologyController extends Controller
     public function exportCsv(Request $request, string $object): StreamedResponse
     {
         $current = BusinessObject::where('key', $object)->firstOrFail();
+        abort_unless($this->workspace->allowsDirectObjectAccess($current), 404);
         abort_unless($request->user()->canDo("object.{$current->key}.view"), 403);
 
         $query = $this->authorizedRecordsQuery($current, $request)
             ->orderByDesc('updated_at')
             ->orderByDesc('id');
         $this->applySearch($query, $current, $this->searchQuery($request));
+        $this->applyFilters($query, $current, $request);
         $this->applySort($query, $current, $request);
         $fields = collect($current->fields ?? [])->values();
         $filename = preg_replace('/[^A-Za-z0-9_-]/', '-', $current->key) ?: 'records';
@@ -177,9 +196,20 @@ class OntologyController extends Controller
 
     public function store(Request $request, BusinessObject $object, CreateObjectRecord $writer): RedirectResponse|JsonResponse
     {
-        abort_unless($request->user()->canDo("object.{$object->key}.create") && ! $object->read_only, 403);
+        abort_unless($this->workspace->allowsDirectObjectAccess($object), 404);
+        abort_unless($request->user()->canDo("object.{$object->key}.create") && $this->canCreate($object, $request->user()), 403);
 
-        $payload = $this->applySystemPayload($object, $this->validatePayload($request, $object), $request->user());
+        $payload = $this->applySystemPayload(
+            $object,
+            $this->scopeWritablePayload($object, $this->validatePayload($request, $object), [], $request->user()),
+            $request->user(),
+        );
+        if ($object->key === 'project') {
+            $payload = $this->prepareNewProjectPayload($payload, $request->user());
+        }
+        if ($object->key === 'contract') {
+            $this->guardContractEvidence($payload);
+        }
         $record = DB::transaction(function () use ($object, $payload, $request, $writer): ObjectRecord {
             $this->relations->lockReferenceGraph();
             if ($object->key === 'inbound') {
@@ -188,7 +218,6 @@ class OntologyController extends Controller
             $this->relations->validateItemRelations($object, $payload, $request->user());
 
             $record = $writer->handle($object, $payload, $request->user());
-            $this->projectWorkflow->handle($record, [], $request->user(), $writer);
 
             return $record;
         });
@@ -212,12 +241,19 @@ class OntologyController extends Controller
     public function update(Request $request, ObjectRecord $record, CreateObjectRecord $writer): RedirectResponse|JsonResponse
     {
         $object = $record->businessObject;
-        abort_unless($request->user()->canDo("object.{$object->key}.update") && ! $object->read_only, 403);
+        abort_unless($this->workspace->allowsDirectObjectAccess($object), 404);
+        abort_unless($request->user()->canDo("object.{$object->key}.update")
+            && $this->workspace->writableFieldKeys($object, $request->user()) !== [], 403);
         abort_unless($this->projectVisibility->allowsRecord($request->user(), $record), 403);
 
         $payload = $this->applySystemPayload(
             $object,
-            $this->validatePayload($request, $object, $record->payload ?? []),
+            $this->scopeWritablePayload(
+                $object,
+                $this->validatePayload($request, $object, $record->payload ?? []),
+                $record->payload ?? [],
+                $request->user(),
+            ),
             $request->user(),
         );
         DB::transaction(function () use ($record, $object, $payload, $writer, $request): void {
@@ -261,20 +297,19 @@ class OntologyController extends Controller
             $oldProjectId = $lockedRecord->payload['project_id'] ?? null;
             $newProjectId = $payload['project_id'] ?? null;
             $lockedProjects = collect();
-            if (in_array($object->key, ['receivable', 'contract'], true)) {
+            if ($object->key === 'contract') {
                 $lockedProjects = $this->projectFinance->lockProjects([$oldProjectId, $newProjectId]);
                 $newProject = $this->projectFinance->lockedProjectOrFail($newProjectId, $lockedProjects);
-                if ($object->key === 'receivable') {
-                    $payload = $this->projectFinance->normalizePayload($payload, $newProject);
-                    $this->projectFinance->guardUnique($newProjectId, $lockedRecord->id, $newProject);
-                } else {
-                    $payload = $this->projectFinance->fillContractProjectDefaults($payload, $oldPayload, $newProject);
-                }
+                $payload = $this->projectFinance->fillContractProjectDefaults($payload, $oldPayload, $newProject);
                 $this->projectFinance->guardCustomerMatchesProject($newProject, $payload['customer_id'] ?? null);
             }
 
             if ($object->key === 'project') {
                 $this->guardProjectCustomerChange($lockedRecord, $payload);
+                $payload = $this->prepareProjectPayload($lockedRecord, $payload, $request->user());
+            }
+            if ($object->key === 'contract') {
+                $this->guardContractEvidence($payload);
             }
             if ($object->key === 'production_team'
                 && ($oldPayload['leader_id'] ?? null) !== ($payload['leader_id'] ?? null)) {
@@ -291,27 +326,15 @@ class OntologyController extends Controller
             if ($object->key === 'contract') {
                 foreach (collect([$oldProjectId, $newProjectId])->filter()->unique()->sort() as $projectId) {
                     $this->contractAmount->handle($projectId);
-                    $this->projectWorkflow->syncContractFinance($projectId, $request->user());
                 }
             }
 
-            if ($object->key === 'receivable') {
-                foreach ($lockedProjects as $project) {
-                    $this->projectFinance->handleLocked($project, $request->user());
-                }
-            }
-
-            if ($object->key === 'invoice') {
-                foreach (collect([$oldProjectId, $newProjectId])->filter()->unique()->sort() as $projectId) {
-                    $this->invoiceAmount->handle($projectId);
-                }
-            }
-
-            if (in_array($object->key, ['contract', 'receivable'], true)) {
+            if ($object->key === 'contract') {
                 $this->projectNotifications->handleProjects([$oldProjectId, $newProjectId]);
             }
-
-            $this->projectWorkflow->handle($lockedRecord, $oldPayload, $request->user(), $writer);
+            if ($object->key === 'project') {
+                $this->projectNotifications->handleProjects([$lockedRecord->id]);
+            }
 
             AuditLog::create([
                 'user_id' => $request->user()->id,
@@ -347,7 +370,9 @@ class OntologyController extends Controller
     public function destroy(Request $request, ObjectRecord $record, CreateObjectRecord $writer): RedirectResponse|JsonResponse
     {
         $object = $record->businessObject;
-        abort_unless($request->user()->canDo("object.{$object->key}.delete") && ! $object->read_only, 403);
+        abort_unless($this->workspace->allowsDirectObjectAccess($object), 404);
+        abort_unless($request->user()->canDo("object.{$object->key}.delete")
+            && $this->workspace->canDelete($object, $request->user()), 403);
         abort_unless($this->projectVisibility->allowsRecord($request->user(), $record), 403);
 
         DB::transaction(function () use ($record, $object, $request, $writer): void {
@@ -358,9 +383,9 @@ class OntologyController extends Controller
             $lockedRecord = ObjectRecord::query()->lockForUpdate()->findOrFail($record->id);
             $oldPayload = $lockedRecord->payload ?? [];
             $oldProjectId = $lockedRecord->payload['project_id'] ?? null;
-            $lockedProjects = in_array($object->key, ['receivable', 'contract'], true)
-                ? $this->projectFinance->lockProjects([$oldProjectId])
-                : collect();
+            if ($object->key === 'contract') {
+                $this->projectFinance->lockProjects([$oldProjectId]);
+            }
 
             if ($object->key === 'team_member') {
                 $writer->validateTeamMemberChange($lockedRecord, null);
@@ -372,21 +397,6 @@ class OntologyController extends Controller
 
             if ($object->key === 'contract') {
                 $this->contractAmount->handle($oldProjectId);
-                $this->projectWorkflow->syncContractFinance($oldProjectId, $request->user());
-            }
-
-            if ($object->key === 'receivable') {
-                $project = $lockedProjects->get($oldProjectId);
-                if ($project) {
-                    $this->projectFinance->handleLocked($project, $request->user());
-                }
-            }
-
-            if ($object->key === 'invoice') {
-                $this->invoiceAmount->handle($oldProjectId);
-            }
-
-            if (in_array($object->key, ['contract', 'receivable'], true)) {
                 $this->projectNotifications->handleProjects([$oldProjectId]);
             }
 
@@ -487,6 +497,130 @@ class OntologyController extends Controller
         return is_string($search) ? mb_substr(trim($search), 0, 100) : '';
     }
 
+    private function applyFilters(Builder|Relation $query, BusinessObject $object, Request $request): void
+    {
+        $filters = collect($request->query('filters', []))
+            ->filter(fn (mixed $filter): bool => is_array($filter))
+            ->take(10)
+            ->values();
+        if ($filters->isEmpty()) {
+            return;
+        }
+
+        $fields = collect($object->fields ?? [])->keyBy('key');
+        $logic = $request->query('filter_logic') === 'or' ? 'or' : 'and';
+        $query->where(function (Builder $group) use ($filters, $fields, $logic): void {
+            foreach ($filters as $filter) {
+                $field = $fields->get($filter['field'] ?? '');
+                $operator = is_string($filter['operator'] ?? null) ? $filter['operator'] : 'equals';
+                $value = $filter['value'] ?? null;
+                if (! is_array($field) || is_array($value) || ! $this->validFilterOperator($field, $operator)) {
+                    continue;
+                }
+                if (! in_array($operator, ['is_empty', 'is_not_empty'], true) && ($value === null || $value === '')) {
+                    continue;
+                }
+
+                $method = $logic === 'or' ? 'orWhere' : 'where';
+                $group->{$method}(function (Builder $condition) use ($field, $operator, $value): void {
+                    $this->applyFilterCondition($condition, $field, $operator, (string) $value);
+                });
+            }
+        });
+    }
+
+    /** @param array<string, mixed> $field */
+    private function applyFilterCondition(Builder $query, array $field, string $operator, string $value): void
+    {
+        $key = (string) ($field['key'] ?? '');
+        $type = (string) ($field['type'] ?? 'text');
+        $column = match ($field['system'] ?? null) {
+            'code' => 'code',
+            'title' => 'title',
+            default => "payload->{$key}",
+        };
+
+        if ($operator === 'is_empty') {
+            $query->where(function (Builder $empty) use ($column): void {
+                $empty->whereNull($column)->orWhere($column, '');
+            });
+
+            return;
+        }
+        if ($operator === 'is_not_empty') {
+            $query->whereNotNull($column)->where($column, '!=', '');
+
+            return;
+        }
+
+        if (in_array($type, ['number', 'range'], true) && is_numeric($value)) {
+            $driver = DB::connection()->getDriverName();
+            $safeKey = str_replace(["'", '"'], '', $key);
+            $expression = $driver === 'pgsql'
+                ? "CAST(payload->>'{$safeKey}' AS NUMERIC)"
+                : "CAST(json_extract(payload, '$.{$safeKey}') AS REAL)";
+            $comparison = match ($operator) {
+                'greater_than' => '>',
+                'greater_or_equal' => '>=',
+                'less_than' => '<',
+                'less_or_equal' => '<=',
+                'not_equals' => '!=',
+                default => '=',
+            };
+            $query->whereRaw("{$expression} {$comparison} ?", [(float) $value]);
+
+            return;
+        }
+
+        if (in_array($type, ['number', 'range', 'date'], true) && $operator === 'between') {
+            [$start, $end] = array_pad(explode('..', $value, 2), 2, null);
+            if ($start !== null && $start !== '' && $end !== null && $end !== '') {
+                if (in_array($type, ['number', 'range'], true) && is_numeric($start) && is_numeric($end)) {
+                    $driver = DB::connection()->getDriverName();
+                    $safeKey = str_replace(["'", '"'], '', $key);
+                    $expression = $driver === 'pgsql'
+                        ? "CAST(payload->>'{$safeKey}' AS NUMERIC)"
+                        : "CAST(json_extract(payload, '$.{$safeKey}') AS REAL)";
+                    $query->whereBetween(DB::raw($expression), [(float) $start, (float) $end]);
+                } elseif ($type === 'date') {
+                    $query->whereBetween($column, [$start, $end]);
+                }
+            }
+
+            return;
+        }
+
+        $comparison = match ($operator) {
+            'not_equals' => '!=',
+            'after', 'greater_than' => '>',
+            'on_or_after', 'greater_or_equal' => '>=',
+            'before', 'less_than' => '<',
+            'on_or_before', 'less_or_equal' => '<=',
+            default => '=',
+        };
+        if ($operator === 'contains') {
+            $query->whereLike($column, '%'.$value.'%', caseSensitive: false);
+        } elseif ($operator === 'not_contains') {
+            $query->whereNotLike($column, '%'.$value.'%', caseSensitive: false);
+        } else {
+            $query->where($column, $comparison, $value);
+        }
+    }
+
+    /** @param array<string, mixed> $field */
+    private function validFilterOperator(array $field, string $operator): bool
+    {
+        $type = $field['type'] ?? 'text';
+        $allowed = match (true) {
+            in_array($type, ['number', 'range'], true) => ['equals', 'not_equals', 'greater_than', 'greater_or_equal', 'less_than', 'less_or_equal', 'between', 'is_empty', 'is_not_empty'],
+            $type === 'date' => ['equals', 'before', 'on_or_before', 'after', 'on_or_after', 'between', 'is_empty', 'is_not_empty'],
+            in_array($type, ['select', 'relation', 'account'], true) => ['equals', 'not_equals', 'is_empty', 'is_not_empty'],
+            default => ['contains', 'not_contains', 'equals', 'not_equals', 'is_empty', 'is_not_empty'],
+        };
+
+        return in_array($operator, $allowed, true);
+    }
+
     private function applySort(Builder|Relation $query, BusinessObject $object, Request $request): void
     {
         $sort = $request->query('sort');
@@ -558,11 +692,9 @@ class OntologyController extends Controller
 
     private function validatePayload(Request $request, BusinessObject $object, array $existingPayload = []): array
     {
-        if (in_array($object->key, ['receivable', 'contract'], true)) {
+        if ($object->key === 'contract') {
             $inputPayload = (array) $request->input('payload', []);
-            $request->merge(['payload' => $object->key === 'receivable'
-                ? $this->projectFinance->fillProjectDefaults($inputPayload)
-                : $this->projectFinance->fillContractProjectDefaults($inputPayload, $existingPayload)]);
+            $request->merge(['payload' => $this->projectFinance->fillContractProjectDefaults($inputPayload, $existingPayload)]);
         }
 
         $rules = [];
@@ -591,6 +723,16 @@ class OntologyController extends Controller
                         File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024),
                     ];
                 }
+
+                continue;
+            }
+
+            if ($field['type'] === 'files') {
+                $fileFields[] = $field;
+                $rules["payload.{$field['key']}"] = ['nullable', 'array', 'max:20'];
+                $rules["payload.{$field['key']}.*"] = [
+                    File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024),
+                ];
 
                 continue;
             }
@@ -653,7 +795,14 @@ class OntologyController extends Controller
         }
         foreach ($fileFields as $field) {
             $key = $field['key'];
-            if ($request->hasFile("payload.{$key}")) {
+            if (($field['type'] ?? null) === 'files') {
+                $existingFiles = collect($existingPayload[$key] ?? [])
+                    ->filter(fn (mixed $path): bool => is_string($path) && $path !== '')
+                    ->values();
+                $uploadedFiles = collect($request->file("payload.{$key}", []))
+                    ->map(fn ($file): string => $file->store('attachments', 'local'));
+                $payload[$key] = $existingFiles->concat($uploadedFiles)->values()->all();
+            } elseif ($request->hasFile("payload.{$key}")) {
                 $payload[$key] = $request->file("payload.{$key}")->store('attachments', 'local');
             } else {
                 $payload[$key] = (string) ($existingPayload[$key] ?? '');
@@ -676,10 +825,6 @@ class OntologyController extends Controller
         );
         $payload = $contactResult['payload'];
         $request->attributes->set('cleared_project_contact_count', $contactResult['cleared_count']);
-        if ($object->key === 'receivable') {
-            $request->attributes->set('finance_status_warning', $this->projectFinance->paymentStatusWarning($payload));
-            $payload = $this->projectFinance->normalizePayload($payload);
-        }
 
         return $payload;
     }
@@ -711,6 +856,13 @@ class OntologyController extends Controller
         if ($type === 'select' && ! empty($field['options'])) {
             $rules[] = Rule::in($field['options']);
         }
+        if ($type === 'account') {
+            $rules = [
+                ! empty($field['required']) ? 'required' : 'nullable',
+                'integer',
+                Rule::exists('users', 'id'),
+            ];
+        }
         if ($type === 'number' && array_key_exists('min', $field)) {
             $rules[] = 'min:'.$field['min'];
         }
@@ -723,7 +875,7 @@ class OntologyController extends Controller
         if ($type === 'range' && array_key_exists('max', $field)) {
             $rules[] = 'max:'.$field['max'];
         }
-        if ($object->key === 'receivable' && $type === 'number') {
+        if ($object->key === 'project' && $type === 'number') {
             $rules[] = 'min:0';
         }
 
@@ -789,14 +941,176 @@ class OntologyController extends Controller
         }
 
         $mismatched = ObjectRecord::query()
-            ->whereHas('businessObject', fn ($query) => $query->whereIn('key', ['contract', 'receivable']))
+            ->whereHas('businessObject', fn ($query) => $query->where('key', 'contract'))
             ->where('payload->project_id', $project->id)
             ->get()
             ->contains(fn (ObjectRecord $record) => ($record->payload['customer_id'] ?? null) !== $newCustomerId);
 
         if ($mismatched) {
             throw ValidationException::withMessages([
-                'payload.customer_id' => '项目已有合同或财务台账，客户必须保持一致。',
+                'payload.customer_id' => '项目已有合同，客户必须保持一致。',
+            ]);
+        }
+    }
+
+    private function canCreate(BusinessObject $object, User $user): bool
+    {
+        if ($object->read_only) {
+            return false;
+        }
+
+        return match ($object->key) {
+            'project' => $this->workspace->isAdmin($user) || $this->workspace->isBusiness($user),
+            'contract' => $this->workspace->isAdmin($user),
+            'customer', 'customer_contact' => $this->workspace->isAdmin($user) || $this->workspace->isBusiness($user),
+            default => false,
+        };
+    }
+
+    private function scopeWritablePayload(
+        BusinessObject $object,
+        array $submitted,
+        array $existing,
+        User $user,
+    ): array {
+        $allowed = array_flip($this->workspace->writableFieldKeys($object, $user));
+        $payload = $existing;
+        foreach ($submitted as $key => $value) {
+            if (isset($allowed[$key])) {
+                $payload[$key] = $value;
+            }
+        }
+
+        return $payload;
+    }
+
+    private function prepareNewProjectPayload(array $payload, User $user): array
+    {
+        if (! $this->workspace->isAdmin($user) && $this->workspace->isBusiness($user)) {
+            $payload['business_owner_user_id'] = (string) $user->id;
+        }
+        if (empty($payload['business_owner_user_id'])) {
+            throw ValidationException::withMessages([
+                'payload.business_owner_user_id' => '请选择负责业务员。',
+            ]);
+        }
+        $this->guardBusinessOwner($payload['business_owner_user_id']);
+
+        $payload['overall_status'] = $payload['overall_status'] ?? '投标中';
+        $this->guardProjectContractState($payload);
+        $this->guardShipmentDates($payload);
+        $payload['overall_status_changed_at'] = now()->toISOString();
+        $payload['contract_status'] = '未签署';
+        $payload['collection_count'] = 0;
+        if (is_numeric($payload['contract_amount'] ?? null)) {
+            $payload['contract_amount_source'] = 'manual';
+        }
+
+        return $payload;
+    }
+
+    private function prepareProjectPayload(ObjectRecord $project, array $payload, User $user): array
+    {
+        $oldPayload = $project->payload ?? [];
+        if (($oldPayload['business_owner_user_id'] ?? null) !== ($payload['business_owner_user_id'] ?? null)) {
+            $this->guardBusinessOwner($payload['business_owner_user_id'] ?? null);
+        }
+        $this->guardProjectContractState($payload);
+        $this->guardShipmentDates($payload);
+
+        if (($oldPayload['overall_status'] ?? null) !== ($payload['overall_status'] ?? null)) {
+            $payload['overall_status_changed_at'] = now()->toISOString();
+        }
+
+        if (($oldPayload['contract_amount'] ?? null) !== ($payload['contract_amount'] ?? null)
+            && ($this->workspace->isAdmin($user) || $this->workspace->isFinance($user))) {
+            $payload['contract_amount_source'] = 'manual';
+            $payload['contract_amount_synced_at'] = null;
+            $payload['contract_amount_synced_by'] = null;
+        }
+
+        $paymentKeys = [
+            'occurred_amount',
+            'paid_amount',
+            'last_payment_date',
+            'unpaid_amount',
+            'reconciled_amount',
+            'payment_progress',
+            'payment_status',
+        ];
+        $paymentChanged = collect($paymentKeys)->contains(
+            fn (string $key): bool => ($oldPayload[$key] ?? null) !== ($payload[$key] ?? null),
+        );
+        if ($paymentChanged && ($this->workspace->isAdmin($user) || $this->workspace->isFinance($user))) {
+            $payload['payment_reminder_anchor_at'] = now()->toISOString();
+            $payload['payment_data_updated_at'] = now()->toISOString();
+        }
+
+        return $payload;
+    }
+
+    private function guardProjectContractState(array $payload): void
+    {
+        $status = $payload['overall_status'] ?? '投标中';
+        $contractStatus = $payload['contract_status'] ?? '未签署';
+        if ($status === '已拿到加工函'
+            && ! in_array($contractStatus, ['已有加工函', '部分签署', '已签署'], true)) {
+            throw ValidationException::withMessages([
+                'payload.overall_status' => '请先在合同表上传加工函并更新合同状态。',
+            ]);
+        }
+        if ($status === '合同签署' && $contractStatus !== '已签署') {
+            throw ValidationException::withMessages([
+                'payload.overall_status' => '所有合同签署并上传合同附件后，才可更新为合同签署。',
+            ]);
+        }
+    }
+
+    private function guardShipmentDates(array $payload): void
+    {
+        $first = $payload['first_shipment_date'] ?? null;
+        $last = $payload['last_shipment_date'] ?? null;
+        if (is_string($first) && $first !== '' && is_string($last) && $last !== '' && $last < $first) {
+            throw ValidationException::withMessages([
+                'payload.last_shipment_date' => '末次发货日期不能早于首次发货日期。',
+            ]);
+        }
+    }
+
+    private function guardContractEvidence(array $payload): void
+    {
+        foreach (['processing_letter_attachments', 'contract_attachments', 'statement_attachments'] as $key) {
+            if (count($payload[$key] ?? []) > 20) {
+                throw ValidationException::withMessages([
+                    "payload.{$key}" => '每类附件最多保留 20 个文件。',
+                ]);
+            }
+        }
+
+        if (($payload['status'] ?? '未签署') === '已有加工函'
+            && empty($payload['processing_letter_attachments'])) {
+            throw ValidationException::withMessages([
+                'payload.processing_letter_attachments' => '合同状态为已有加工函时，必须上传加工函附件。',
+            ]);
+        }
+        if (($payload['status'] ?? '未签署') === '已签署'
+            && empty($payload['contract_attachments'])) {
+            throw ValidationException::withMessages([
+                'payload.contract_attachments' => '合同状态为已签署时，必须上传合同附件。',
+            ]);
+        }
+    }
+
+    private function guardBusinessOwner(mixed $userId): void
+    {
+        $valid = filter_var($userId, FILTER_VALIDATE_INT) !== false
+            && User::query()
+                ->whereKey((int) $userId)
+                ->whereHas('roles', fn ($query) => $query->where('name', 'business'))
+                ->exists();
+        if (! $valid) {
+            throw ValidationException::withMessages([
+                'payload.business_owner_user_id' => '负责业务员必须选择具有业务角色的账号。',
             ]);
         }
     }

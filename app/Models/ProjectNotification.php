@@ -19,7 +19,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class ProjectNotification extends Model
 {
-    public const TYPE_CONTRACT = 'contract';
+    public const TYPE_BID = 'bid';
+
+    public const TYPE_PROCESSING_LETTER = 'processing_letter';
+
+    public const TYPE_SIGNATURE = 'contract_signature';
+
+    public const TYPE_CONTRACT = self::TYPE_SIGNATURE;
 
     public const TYPE_PAYMENT = 'payment';
 

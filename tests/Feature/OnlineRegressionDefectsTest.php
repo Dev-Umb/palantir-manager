@@ -15,21 +15,23 @@ class OnlineRegressionDefectsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_business_object_store_accepts_key_and_existing_numeric_id_contract(): void
+    public function test_retained_project_store_accepts_key_and_existing_numeric_id_contract(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $this->actingAs($this->userWithRole('admin'));
-        $customer = BusinessObject::where('key', 'customer')->firstOrFail();
+        $project = BusinessObject::where('key', 'project')->firstOrFail();
+        $customer = BusinessObject::where('key', 'customer')->firstOrFail()->records()->firstOrFail();
+        $owner = User::where('email', 'business@xyc.test')->firstOrFail();
 
-        $this->postJson('/objects/customer', [
-            'payload' => ['name' => '按 Key 创建客户', 'level' => 'A'],
+        $this->postJson('/objects/project', [
+            'payload' => ['name' => '按 Key 创建项目', 'customer_id' => $customer->id, 'business_owner_user_id' => (string) $owner->id],
         ])->assertCreated();
-        $this->postJson("/objects/{$customer->id}", [
-            'payload' => ['name' => '按 ID 创建客户', 'level' => 'B'],
+        $this->postJson("/objects/{$project->id}", [
+            'payload' => ['name' => '按 ID 创建项目', 'customer_id' => $customer->id, 'business_owner_user_id' => (string) $owner->id],
         ])->assertCreated();
 
-        $this->assertTrue($customer->records()->where('payload->name', '按 Key 创建客户')->exists());
-        $this->assertTrue($customer->records()->where('payload->name', '按 ID 创建客户')->exists());
+        $this->assertTrue($project->records()->where('payload->name', '按 Key 创建项目')->exists());
+        $this->assertTrue($project->records()->where('payload->name', '按 ID 创建项目')->exists());
     }
 
     public function test_unknown_object_and_malformed_record_ids_return_sanitized_not_found_responses(): void
@@ -88,11 +90,12 @@ class OnlineRegressionDefectsTest extends TestCase
         $this->assertSame('关联记录格式不正确', $requisitionResponse->json('errors')['material_id'][0]);
 
         $this->actingAs($this->userWithRole('admin'));
+        $owner = User::where('email', 'business@xyc.test')->firstOrFail();
         $projectResponse = $this->postJson('/objects/project', [
             'payload' => [
                 'name' => '非法关联项目',
                 'customer_id' => 'not-a-uuid',
-                'stage' => '生产加工',
+                'business_owner_user_id' => (string) $owner->id,
             ],
         ])
             ->assertUnprocessable()
@@ -102,33 +105,27 @@ class OnlineRegressionDefectsTest extends TestCase
             $projectResponse->json('errors')['payload.customer_id'][0],
         );
 
-        $itemResponse = $this->postJson('/objects/purchase', [
+        $this->postJson('/objects/purchase', [
             'payload' => [
                 'items' => [[
                     'material_id' => 'not-a-uuid',
                     'qty' => 1,
                 ]],
             ],
-        ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('payload.items.0.material_id');
-        $this->assertSame(
-            '关联记录格式不正确',
-            $itemResponse->json('errors')['payload.items.0.material_id'][0],
-        );
+        ])->assertNotFound();
     }
 
     public function test_existing_authorization_and_required_field_errors_remain_403_and_422(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $customer = BusinessObject::where('key', 'customer')->firstOrFail();
+        $project = BusinessObject::where('key', 'project')->firstOrFail();
 
         $this->actingAs($this->userWithRole('basic'));
-        $this->postJson("/objects/{$customer->id}", ['payload' => ['name' => '无权创建']])
+        $this->postJson("/objects/{$project->id}", ['payload' => ['name' => '无权创建']])
             ->assertForbidden();
 
         $this->actingAs($this->userWithRole('admin'));
-        $this->postJson("/objects/{$customer->id}", ['payload' => []])
+        $this->postJson("/objects/{$project->id}", ['payload' => []])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('payload.name');
     }

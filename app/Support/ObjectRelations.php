@@ -25,6 +25,9 @@ class ObjectRelations
     /** @var array<string, array<string, string|null>|null> */
     private array $labelCache = [];
 
+    /** @var array<int, string> */
+    private array $accountLabelCache = [];
+
     /** @var array<string, array<int, string>> */
     private array $projectIdsByContact = [];
 
@@ -140,6 +143,17 @@ class ObjectRelations
                 $value = route('attachments.download', [$record->id, $field['key']], false);
                 $payload[$field['key']] = $value;
             }
+            if (($field['type'] ?? null) === 'files' && is_array($value)) {
+                $value = collect($value)
+                    ->values()
+                    ->map(fn (mixed $path, int $index): ?string => is_string($path) && $path !== ''
+                        ? route('attachments.download', [$record->id, $field['key'], $index], false)
+                        : null)
+                    ->filter()
+                    ->values()
+                    ->all();
+                $payload[$field['key']] = $value;
+            }
             $display[$field['key']] = match ($field['type'] ?? null) {
                 'relation', 'creatable_relation' => $this->relationDisplayLabel(
                     $payload,
@@ -150,6 +164,7 @@ class ObjectRelations
                         && ($field['target'] ?? null) === 'customer',
                 ),
                 'multirelation' => $this->multirelationDisplayLabels($payload, $field, $value),
+                'account' => $this->accountLabel($value),
                 default => $value,
             };
         }
@@ -250,6 +265,25 @@ class ObjectRelations
     {
         $records->each(fn (ObjectRecord $record) => $record->loadMissing('businessObject'));
 
+        $accountIds = $records
+            ->flatMap(function (ObjectRecord $record): array {
+                $payload = $record->payload ?? [];
+
+                return collect($record->businessObject?->fields ?? [])
+                    ->filter(fn (array $field): bool => ($field['type'] ?? null) === 'account')
+                    ->map(fn (array $field): mixed => $payload[$field['key']] ?? null)
+                    ->filter(fn (mixed $id): bool => filter_var($id, FILTER_VALIDATE_INT) !== false)
+                    ->map(fn (mixed $id): int => (int) $id)
+                    ->all();
+            })
+            ->unique()
+            ->reject(fn (int $id): bool => array_key_exists($id, $this->accountLabelCache))
+            ->values();
+        if ($accountIds->isNotEmpty()) {
+            User::query()->whereIn('id', $accountIds)->pluck('name', 'id')
+                ->each(fn (string $name, int $id) => $this->accountLabelCache[$id] = $name);
+        }
+
         $ids = $records
             ->flatMap(function (ObjectRecord $record) {
                 if (! $record->businessObject) {
@@ -298,6 +332,20 @@ class ObjectRelations
                 $this->contactDetailsById[$record->id] = $this->contactDetails($record);
             }
         }
+    }
+
+    private function accountLabel(mixed $value): string
+    {
+        if (filter_var($value, FILTER_VALIDATE_INT) === false) {
+            return '';
+        }
+
+        $id = (int) $value;
+        if (! array_key_exists($id, $this->accountLabelCache)) {
+            $this->accountLabelCache[$id] = User::query()->whereKey($id)->value('name') ?? '';
+        }
+
+        return $this->accountLabelCache[$id];
     }
 
     public function chain(?ObjectRecord $record, ?Collection $objects = null): ?array

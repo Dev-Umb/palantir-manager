@@ -14,7 +14,7 @@ class NavigationContractTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_shared_navigation_contract_preserves_labels_links_visibility_children_and_task_counts(): void
+    public function test_shared_navigation_exposes_the_four_retained_business_tables_only(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $admin = User::create(['name' => 'admin', 'email' => 'nav@example.com', 'password' => Hash::make('password123')]);
@@ -22,12 +22,19 @@ class NavigationContractTest extends TestCase
 
         $this->actingAs($admin)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->has('auth')->has('flash')->has('notificationUnreadCount')
-            ->has('nav', 8)
+            ->has('nav', 5)
             ->where('nav.0.key', 'dashboard')
             ->where('nav.0.label', '经营大盘')
             ->where('nav.0.mobile_priority', 10)
             ->where('nav.0.visible', true)
-            ->has('nav.5.children')
-            ->has('nav.5.children.0.items.0.new_task_count'));
+            ->where('nav.2.key', 'ontology')
+            ->has('nav.2.children', 2)
+            ->has('nav.2.children.0.items', 2)
+            ->where('nav.2.children.0.items.0.label', '客户信息')
+            ->where('nav.2.children.0.items.1.label', '客户联系人')
+            ->has('nav.2.children.1.items', 2)
+            ->where('nav.2.children.1.items.0.label', '业务项目')
+            ->where('nav.2.children.1.items.1.label', '合同表')
+            ->has('nav.2.children.0.items.0.new_task_count'));
     }
 }

@@ -18,7 +18,7 @@ class AttachmentController extends Controller
 
     public function __construct(private ProjectVisibility $projectVisibility) {}
 
-    public function __invoke(Request $request, ObjectRecord $record, string $field): BinaryFileResponse
+    public function __invoke(Request $request, ObjectRecord $record, string $field, ?int $index = null): BinaryFileResponse
     {
         $record->loadMissing('businessObject');
         $object = $record->businessObject;
@@ -27,12 +27,17 @@ class AttachmentController extends Controller
 
         $fileField = collect($object->fields ?? [])->first(
             fn (array $candidate): bool => ($candidate['key'] ?? null) === $field
-                && ($candidate['type'] ?? null) === 'file'
+                && in_array($candidate['type'] ?? null, ['file', 'files'], true)
                 && ($candidate['scope'] ?? null) !== 'item',
         );
         abort_unless($fileField, 404);
 
-        $path = $this->privatePath($record->payload[$field] ?? null);
+        $value = $record->payload[$field] ?? null;
+        if (($fileField['type'] ?? null) === 'files') {
+            abort_unless(is_array($value) && $index !== null && array_key_exists($index, $value), 404);
+            $value = $value[$index];
+        }
+        $path = $this->privatePath($value);
         $disk = Storage::disk('local');
         abort_unless($path && $disk->exists($path), 404);
 

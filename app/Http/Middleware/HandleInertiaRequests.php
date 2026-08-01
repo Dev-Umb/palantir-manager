@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\BusinessObject;
 use App\Models\ProjectNotification;
+use App\Support\BusinessWorkspace;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -40,6 +41,7 @@ class HandleInertiaRequests extends Middleware
         $can = fn (string $permission) => in_array($permission, $permissions, true);
         $roles = $request->user()?->roles->pluck('name')->all() ?? [];
         $objects = BusinessObject::query()
+            ->whereIn('key', BusinessWorkspace::RETAINED_OBJECT_KEYS)
             ->withCount(['records as new_task_count' => function ($query) use ($roles): void {
                 $query->whereNotNull('workflow_key')->whereNull('workflow_seen_at');
                 if (! in_array('admin', $roles, true)) {
@@ -53,18 +55,11 @@ class HandleInertiaRequests extends Middleware
             ->orderBy('sort_order')
             ->get()
             ->filter(fn (BusinessObject $object) => $can("object.{$object->key}.view"))
-            ->reject(fn (BusinessObject $object) => $object->key === 'customer_contact'
-                || ($object->key === 'requisition'
-                    && in_array('procurement', $roles, true)
-                    && ! in_array('admin', $roles, true)))
             ->values();
 
         return [
             ['key' => 'dashboard', 'label' => '经营大盘', 'href' => route('dashboard'), 'visible' => $can('dashboard.view'), 'mobile_priority' => 10],
             ['key' => 'notifications', 'label' => '通知中心', 'href' => route('notifications.index'), 'visible' => true, 'mobile_priority' => 40],
-            ['key' => 'requisition-create', 'label' => '提交采购申请', 'href' => route('requisitions.create'), 'visible' => $can('requisition.create'), 'mobile_priority' => 20],
-            ['key' => 'approvals', 'label' => '采购OA审批', 'href' => route('requisitions.approvals'), 'visible' => $can('object.requisition.update'), 'mobile_priority' => 30],
-            ['key' => 'team-log', 'label' => '现场报工', 'href' => route('team-logs.create'), 'visible' => $can('object.team_log.create'), 'mobile_priority' => 35],
             [
                 'key' => 'ontology',
                 'label' => '本体工作台',

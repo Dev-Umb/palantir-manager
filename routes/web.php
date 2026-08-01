@@ -8,6 +8,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OntologyController;
+use App\Http\Controllers\ProjectContractAmountController;
+use App\Http\Controllers\ProjectCustomerController;
 use App\Http\Controllers\RbacController;
 use App\Http\Controllers\RelationOptionsController;
 use App\Http\Controllers\RequisitionController;
@@ -57,7 +59,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/ai/messages', [AiController::class, 'messages'])->middleware('throttle:ai-post')->name('ai.messages');
         Route::get('/ai/conversations/{conversation}', [AiController::class, 'show'])->name('ai.conversations.show');
     });
-    Route::get('/attachments/{record}/{field}', AttachmentController::class)->name('attachments.download');
+    Route::get('/attachments/{record}/{field}/{index?}', AttachmentController::class)
+        ->whereNumber('index')
+        ->name('attachments.download');
 
     Route::get('/requests/create', [RequisitionController::class, 'create'])
         ->middleware('permission:requisition.create')
@@ -81,6 +85,13 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:object.team_log.create')
         ->name('team-logs.store');
     Route::get('/relation-options', RelationOptionsController::class)->name('relation-options.index');
+    Route::post('/projects/{project}/contract-amount/sync', ProjectContractAmountController::class)
+        ->name('projects.contract-amount.sync');
+    Route::get('/project-customers/{customer}', [ProjectCustomerController::class, 'show'])->name('project-customers.show');
+    Route::post('/project-customers', [ProjectCustomerController::class, 'store'])->name('project-customers.store');
+    Route::put('/project-customers/{customer}', [ProjectCustomerController::class, 'update'])->name('project-customers.update');
+    Route::post('/project-customers/{customer}/contacts', [ProjectCustomerController::class, 'storeContact'])->name('project-customers.contacts.store');
+    Route::put('/project-customers/{customer}/contacts/{contact}', [ProjectCustomerController::class, 'updateContact'])->name('project-customers.contacts.update');
     Route::get('/objects/{object}/export.csv', [OntologyController::class, 'exportCsv'])->name('objects.export');
     Route::get('/objects/{object?}', [OntologyController::class, 'index'])->name('objects.index');
     Route::post('/objects/{object}', [OntologyController::class, 'store'])->name('objects.store');

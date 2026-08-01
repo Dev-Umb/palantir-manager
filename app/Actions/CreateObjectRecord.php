@@ -16,7 +16,6 @@ class CreateObjectRecord
     public function __construct(
         private AllocateObjectCode $codes,
         private SyncProjectContractAmount $contractAmount,
-        private SyncProjectInvoiceAmount $invoiceAmount,
         private SyncProjectFinance $projectFinance,
         private SyncProjectNotifications $projectNotifications,
         private MaterialNames $materialNames,
@@ -88,15 +87,7 @@ class CreateObjectRecord
                 $this->contractAmount->handle($payload['project_id'] ?? null);
             }
 
-            if ($object->key === 'invoice') {
-                $this->invoiceAmount->handle($payload['project_id'] ?? null);
-            }
-
-            if ($object->key === 'receivable') {
-                $this->projectFinance->handleLocked($project, $user);
-            }
-
-            if (in_array($object->key, ['contract', 'receivable'], true)) {
+            if ($object->key === 'contract') {
                 $this->projectNotifications->handleProjects([$payload['project_id'] ?? null]);
             }
 

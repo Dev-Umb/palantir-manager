@@ -81,7 +81,7 @@ export default function ObjectGrid({
             editable: can.update
                 && !field.readonly
                 && !(object.key === 'customer' && field.key === 'cooperation_history')
-                && !['readonly', 'lookup', 'derived', 'file'].includes(field.type),
+                && !['readonly', 'lookup', 'derived', 'file', 'files'].includes(field.type),
             cellEditor: GridEditor,
             cellEditorParams: (params) => ({
                 fieldConfig: field,
@@ -102,7 +102,7 @@ export default function ObjectGrid({
             },
             cellRenderer: (params) => object.key === 'customer' && field.key === 'cooperation_history'
                 ? <CooperationHistoryCell projects={params.data?.__record?.cooperation_projects || []} />
-                : renderValue(field, params.data?.__record, params.value, relationOptions, params.data),
+                : renderValue(object, field, params.data?.__record, params.value, relationOptions, params.data),
         }));
 
         if (object.key === 'customer') {
@@ -467,15 +467,16 @@ function optionsFor(field, value, relationOptions) {
     ];
 }
 
-function renderValue(field, record, value, relationOptions, row = null) {
+function renderValue(object, field, record, value, relationOptions, row = null) {
     if (value === null || value === undefined || value === '') return <span className="empty-value">—</span>;
     if (field.system === 'code') return <span className="mono">{value}</span>;
     if (field.system === 'title') return <span title={String(value)}>{String(value)}</span>;
     if (['relation', 'creatable_relation'].includes(field.type)) {
         const snapshot = isItemField(field) ? row?._snapshots?.[field.key] : null;
-        const text = (snapshot?.id === value ? snapshot.label : null)
+        const relationText = (snapshot?.id === value ? snapshot.label : null)
             || (isItemField(field) ? null : record?.display?.[field.key])
             || displayValueFor(field, value, relationOptions);
+        const text = relationGridText(object.key, field, relationText);
         return text ? <span title={text}>{text}</span> : <span className="empty-value">—</span>;
     }
     if (field.type === 'multirelation') {
@@ -483,6 +484,15 @@ function renderValue(field, record, value, relationOptions, row = null) {
         return text ? <span title={text}>{text}</span> : <span className="empty-value">—</span>;
     }
     if (field.type === 'file') return <a className="relation-chip" href={record?.display?.[field.key] || value} target="_blank" rel="noreferrer">查看附件</a>;
+    if (field.type === 'files') {
+        const attachments = Array.isArray(record?.display?.[field.key]) ? record.display[field.key] : [];
+        return attachments.length
+            ? <span title={`${attachments.length} 个附件`}>{attachments.length} 个附件</span>
+            : <span className="empty-value">—</span>;
+    }
+    if (field.type === 'account') {
+        return <span title={record?.display?.[field.key] || ''}>{record?.display?.[field.key] || '—'}</span>;
+    }
 
     return <span title={String(value)}>{String(value)}</span>;
 }
@@ -499,7 +509,7 @@ function columnWidth(field, objectKey, rows, relationOptions) {
     const bounds = columnBounds(field);
     const longest = Math.max(
         textWidth(field.label),
-        ...rows.map((row) => textWidth(displayText(field, row, relationOptions))),
+        ...rows.map((row) => textWidth(displayText(field, row, relationOptions, objectKey))),
     );
     const preferred = Math.max(bounds.preferred, longest + 34);
 
@@ -538,16 +548,29 @@ function numericField(field) {
         || /(?:amount|count|price|qty|quantity|weight|progress|total|rate|percent)$/i.test(field.key);
 }
 
-function displayText(field, row, relationOptions) {
+function displayText(field, row, relationOptions, objectKey) {
     if (field.system === 'code') return row._code;
     if (field.system === 'title') return row._title;
     if (['relation', 'creatable_relation'].includes(field.type)) {
         const snapshot = isItemField(field) ? row?._snapshots?.[field.key] : null;
-        if (snapshot && snapshot.id === row[field.key] && snapshot.label) return snapshot.label;
-        return displayValueFor(field, row[field.key], relationOptions);
+        const text = snapshot && snapshot.id === row[field.key] && snapshot.label
+            ? snapshot.label
+            : displayValueFor(field, row[field.key], relationOptions);
+
+        return relationGridText(objectKey, field, text);
     }
 
     return row[field.key] ?? '';
+}
+
+function relationGridText(objectKey, field, text) {
+    if (objectKey !== 'project' || field.key !== 'customer_id' || typeof text !== 'string') {
+        return text;
+    }
+
+    const separator = text.indexOf(' · ');
+
+    return separator >= 0 ? text.slice(separator + 3) : text;
 }
 
 function textWidth(value) {
