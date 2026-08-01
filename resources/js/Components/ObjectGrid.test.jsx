@@ -2,7 +2,25 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import ObjectGrid from './ObjectGrid';
+import ObjectGrid, { columnBounds, MIN_DATA_COLUMN_WIDTH } from './ObjectGrid';
+
+describe('ObjectGrid column resizing', () => {
+    it('allows every ordinary data column type to shrink to about three Chinese characters', () => {
+        const fields = [
+            { key: 'customer_id', type: 'relation' },
+            { key: 'delivery_date', type: 'date' },
+            { key: 'contract_amount', type: 'number' },
+            { key: 'status', type: 'select' },
+            { key: 'project_no', type: 'readonly', system: 'code' },
+            { key: 'remark', type: 'text' },
+            { key: 'name', type: 'text' },
+        ];
+
+        expect(MIN_DATA_COLUMN_WIDTH).toBe(72);
+        expect(fields.map((field) => columnBounds(field).min))
+            .toEqual(fields.map(() => MIN_DATA_COLUMN_WIDTH));
+    });
+});
 
 describe('ObjectGrid date editing', () => {
     beforeEach(() => {

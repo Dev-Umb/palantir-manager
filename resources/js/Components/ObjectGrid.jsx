@@ -16,6 +16,7 @@ import { columnOrderFromState, columnWidthsFromState } from './objectGridColumnS
 import { expandObjectRecords, isItemField, rawRowValue, sameRecordSpan, scopedRelationOptions, updateRecordField } from './objectGridRows';
 
 const modules = [CellSpanModule, CellStyleModule, ClientSideRowModelApiModule, ClientSideRowModelModule, ColumnApiModule, CustomEditorModule, DateFilterModule, LocaleModule, NumberFilterModule, RowApiModule, RowStyleModule, ScrollApiModule, TextFilterModule, TooltipModule];
+export const MIN_DATA_COLUMN_WIDTH = 72;
 
 export default function ObjectGrid({
     object,
@@ -525,27 +526,27 @@ function columnWidth(field, objectKey, rows, relationOptions) {
     return Math.min(preferred, bounds.max);
 }
 
-function columnBounds(field) {
+export function columnBounds(field) {
     if (['relation', 'multirelation', 'creatable_relation'].includes(field.type)) {
-        return { min: 220, preferred: 280, max: 360 };
+        return { min: MIN_DATA_COLUMN_WIDTH, preferred: 280, max: 360 };
     }
     if (field.type === 'date') {
-        return { min: 112, preferred: 120, max: 132 };
+        return { min: MIN_DATA_COLUMN_WIDTH, preferred: 120, max: 132 };
     }
     if (numericField(field)) {
-        return { min: 104, preferred: 118, max: 160 };
+        return { min: MIN_DATA_COLUMN_WIDTH, preferred: 118, max: 160 };
     }
     if (field.type === 'select') {
-        return { min: 112, preferred: 132, max: 180 };
+        return { min: MIN_DATA_COLUMN_WIDTH, preferred: 132, max: 180 };
     }
     if (field.system === 'code') {
-        return { min: 160, preferred: 180, max: 220 };
+        return { min: MIN_DATA_COLUMN_WIDTH, preferred: 180, max: 220 };
     }
     if (['remark', 'risk'].includes(field.key)) {
-        return { min: 200, preferred: 240, max: 420 };
+        return { min: MIN_DATA_COLUMN_WIDTH, preferred: 240, max: 420 };
     }
 
-    return { min: 160, preferred: 200, max: 320 };
+    return { min: MIN_DATA_COLUMN_WIDTH, preferred: 200, max: 320 };
 }
 
 function numericField(field) {

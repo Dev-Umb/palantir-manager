@@ -56,6 +56,12 @@ describe('personal object grid column order', () => {
         });
     });
 
+    it('persists a manually narrowed three-character data column width', () => {
+        expect(columnWidthsFromState([
+            { colId: 'name', width: 72 },
+        ], ['name'])).toEqual({ name: 72 });
+    });
+
     it('provides a shared field ordering function for table, forms, and details', () => {
         expect(columnState.fieldsInColumnOrder).toBeTypeOf('function');
     });
