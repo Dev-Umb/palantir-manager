@@ -109,7 +109,7 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                                             <div className="muted">{notification.tender?.name || '招投标记录已删除'}</div>
                                         </td>
                                         <td>{notification.message}</td>
-                                        <td>{formatDate(notification.deadline_at || notification.triggered_at)}</td>
+                                        <td>{formatTenderDate(notification.deadline_at || notification.triggered_at)}</td>
                                         <td>
                                             {!notification.read_at && (
                                                 <button className="ghost-button" type="button" onClick={() => router.patch(notification.read_url)}>
@@ -158,5 +158,18 @@ function formatDate(value) {
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
+    }).format(new Date(value));
+}
+
+function formatTenderDate(value) {
+    if (!value) return '-';
+
+    return new Intl.DateTimeFormat('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Shanghai',
     }).format(new Date(value));
 }

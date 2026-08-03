@@ -83,7 +83,9 @@ class NotificationController extends Controller
                     'read_at' => $notification->read_at?->toISOString(),
                     'resolved_at' => $notification->resolved_at?->toISOString(),
                     'triggered_at' => $notification->triggered_at?->toISOString(),
-                    'deadline_at' => $notification->deadline_at?->toISOString(),
+                    'deadline_at' => $notification->deadline_at
+                        ?->shiftTimezone(config('xyc.tender_timezone'))
+                        ->toISOString(),
                     'occurrences' => $notification->occurrences,
                     'tender' => $tender ? [
                         'id' => $tender->id,

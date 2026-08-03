@@ -128,6 +128,7 @@ class TenderNotificationTest extends TestCase
                 ->has('notifications.data', 0)
                 ->has('tenderNotifications.data', 1)
                 ->where('tenderNotifications.data.0.type_label', '投标截止（今日）')
+                ->where('tenderNotifications.data.0.deadline_at', '2026-08-03T04:30:00.000000Z')
                 ->where('tenderNotifications.data.0.tender.code', fn ($code) => str_starts_with($code, 'ZB-')));
 
         $this->patch("/tender-notifications/{$notification->id}/read")

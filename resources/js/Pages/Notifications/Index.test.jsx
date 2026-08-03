@@ -51,6 +51,7 @@ describe('notification list layout', () => {
 
         expect(screen.getByText('投标截止（今日）')).toBeInTheDocument();
         expect(screen.getByText('ZB-001')).toBeInTheDocument();
+        expect(screen.getByText('2026/08/03 10:30')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /查看招投标/ })).toHaveAttribute(
             'href',
             '/objects/tender?record=tender-1&mode=detail',
