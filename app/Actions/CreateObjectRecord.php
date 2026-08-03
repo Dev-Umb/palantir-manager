@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\MaterialNames;
 use App\Support\ObjectRelations;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class CreateObjectRecord
@@ -127,8 +128,9 @@ class CreateObjectRecord
         $payload['purchase_status'] = trim((string) ($payload['purchase_status'] ?? '')) ?: '未购买';
 
         $customerReference = trim((string) ($payload['customer_id'] ?? ''));
-        if ($customerReference === '' || ObjectRecord::whereKey($customerReference)
-            ->whereRelation('businessObject', 'key', 'customer')->exists()) {
+        if ($customerReference === '' || (Str::isUuid($customerReference)
+            && ObjectRecord::whereKey($customerReference)
+                ->whereRelation('businessObject', 'key', 'customer')->exists())) {
             return $payload;
         }
 

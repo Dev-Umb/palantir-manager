@@ -8,6 +8,7 @@ use App\Models\ObjectRecord;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class TenderManagementTest extends TestCase
@@ -47,10 +48,18 @@ class TenderManagementTest extends TestCase
         $tenderUser = $this->userWithRole('tender');
         $tenderObject = BusinessObject::query()->where('key', 'tender')->firstOrFail();
         $payload = $this->validTenderPayload('现场新客户');
+        $queriedCustomerNameAsUuid = false;
+        DB::listen(function ($query) use (&$queriedCustomerNameAsUuid): void {
+            if (str_contains($query->sql, '"object_records"."id"')
+                && in_array('现场新客户', $query->bindings, true)) {
+                $queriedCustomerNameAsUuid = true;
+            }
+        });
 
         $this->actingAs($tenderUser)
             ->post("/objects/{$tenderObject->id}", ['payload' => $payload])
             ->assertRedirect('/objects/tender');
+        $this->assertFalse($queriedCustomerNameAsUuid);
 
         $customer = ObjectRecord::query()
             ->whereRelation('businessObject', 'key', 'customer')
