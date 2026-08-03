@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\DeleteRbacUser;
+use App\Actions\UpdateRbacUserRoles;
 use App\Models\AuditLog;
 use App\Models\Permission;
 use App\Models\Role;
@@ -13,29 +15,43 @@ use Inertia\Response;
 
 class RbacController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $users = User::query()->with('roles')->latest()->get();
+        $adminCount = User::query()->whereHas('roles', fn ($query) => $query->where('name', 'admin'))->count();
+
         return Inertia::render('Rbac/Index', [
-            'users' => User::with('roles')->latest()->get(),
+            'users' => $users->map(function (User $user) use ($request, $adminCount): array {
+                $blockReason = match (true) {
+                    $user->is($request->user()) => '不能删除当前登录账号',
+                    $user->roles->contains('name', 'admin') && $adminCount <= 1 => '不能删除最后一个管理员',
+                    default => null,
+                };
+
+                return [
+                    ...$user->toArray(),
+                    'can_delete' => $blockReason === null,
+                    'delete_block_reason' => $blockReason,
+                ];
+            }),
             'roles' => Role::with('permissions')->orderByDesc('locked')->orderBy('label')->get(),
             'permissions' => Permission::orderBy('module')->orderBy('action')->get()->groupBy('module'),
         ]);
     }
 
-    public function updateUserRoles(Request $request, User $user): RedirectResponse
+    public function updateUserRoles(Request $request, User $user, UpdateRbacUserRoles $update): RedirectResponse
     {
         $data = $request->validate(['roles' => ['array'], 'roles.*' => ['integer', 'exists:roles,id']]);
-        $user->roles()->sync($data['roles'] ?? []);
-
-        AuditLog::create([
-            'user_id' => $request->user()->id,
-            'action' => 'rbac.user_roles.update',
-            'subject_type' => User::class,
-            'subject_id' => (string) $user->id,
-            'payload' => ['roles' => $data['roles'] ?? []],
-        ]);
+        $update->handle($user, $data['roles'] ?? [], $request->user());
 
         return back()->with('status', '用户角色已更新。');
+    }
+
+    public function destroyUser(Request $request, User $user, DeleteRbacUser $delete): RedirectResponse
+    {
+        $delete->handle($user, $request->user());
+
+        return back()->with('status', '用户已删除。');
     }
 
     public function updateRolePermissions(Request $request, Role $role): RedirectResponse

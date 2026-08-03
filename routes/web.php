@@ -106,6 +106,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:rbac.manage')->group(function () {
         Route::get('/admin/rbac', [RbacController::class, 'index'])->name('rbac.index');
         Route::put('/admin/users/{user}/roles', [RbacController::class, 'updateUserRoles'])->name('rbac.users.roles');
+        Route::delete('/admin/users/{user}', [RbacController::class, 'destroyUser'])->name('rbac.users.destroy');
         Route::put('/admin/roles/{role}/permissions', [RbacController::class, 'updateRolePermissions'])->name('rbac.roles.permissions');
     });
 });

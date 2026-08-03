@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import Layout from '../../Components/Layout';
 import { businessText, permissionGroupLabel } from '../../businessLanguage';
@@ -41,6 +41,7 @@ function UserRoleEditor({ user, roles }) {
     const [selected, setSelected] = useState(initialRoleIds);
     const [saved, setSaved] = useState(initialRoleIds);
     const [processing, setProcessing] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const isDirty = !sameIds(selected, saved);
 
     function toggle(id) {
@@ -53,6 +54,18 @@ function UserRoleEditor({ user, roles }) {
             preserveScroll: true,
             onSuccess: () => setSaved([...selected]),
             onFinish: () => setProcessing(false),
+        });
+    }
+
+    function destroy() {
+        if (!window.confirm(`确认删除用户“${user.name}”吗？删除后该账号将立即无法登录，历史业务记录会保留。`)) {
+            return;
+        }
+
+        setDeleting(true);
+        router.delete(`/admin/users/${user.id}`, {
+            preserveScroll: true,
+            onFinish: () => setDeleting(false),
         });
     }
 
@@ -81,6 +94,17 @@ function UserRoleEditor({ user, roles }) {
                 >
                     {processing ? '保存中...' : '保存角色'}
                 </button>
+                <button
+                    type="button"
+                    className="icon-danger"
+                    onClick={destroy}
+                    disabled={!user.can_delete || deleting}
+                    title={user.delete_block_reason || `删除${user.name}`}
+                    aria-label={`删除${user.name}`}
+                >
+                    <Trash2 size={15} /> {deleting ? '删除中...' : '删除用户'}
+                </button>
+                {user.delete_block_reason && <small>{user.delete_block_reason}</small>}
             </div>
         </article>
     );

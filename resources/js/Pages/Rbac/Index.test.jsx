@@ -5,16 +5,17 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Index from './Index';
 
-const { put } = vi.hoisted(() => ({
+const { put, destroy } = vi.hoisted(() => ({
     put: vi.fn((url, data, options) => {
         options?.onSuccess?.();
         options?.onFinish?.();
     }),
+    destroy: vi.fn(),
 }));
 
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
-    router: { put },
+    router: { put, delete: destroy },
 }));
 
 vi.mock('../../Components/Layout', () => ({
@@ -24,6 +25,8 @@ vi.mock('../../Components/Layout', () => ({
 afterEach(() => {
     cleanup();
     put.mockClear();
+    destroy.mockClear();
+    vi.restoreAllMocks();
 });
 
 describe('RBAC role editor', () => {
@@ -44,6 +47,8 @@ describe('RBAC role editor', () => {
                     name: '陈昊',
                     email: 'i@umb.ink',
                     roles: [{ id: 1, label: '管理' }],
+                    can_delete: true,
+                    delete_block_reason: null,
                 }]}
                 roles={[
                     { id: 1, label: '管理', permissions: [], locked: true },
@@ -69,5 +74,77 @@ describe('RBAC role editor', () => {
             expect.objectContaining({ preserveScroll: true }),
         );
         expect(save).toBeDisabled();
+    });
+
+    it('deletes one confirmed user and explains that history is preserved', () => {
+        vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+        render(
+            <Index
+                users={[{
+                    id: 7,
+                    name: '陈昊',
+                    email: 'i@umb.ink',
+                    roles: [],
+                    can_delete: true,
+                    delete_block_reason: null,
+                }]}
+                roles={[]}
+                permissions={{}}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '删除陈昊' }));
+
+        expect(window.confirm).toHaveBeenCalledWith('确认删除用户“陈昊”吗？删除后该账号将立即无法登录，历史业务记录会保留。');
+        expect(destroy).toHaveBeenCalledWith(
+            '/admin/users/7',
+            expect.objectContaining({ preserveScroll: true }),
+        );
+        expect(screen.getByRole('button', { name: '删除陈昊' })).toBeDisabled();
+        expect(screen.getByText('删除中...')).toBeInTheDocument();
+    });
+
+    it('does not delete when confirmation is cancelled', () => {
+        vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+        render(
+            <Index
+                users={[{
+                    id: 7,
+                    name: '陈昊',
+                    email: 'i@umb.ink',
+                    roles: [],
+                    can_delete: true,
+                    delete_block_reason: null,
+                }]}
+                roles={[]}
+                permissions={{}}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '删除陈昊' }));
+
+        expect(destroy).not.toHaveBeenCalled();
+    });
+
+    it('disables protected deletion and shows the reason', () => {
+        render(
+            <Index
+                users={[{
+                    id: 7,
+                    name: '陈昊',
+                    email: 'i@umb.ink',
+                    roles: [{ id: 1, label: '管理' }],
+                    can_delete: false,
+                    delete_block_reason: '不能删除最后一个管理员',
+                }]}
+                roles={[{ id: 1, label: '管理', permissions: [], locked: true }]}
+                permissions={{}}
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: '删除陈昊' })).toBeDisabled();
+        expect(screen.getByText('不能删除最后一个管理员')).toBeInTheDocument();
     });
 });
