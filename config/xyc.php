@@ -105,6 +105,7 @@ return [
                 $file('tender_file', '招标文件'),
                 $file('bid_file', '投标文件扫描件'),
                 $relation('converted_project_id', '流转项目', 'project', ['readonly' => true]),
+                $field('assignee_user_id', '接手业务员', 'account', ['editable_when_status' => ['已中标']]),
                 $field('manager', '投标负责人'),
             ],
         ],

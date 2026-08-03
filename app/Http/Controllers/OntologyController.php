@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\AcknowledgeWorkflowTask;
 use App\Actions\CreateObjectRecord;
+use App\Actions\ReassignTenderBusinessOwner;
 use App\Actions\ResolveInboundMaterials;
 use App\Actions\SyncProjectContractAmount;
 use App\Actions\SyncProjectFinance;
@@ -42,6 +43,7 @@ class OntologyController extends Controller
         private MaterialNames $materialNames,
         private AcknowledgeWorkflowTask $workflowTasks,
         private BusinessWorkspace $workspace,
+        private ReassignTenderBusinessOwner $tenderBusinessOwner,
     ) {}
 
     public function index(Request $request, ?string $object = null): Response|RedirectResponse
@@ -96,6 +98,12 @@ class OntologyController extends Controller
                 'items' => collect($businessAccounts)
                     ->map(fn (array $account): array => [...$account, 'id' => (string) $account['id']])
                     ->all(),
+                'selectedItems' => [],
+            ];
+        }
+        if ($current->key === 'tender') {
+            $relationOptions['assignee_user_id'] = [
+                'items' => $this->workspace->businessAccountOptions()->all(),
                 'selectedItems' => [],
             ];
         }
@@ -300,9 +308,13 @@ class OntologyController extends Controller
                     }
                 }
             }
+            $relationPayload = $payload;
+            if ($object->key === 'tender') {
+                unset($relationPayload['converted_project_id']);
+            }
             $this->relations->validatePayloadRelations(
                 $object,
-                $payload,
+                $relationPayload,
                 $request->user(),
                 $oldPayload,
             );
@@ -328,6 +340,9 @@ class OntologyController extends Controller
             if ($object->key === 'project') {
                 $this->guardProjectCustomerChange($lockedRecord, $payload);
                 $payload = $this->prepareProjectPayload($lockedRecord, $payload, $request->user());
+            }
+            if ($object->key === 'tender') {
+                $this->tenderBusinessOwner->handle($lockedRecord, $payload, $request->user());
             }
             if ($object->key === 'contract') {
                 $this->guardContractEvidence($payload);

@@ -84,6 +84,7 @@ export default function ObjectGrid({
             editable: (params) => can.update
                 && params.data?.__record?.can_update !== false
                 && !field.readonly
+                && fieldEditableForRecord(field, params.data?.__record)
                 && !(object.key === 'customer' && field.key === 'cooperation_history')
                 && !['readonly', 'lookup', 'derived', 'file', 'files'].includes(field.type),
             cellEditor: GridEditor,
@@ -96,7 +97,7 @@ export default function ObjectGrid({
                     params.data?.__record?.id,
                 ),
             }),
-            cellEditorPopup: ['relation', 'select'].includes(field.type),
+            cellEditorPopup: ['relation', 'select', 'account'].includes(field.type),
             cellEditorPopupPosition: 'under',
             valueGetter: (params) => rawRowValue(field, params.data),
             valueSetter: (params) => {
@@ -344,7 +345,7 @@ function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOp
         );
     }
 
-    if (['relation', 'select'].includes(fieldConfig.type)) {
+    if (['relation', 'select', 'account'].includes(fieldConfig.type)) {
         const options = optionsFor(fieldConfig, value, relationOptions);
         const relation = relationOptions[fieldConfig.key] || {};
 
@@ -452,6 +453,13 @@ function GridActions({ object, record, can, onDelete }) {
 }
 
 function optionsFor(field, value, relationOptions) {
+    if (field.type === 'account') {
+        return [
+            { value: '', label: '未选择' },
+            ...(relationOptions[field.key]?.items || []).map((item) => ({ value: String(item.id), label: item.label })),
+        ];
+    }
+
     if (['relation', 'creatable_relation'].includes(field.type)) {
         const relation = relationOptions[field.key] || {};
         const items = relation.items || [];
@@ -522,11 +530,22 @@ function displayValueFor(field, value, relationOptions) {
 
         return (Array.isArray(value) ? value : []).map((id) => labels.get(String(id)) || String(id));
     }
+    if (field.type === 'account') {
+        const option = relationOptions[field.key]?.items?.find((item) => String(item.id) === String(value));
+
+        return option?.label ?? (value ? '保存中...' : '');
+    }
     if (!['relation', 'creatable_relation'].includes(field.type)) return value;
 
     const option = relationOptions[field.key]?.items?.find((item) => item.id === value);
 
     return option?.label ?? (value ? '保存中...' : '');
+}
+
+export function fieldEditableForRecord(field, record) {
+    const allowedStatuses = field.editable_when_status;
+
+    return !Array.isArray(allowedStatuses) || allowedStatuses.includes(record?.payload?.status);
 }
 
 function columnWidth(field, objectKey, rows, relationOptions) {

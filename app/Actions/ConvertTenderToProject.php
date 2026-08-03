@@ -76,6 +76,7 @@ class ConvertTenderToProject
                     ...$tenderPayload,
                     'status' => '已中标',
                     'converted_project_id' => $project->id,
+                    'assignee_user_id' => (string) $assignee->id,
                 ],
             ]);
 

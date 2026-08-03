@@ -184,6 +184,7 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
 export function SchemaForm({ fields, data, setData, submitLabel = '保存', processing, relationOptions = {}, children }) {
     const editable = fields.filter((field) => field.scope !== 'item'
         && !field.readonly
+        && (!Array.isArray(field.editable_when_status) || field.editable_when_status.includes(data.status))
         && !['readonly', 'lookup', 'derived'].includes(field.type));
 
     return (

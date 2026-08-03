@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import ObjectGrid, { columnBounds, MIN_DATA_COLUMN_WIDTH } from './ObjectGrid';
+import ObjectGrid, { columnBounds, fieldEditableForRecord, MIN_DATA_COLUMN_WIDTH } from './ObjectGrid';
 
 describe('ObjectGrid column resizing', () => {
     it('allows every ordinary data column type to shrink to about three Chinese characters', () => {
@@ -19,6 +19,20 @@ describe('ObjectGrid column resizing', () => {
         expect(MIN_DATA_COLUMN_WIDTH).toBe(72);
         expect(fields.map((field) => columnBounds(field).min))
             .toEqual(fields.map(() => MIN_DATA_COLUMN_WIDTH));
+    });
+});
+
+describe('ObjectGrid status-dependent fields', () => {
+    it('only enables the tender assignee field after the tender is won', () => {
+        const field = {
+            key: 'assignee_user_id',
+            type: 'account',
+            editable_when_status: ['已中标'],
+        };
+
+        expect(fieldEditableForRecord(field, { payload: { status: '跟踪中' } })).toBe(false);
+        expect(fieldEditableForRecord(field, { payload: { status: '已中标' } })).toBe(true);
+        expect(fieldEditableForRecord({ key: 'name', type: 'text' }, { payload: { status: '跟踪中' } })).toBe(true);
     });
 });
 
