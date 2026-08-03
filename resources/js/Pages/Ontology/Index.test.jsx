@@ -693,6 +693,71 @@ describe('customer cooperation history', () => {
     }
 });
 
+describe('tender management', () => {
+    afterEach(() => {
+        cleanup();
+        inertia.post.mockReset();
+    });
+
+    it('uses minute-precise controls and hides the won status from generic creation', async () => {
+        window.history.replaceState({}, '', '/objects/tender?mode=create');
+        render(
+            <Index
+                currentObject={{
+                    id: 30,
+                    key: 'tender',
+                    group: '招投标',
+                    label: '招投标信息',
+                    fields: [
+                        { key: 'name', label: '标的名称', type: 'text', required: true },
+                        { key: 'submit_deadline', label: '投标截止时间', type: 'datetime', required: true },
+                        { key: 'status', label: '招投标状态', type: 'select', options: ['跟踪中', '已中标'], restricted_options: ['已中标'] },
+                    ],
+                }}
+                objects={[]}
+                records={{ data: [] }}
+                can={{ create: true, update: true, delete: true, convert: true }}
+                relationOptions={{}}
+                selectedRecordId={null}
+            />,
+        );
+
+        const dialog = await screen.findByRole('dialog');
+        expect(dialog.querySelector('input[type="datetime-local"]')).toBeInTheDocument();
+        expect(within(dialog).queryByRole('option', { name: '已中标' })).not.toBeInTheDocument();
+    });
+
+    it('requires a business assignee before submitting the conversion confirmation', async () => {
+        const tender = {
+            id: 'tender-1',
+            code: 'ZB-001',
+            title: '厂房标的',
+            payload: { name: '厂房标的', status: '已递交' },
+            display: {},
+        };
+        window.history.replaceState({}, '', '/objects/tender?mode=convert&record=tender-1');
+        render(
+            <Index
+                currentObject={{ id: 30, key: 'tender', group: '招投标', label: '招投标信息', fields: [] }}
+                objects={[]}
+                records={{ data: [tender] }}
+                can={{ create: true, update: true, delete: true, convert: true }}
+                relationOptions={{}}
+                selectedRecordId={tender.id}
+                businessUsers={[{ id: 9, name: '接手业务员' }]}
+            />,
+        );
+
+        const dialog = await screen.findByRole('dialog', { name: '确认中标并流转' });
+        const submit = within(dialog).getByRole('button', { name: '确认中标并流转' });
+        expect(submit).toBeDisabled();
+        fireEvent.change(within(dialog).getByRole('combobox', { name: '接手业务员' }), { target: { value: '9' } });
+        expect(submit).toBeEnabled();
+        fireEvent.click(submit);
+        expect(inertia.post).toHaveBeenCalledWith('/records/tender-1/convert-to-project', { preserveScroll: true });
+    });
+});
+
 function renderPage(mode, selected = record) {
     if (mode) window.history.replaceState({}, '', `/objects/customer?mode=${mode}&record=${selected.id}`);
 

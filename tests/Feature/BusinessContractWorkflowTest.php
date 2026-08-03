@@ -43,10 +43,11 @@ class BusinessContractWorkflowTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Ontology/Index')
-                ->has('objects', 4)
+                ->has('objects', 5)
                 ->where('objects', fn ($objects): bool => collect($objects)->pluck('key')->all() === [
                     'customer',
                     'customer_contact',
+                    'tender',
                     'project',
                     'contract',
                 ])

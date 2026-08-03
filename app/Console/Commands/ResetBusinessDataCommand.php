@@ -28,16 +28,23 @@ class ResetBusinessDataCommand extends Command
             $notificationCount = Schema::hasTable('project_notifications')
                 ? DB::table('project_notifications')->count()
                 : 0;
+            $tenderNotificationCount = Schema::hasTable('tender_notifications')
+                ? DB::table('tender_notifications')->count()
+                : 0;
             $recordCount = ObjectRecord::count();
             $auditCount = AuditLog::whereIn('subject_type', $objectKeys)->count();
             $counts = [
                 'object_records' => $recordCount,
                 'audit_logs' => $auditCount,
                 'project_notifications' => $notificationCount,
+                'tender_notifications' => $tenderNotificationCount,
             ];
 
             if (Schema::hasTable('project_notifications')) {
                 DB::table('project_notifications')->delete();
+            }
+            if (Schema::hasTable('tender_notifications')) {
+                DB::table('tender_notifications')->delete();
             }
 
             AuditLog::whereIn('subject_type', $objectKeys)->delete();

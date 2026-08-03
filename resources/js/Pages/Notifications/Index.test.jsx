@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import NotificationsIndex from './Index';
 
@@ -25,5 +25,35 @@ describe('notification list layout', () => {
 
         expect(container.querySelector('main')).toHaveAttribute('data-title', '通知中心');
         expect(container.querySelector('main')).toHaveAttribute('data-eyebrow', '通知中心');
+    });
+
+    it('renders tender deadlines with the precise time and tender entry point', () => {
+        render(
+            <NotificationsIndex
+                notifications={{ data: [], links: [] }}
+                tenderNotifications={{
+                    data: [{
+                        id: 7,
+                        status: 'active',
+                        read_at: null,
+                        type_label: '投标截止（今日）',
+                        message: '招投标「厂房标的」即将到达投标截止时间。',
+                        deadline_at: '2026-08-03T10:30:00+08:00',
+                        tender: { code: 'ZB-001', name: '厂房标的' },
+                        tender_url: '/objects/tender?record=tender-1&mode=detail',
+                        read_url: '/tender-notifications/7/read',
+                    }],
+                    links: [],
+                }}
+                unreadCount={1}
+            />,
+        );
+
+        expect(screen.getByText('投标截止（今日）')).toBeInTheDocument();
+        expect(screen.getByText('ZB-001')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /查看招投标/ })).toHaveAttribute(
+            'href',
+            '/objects/tender?record=tender-1&mode=detail',
+        );
     });
 });

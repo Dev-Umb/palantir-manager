@@ -119,9 +119,11 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
     }
 
     if (field.type === 'select' && field.options?.length) {
+        const restricted = new Set(field.restricted_options || []);
         const options = [
             { value: '', label: '未选择' },
-            ...field.options.map((option) => ({ value: option, label: option })),
+            ...field.options.filter((option) => !restricted.has(option) || option === value)
+                .map((option) => ({ value: option, label: option })),
         ];
 
         return <ComboBox value={common.value} options={options} onChange={(next) => onChange(field.key, next)} autoFocus={autoFocus} />;
@@ -135,6 +137,19 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
                 required={!!field.required}
                 autoFocus={autoFocus}
                 type="date"
+                onInput={(event) => onChange(field.key, event.currentTarget.value)}
+            />
+        );
+    }
+
+    if (field.type === 'datetime') {
+        return (
+            <input
+                name={field.key}
+                value={value ?? ''}
+                required={!!field.required}
+                autoFocus={autoFocus}
+                type="datetime-local"
                 onInput={(event) => onChange(field.key, event.currentTarget.value)}
             />
         );

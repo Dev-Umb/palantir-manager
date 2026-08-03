@@ -37,6 +37,10 @@ class ProjectVisibility
             return $this->scope($query, $user);
         }
 
+        if ($object->key === 'tender') {
+            return $query;
+        }
+
         if ($this->isAdmin($user)) {
             return $query;
         }

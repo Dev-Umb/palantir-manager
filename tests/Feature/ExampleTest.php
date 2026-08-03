@@ -521,6 +521,7 @@ class ExampleTest extends TestCase
                 ->where('objects', fn ($objects): bool => collect($objects)->pluck('key')->all() === [
                     'customer',
                     'customer_contact',
+                    'tender',
                     'project',
                     'contract',
                 ])

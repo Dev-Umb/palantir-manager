@@ -14,6 +14,7 @@ use App\Http\Controllers\RbacController;
 use App\Http\Controllers\RelationOptionsController;
 use App\Http\Controllers\RequisitionController;
 use App\Http\Controllers\ShopFloorController;
+use App\Http\Controllers\TenderConversionController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -44,6 +45,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::patch('/tender-notifications/{notification}/read', [NotificationController::class, 'markTenderRead'])
+        ->name('tender-notifications.read');
     Route::middleware('permission:ai.harness.view')->group(function () {
         Route::get('/ai', [AiController::class, 'index'])->name('ai.index');
         Route::post('/ai/runs', [AiRunController::class, 'store'])->middleware('throttle:ai-post')->name('ai.runs.store');
@@ -97,6 +100,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/objects/{object}', [OntologyController::class, 'store'])->name('objects.store');
     Route::put('/records/{record}', [OntologyController::class, 'update'])->name('records.update');
     Route::delete('/records/{record}', [OntologyController::class, 'destroy'])->name('records.destroy');
+    Route::post('/records/{record}/convert-to-project', TenderConversionController::class)
+        ->name('tenders.convert');
 
     Route::middleware('permission:rbac.manage')->group(function () {
         Route::get('/admin/rbac', [RbacController::class, 'index'])->name('rbac.index');

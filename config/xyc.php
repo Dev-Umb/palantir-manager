@@ -12,6 +12,7 @@ $multiaccount = fn (string $key, string $label, array $extra = []) => $field($ke
 $creatableRelation = fn (string $key, string $label, string $target, array $extra = []) => $field($key, $label, 'creatable_relation', array_merge(['target' => $target], $extra));
 $select = fn (string $key, string $label, array $options, array $extra = []) => $field($key, $label, 'select', array_merge(['options' => $options], $extra));
 $date = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'date', $extra);
+$datetime = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'datetime', $extra);
 $number = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'number', $extra);
 $file = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'file', $extra);
 $files = fn (string $key, string $label, array $extra = []) => $field($key, $label, 'files', $extra);
@@ -20,6 +21,7 @@ $units = ['张', '支', '根', 'kg', '吨', '桶', '盒'];
 
 return [
     'default_role' => 'basic',
+    'tender_timezone' => env('TENDER_TIMEZONE', 'Asia/Shanghai'),
     'retired_roles' => ['warehouse'],
 
     'roles' => [
@@ -31,6 +33,7 @@ return [
         ['name' => 'production_manager', 'label' => '生产负责人', 'description' => '维护生产班组、成员和生产信息。', 'locked' => false],
         ['name' => 'production', 'label' => '生产', 'description' => '查看班组档案并填写生产信息。', 'locked' => false],
         ['name' => 'finance', 'label' => '财务', 'description' => '项目财务台账、开票和回款。', 'locked' => false],
+        ['name' => 'tender', 'label' => '招投标', 'description' => '维护招投标信息并参与客户前期对接。', 'locked' => false],
     ],
 
     'permissions' => [
@@ -49,6 +52,13 @@ return [
         'production_manager' => ['dashboard.view', 'requisition.create', 'ai.harness.view'],
         'production' => ['dashboard.view', 'requisition.create', 'ai.harness.view'],
         'finance' => ['dashboard.view', 'ai.harness.view'],
+        'tender' => [
+            'dashboard.view',
+            'ai.harness.view',
+            'object.customer.view',
+            'object.customer.create',
+            'object.customer.update',
+        ],
     ],
 
     'objects' => [
@@ -70,6 +80,32 @@ return [
                 $field('phone', '联系电话'),
                 $relation('customer_id', '所属客户', 'customer', ['required' => true]),
                 $multirelation('project_ids', '关联项目', 'project', ['readonly' => true]),
+            ],
+        ],
+        [
+            'key' => 'tender', 'label' => '招投标信息', 'group' => '招投标', 'code_prefix' => 'ZB', 'title_field' => 'name', 'roles' => ['tender', 'business'], 'write_roles' => ['tender'],
+            'fields' => [
+                $code('tender_no', '招投标编号'),
+                $field('name', '标的名称', 'text', ['required' => true]),
+                $creatableRelation('customer_id', '客户名称', 'customer', ['required' => true]),
+                $field('tender_agency', '招标单位/代理机构'),
+                $field('source_site', '信息来源网站'),
+                $date('announce_date', '公告日期'),
+                $datetime('register_deadline', '报名截止时间', ['required' => true]),
+                $datetime('purchase_deadline', '购买标书截止时间', ['required' => true]),
+                $datetime('submit_deadline', '投标截止时间', ['required' => true]),
+                $datetime('bid_open_at', '开标时间'),
+                $number('budget_amount', '预算金额', ['min' => 0]),
+                $number('doc_fee', '标书费用', ['min' => 0]),
+                $select('purchase_status', '标书购买状态', ['未购买', '已购买'], ['default' => '未购买']),
+                $select('status', '招投标状态', ['跟踪中', '已报名', '已购标书', '制作中', '已递交', '已中标', '未中标', '已放弃'], [
+                    'default' => '跟踪中',
+                    'restricted_options' => ['已中标'],
+                ]),
+                $file('tender_file', '招标文件'),
+                $file('bid_file', '投标文件扫描件'),
+                $relation('converted_project_id', '流转项目', 'project', ['readonly' => true]),
+                $field('manager', '投标负责人'),
             ],
         ],
         [

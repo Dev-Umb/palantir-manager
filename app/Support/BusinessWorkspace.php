@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 
 class BusinessWorkspace
 {
-    public const RETAINED_OBJECT_KEYS = ['customer', 'customer_contact', 'project', 'contract'];
+    public const RETAINED_OBJECT_KEYS = ['customer', 'customer_contact', 'tender', 'project', 'contract'];
 
     public const FINANCE_FIELD_KEYS = [
         'contract_amount',
@@ -62,11 +62,28 @@ class BusinessWorkspace
         return in_array('business', $this->roleNames($user), true);
     }
 
+    public function isTender(User $user): bool
+    {
+        return in_array('tender', $this->roleNames($user), true);
+    }
+
     /** @return array<int, string> */
     public function writableFieldKeys(BusinessObject $object, User $user): array
     {
-        if (in_array($object->key, ['customer', 'customer_contact'], true)) {
+        if ($object->key === 'customer') {
+            return $this->isAdmin($user) || $this->isBusiness($user) || $this->isTender($user)
+                ? $this->editableMetadataKeys($object)
+                : [];
+        }
+
+        if ($object->key === 'customer_contact') {
             return $this->isAdmin($user) || $this->isBusiness($user)
+                ? $this->editableMetadataKeys($object)
+                : [];
+        }
+
+        if ($object->key === 'tender') {
+            return $this->isAdmin($user) || $this->isTender($user)
                 ? $this->editableMetadataKeys($object)
                 : [];
         }
@@ -112,8 +129,9 @@ class BusinessWorkspace
             return true;
         }
 
-        return $this->isBusiness($user)
-            && in_array($object->key, ['customer', 'customer_contact'], true);
+        return ($this->isBusiness($user)
+            && in_array($object->key, ['customer', 'customer_contact'], true))
+            || ($this->isTender($user) && $object->key === 'tender');
     }
 
     /** @return array<int, array<string, mixed>> */

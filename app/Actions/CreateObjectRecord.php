@@ -40,7 +40,7 @@ class CreateObjectRecord
         ): ObjectRecord {
             $this->relations->lockReferenceGraph();
             $object = BusinessObject::query()->lockForUpdate()->findOrFail($object->id);
-            $payload = $this->normalizePayload($object, $payload);
+            $payload = $this->normalizePayload($object, $payload, user: $user);
             $payload = $this->materialNames->normalizeAndGuardUnique($object, $payload);
             $this->relations->validatePayloadRelations($object, $payload, $user);
             $this->relations->validateItemRelations($object, $payload, $user);
@@ -95,8 +95,16 @@ class CreateObjectRecord
         });
     }
 
-    public function normalizePayload(BusinessObject $object, array $payload, array $existingPayload = []): array
-    {
+    public function normalizePayload(
+        BusinessObject $object,
+        array $payload,
+        array $existingPayload = [],
+        ?User $user = null,
+    ): array {
+        if ($object->key === 'tender') {
+            $payload = $this->normalizeTender($payload, $user);
+        }
+
         $payload = match ($object->key) {
             'drawing' => $this->normalizeDrawing($payload),
             'work_order' => $this->fillWorkOrderFromTeam(
@@ -111,6 +119,44 @@ class CreateObjectRecord
         $payload = $this->fillProjectNumber($object, $payload, $existingPayload);
 
         return $this->snapshotRelations($object, $payload, $existingPayload);
+    }
+
+    private function normalizeTender(array $payload, ?User $user): array
+    {
+        $payload['status'] = trim((string) ($payload['status'] ?? '')) ?: '跟踪中';
+        $payload['purchase_status'] = trim((string) ($payload['purchase_status'] ?? '')) ?: '未购买';
+
+        $customerReference = trim((string) ($payload['customer_id'] ?? ''));
+        if ($customerReference === '' || ObjectRecord::whereKey($customerReference)
+            ->whereRelation('businessObject', 'key', 'customer')->exists()) {
+            return $payload;
+        }
+
+        if (! $user?->canDo('object.customer.create')) {
+            throw ValidationException::withMessages([
+                'payload.customer_id' => '当前用户无权新建客户。',
+            ]);
+        }
+
+        $customerObject = BusinessObject::query()->where('key', 'customer')->firstOrFail();
+        $existingCustomer = $customerObject->records()
+            ->where('title', $customerReference)
+            ->first();
+        if ($existingCustomer) {
+            $payload['customer_id'] = $existingCustomer->id;
+
+            return $payload;
+        }
+
+        $customer = $this->handle(
+            $customerObject,
+            ['name' => $customerReference],
+            $user,
+            action: 'object.create.related',
+        );
+        $payload['customer_id'] = $customer->id;
+
+        return $payload;
     }
 
     public function nextCode(BusinessObject $object): string

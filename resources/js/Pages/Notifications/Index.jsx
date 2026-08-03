@@ -2,8 +2,9 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Bell, Check, CheckCheck, ExternalLink } from 'lucide-react';
 import Layout from '../../Components/Layout';
 
-export default function NotificationsIndex({ notifications, unreadCount }) {
+export default function NotificationsIndex({ notifications, tenderNotifications, unreadCount }) {
     const items = notifications?.data || [];
+    const tenderItems = tenderNotifications?.data || [];
 
     return (
         <Layout title="通知中心" eyebrow="通知中心">
@@ -60,13 +61,13 @@ export default function NotificationsIndex({ notifications, unreadCount }) {
                             </tbody>
                         </table>
                     </div>
-                ) : (
+                ) : !tenderItems.length ? (
                     <div className="empty-state">
                         <Bell size={24} />
                         <strong>目前没有需要处理的风险提醒</strong>
-                        <span>合同逾期、回款异常等风险出现时，会在这里通知你。</span>
+                        <span>合同、回款或招投标截止风险出现时，会在这里通知你。</span>
                     </div>
-                )}
+                ) : null}
 
                 {notifications?.links?.length > 3 && (
                     <nav className="pagination" aria-label="通知分页">
@@ -80,6 +81,70 @@ export default function NotificationsIndex({ notifications, unreadCount }) {
                     </nav>
                 )}
             </section>
+            {tenderItems.length > 0 && (
+                <section className="surface">
+                    <div className="section-head">
+                        <div>
+                            <p>招投标提醒</p>
+                            <h2>截止预警与中标流转</h2>
+                            <span>截止时间精确到分钟；已处理提醒仍保留历史记录。</span>
+                        </div>
+                    </div>
+                    <div className="table-scroll">
+                        <table className="data-table">
+                            <thead>
+                                <tr><th>状态</th><th>类型</th><th>招投标</th><th>提醒内容</th><th>截止/触发时间</th><th>操作</th></tr>
+                            </thead>
+                            <tbody>
+                                {tenderItems.map((notification) => (
+                                    <tr key={notification.id}>
+                                        <td>
+                                            <span className="pill">
+                                                {notification.status === 'resolved' ? '已处理' : notification.read_at ? '已读' : '未读'}
+                                            </span>
+                                        </td>
+                                        <td>{notification.type_label}</td>
+                                        <td>
+                                            <strong>{notification.tender?.code || '-'}</strong>
+                                            <div className="muted">{notification.tender?.name || '招投标记录已删除'}</div>
+                                        </td>
+                                        <td>{notification.message}</td>
+                                        <td>{formatDate(notification.deadline_at || notification.triggered_at)}</td>
+                                        <td>
+                                            {!notification.read_at && (
+                                                <button className="ghost-button" type="button" onClick={() => router.patch(notification.read_url)}>
+                                                    <Check size={15} /> 标为已读
+                                                </button>
+                                            )}
+                                            {notification.tender_url && (
+                                                <Link className="small-action" href={notification.tender_url}>
+                                                    查看招投标 <ExternalLink size={14} />
+                                                </Link>
+                                            )}
+                                            {notification.project_url && (
+                                                <Link className="small-action" href={notification.project_url}>
+                                                    查看项目 <ExternalLink size={14} />
+                                                </Link>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {tenderNotifications?.links?.length > 3 && (
+                        <nav className="pagination" aria-label="招投标通知分页">
+                            {tenderNotifications.links.map((link, index) => link.url ? (
+                                <Link key={`${link.label}-${index}`} className={link.active ? 'active' : ''} href={link.url} preserveScroll>
+                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                </Link>
+                            ) : (
+                                <span key={`${link.label}-${index}`} dangerouslySetInnerHTML={{ __html: link.label }} />
+                            ))}
+                        </nav>
+                    )}
+                </section>
+            )}
         </Layout>
     );
 }

@@ -4,8 +4,10 @@ namespace App\Http\Middleware;
 
 use App\Models\BusinessObject;
 use App\Models\ProjectNotification;
+use App\Models\TenderNotification;
 use App\Support\BusinessWorkspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -26,14 +28,26 @@ class HandleInertiaRequests extends Middleware
             ],
             'nav' => $user ? $this->navigation($request, $permissions) : [],
             'notificationUnreadCount' => fn () => $user
-                ? ProjectNotification::query()
-                    ->where('user_id', $user->id)
-                    ->active()
-                    ->whereNull('read_at')
-                    ->count()
+                ? $this->unreadNotificationCount($user->id)
                 : 0,
             'flash' => ['status' => fn () => $request->session()->get('status')],
         ];
+    }
+
+    private function unreadNotificationCount(int $userId): int
+    {
+        $notifications = ProjectNotification::query()
+            ->select(['user_id', 'status', 'read_at'])
+            ->unionAll(
+                TenderNotification::query()->select(['user_id', 'status', 'read_at']),
+            );
+
+        return DB::query()
+            ->fromSub($notifications, 'notifications')
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->whereNull('read_at')
+            ->count();
     }
 
     private function navigation(Request $request, array $permissions): array

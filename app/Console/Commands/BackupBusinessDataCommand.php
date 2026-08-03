@@ -63,6 +63,9 @@ class BackupBusinessDataCommand extends Command
         $notifications = Schema::hasTable('project_notifications')
             ? DB::table('project_notifications')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all()
             : [];
+        $tenderNotifications = Schema::hasTable('tender_notifications')
+            ? DB::table('tender_notifications')->orderBy('id')->get()->map(fn ($row) => (array) $row)->all()
+            : [];
 
         $records = ObjectRecord::query()
             ->with('businessObject:id,key,label')
@@ -107,10 +110,12 @@ class BackupBusinessDataCommand extends Command
                 'object_records' => count($records),
                 'audit_logs' => count($audits),
                 'project_notifications' => count($notifications),
+                'tender_notifications' => count($tenderNotifications),
             ],
             'object_records' => $records,
             'audit_logs' => $audits,
             'project_notifications' => $notifications,
+            'tender_notifications' => $tenderNotifications,
         ];
     }
 }

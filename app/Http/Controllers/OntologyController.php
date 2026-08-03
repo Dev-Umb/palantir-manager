@@ -122,7 +122,14 @@ class OntologyController extends Controller
                     && ($this->workspace->isAdmin($request->user()) || $this->workspace->isFinance($request->user())),
                 'manage_customers' => $current->key === 'project'
                     && ($this->workspace->isAdmin($request->user()) || $this->workspace->isBusiness($request->user())),
+                'convert' => $current->key === 'tender' && $can('object.tender.update'),
             ],
+            'businessUsers' => $current->key === 'tender'
+                ? User::query()
+                    ->whereHas('roles', fn ($query) => $query->where('name', 'business'))
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                : [],
         ]);
     }
 
@@ -219,6 +226,7 @@ class OntologyController extends Controller
         if ($object->key === 'contract') {
             $this->guardContractEvidence($payload);
         }
+        $this->guardTenderStatus($object, $payload);
         $record = DB::transaction(function () use ($object, $payload, $request, $writer): ObjectRecord {
             $this->relations->lockReferenceGraph();
             if ($object->key === 'inbound') {
@@ -283,7 +291,8 @@ class OntologyController extends Controller
             if ($object->key === 'inbound') {
                 $payload = $this->inboundMaterials->handle($payload, $request->user());
             }
-            $payload = $writer->normalizePayload($object, $payload, $oldPayload);
+            $payload = $writer->normalizePayload($object, $payload, $oldPayload, $request->user());
+            $this->guardTenderStatus($object, $payload, $oldPayload);
             if ($object->key === 'customer_contact') {
                 foreach (['position', 'remark', 'status'] as $legacyKey) {
                     if (array_key_exists($legacyKey, $oldPayload)) {
@@ -394,6 +403,11 @@ class OntologyController extends Controller
             }
             $lockedRecord = ObjectRecord::query()->lockForUpdate()->findOrFail($record->id);
             $oldPayload = $lockedRecord->payload ?? [];
+            if ($object->key === 'tender' && ! empty($oldPayload['converted_project_id'])) {
+                throw ValidationException::withMessages([
+                    'tender' => '已流转项目的招投标记录不能删除。',
+                ]);
+            }
             $oldProjectId = $lockedRecord->payload['project_id'] ?? null;
             if ($object->key === 'contract') {
                 $this->projectFinance->lockProjects([$oldProjectId]);
@@ -872,7 +886,7 @@ class OntologyController extends Controller
         $rules = array_values(array_filter([
             ! empty($field['required']) ? 'required' : 'nullable',
             in_array($type, ['number', 'range'], true) ? ($type === 'range' ? 'integer' : 'numeric') : 'string',
-            $type === 'date' ? 'date' : null,
+            in_array($type, ['date', 'datetime'], true) ? 'date' : null,
         ]));
 
         if ($type === 'select' && ! empty($field['options'])) {
@@ -984,7 +998,9 @@ class OntologyController extends Controller
         return match ($object->key) {
             'project' => $this->workspace->isAdmin($user) || $this->workspace->isBusiness($user),
             'contract' => $this->workspace->isAdmin($user),
-            'customer', 'customer_contact' => $this->workspace->isAdmin($user) || $this->workspace->isBusiness($user),
+            'customer' => $this->workspace->isAdmin($user) || $this->workspace->isBusiness($user) || $this->workspace->isTender($user),
+            'customer_contact' => $this->workspace->isAdmin($user) || $this->workspace->isBusiness($user),
+            'tender' => $this->workspace->isAdmin($user) || $this->workspace->isTender($user),
             default => false,
         };
     }
@@ -1162,6 +1178,30 @@ class OntologyController extends Controller
         if ($ids->count() !== count($userIds) || $validCount !== $ids->count()) {
             throw ValidationException::withMessages([
                 'payload.informed_business_user_ids' => '知会人员必须选择具有业务角色的账号。',
+            ]);
+        }
+    }
+
+    private function guardTenderStatus(
+        BusinessObject $object,
+        array $payload,
+        array $existingPayload = [],
+    ): void {
+        if ($object->key !== 'tender') {
+            return;
+        }
+
+        $currentStatus = $existingPayload['status'] ?? null;
+        $nextStatus = $payload['status'] ?? null;
+        if ($nextStatus === '已中标' && $currentStatus !== '已中标') {
+            throw ValidationException::withMessages([
+                'payload.status' => '已中标只能通过“确认中标并流转”操作写入。',
+            ]);
+        }
+
+        if (! empty($existingPayload['converted_project_id']) && $nextStatus !== '已中标') {
+            throw ValidationException::withMessages([
+                'payload.status' => '已流转项目的招投标状态必须保持为已中标。',
             ]);
         }
     }

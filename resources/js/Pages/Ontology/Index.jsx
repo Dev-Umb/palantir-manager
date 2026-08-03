@@ -18,7 +18,7 @@ import { businessText } from '../../businessLanguage';
 
 const ObjectGrid = lazy(() => import('../../Components/ObjectGrid'));
 
-export default function Index({ objects = [], currentObject, records, can, relationOptions, selectedRecordId, selectedRecord: selectedRecordProp = null }) {
+export default function Index({ objects = [], currentObject, records, can, relationOptions, selectedRecordId, selectedRecord: selectedRecordProp = null, businessUsers = [] }) {
     const { auth } = usePage().props;
     const params = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
     const mode = params.get('mode');
@@ -186,6 +186,13 @@ export default function Index({ objects = [], currentObject, records, can, relat
                 <Modal title={`${selectedRecord.code} · 详情`} closeHref={closeHref}>
                     <RecordDetail object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} contactCan={contactCan} onContactDetail={openContactDetail} onContactCreate={openContactCreate} can={can} />
                 </Modal>
+            )}
+            {mode === 'convert' && can.convert && selectedRecord && !selectedRecord.payload?.converted_project_id && (
+                <TenderConversionModal
+                    record={selectedRecord}
+                    businessUsers={businessUsers}
+                    closeHref={`/objects/tender?record=${selectedRecord.id}&mode=detail`}
+                />
             )}
             {mode === 'edit' && can.update && selectedRecord && selectedRecord.can_update !== false && (
                 <EditRecordModal key={selectedRecord.id} object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} closeHref={closeHref} canManageCustomers={can.manage_customers} />
@@ -639,6 +646,14 @@ function RecordDetail({ object, record, fields, relationOptions, contactCan, onC
             {object.key === 'project' && <ProjectContacts contacts={record.contacts || []} />}
             {object.key === 'project' && can.sync_contract_amount && <ContractAmountSync project={record} />}
             {object.key === 'customer' && <CustomerContacts customer={record} contacts={record.contacts || []} can={contactCan} onDetail={onContactDetail} onCreate={onContactCreate} />}
+            {object.key === 'tender' && can.convert && !record.payload?.converted_project_id && (
+                <div className="form-actions">
+                    <span>确认中标后将创建项目主档并指派接手业务员。</span>
+                    <Link className="action-button" href={`/objects/tender?record=${record.id}&mode=convert`} preserveScroll>
+                        确认中标并流转
+                    </Link>
+                </div>
+            )}
         </>
     );
 }
@@ -668,6 +683,46 @@ function ContractAmountSync({ project }) {
             <div><strong>合同金额维护来源：{source}</strong><span>最后同步：{syncedAt ? new Date(syncedAt).toLocaleString('zh-CN') : '尚未主动同步'}</span></div>
             <button type="button" className="secondary-button small-action" onClick={sync} disabled={syncing}><RefreshCw size={14} /> {syncing ? '同步中…' : '从合同表重新同步'}</button>
         </section>
+    );
+}
+
+function TenderConversionModal({ record, businessUsers, closeHref }) {
+    const form = useForm({ assignee_user_id: '' });
+
+    function submit(event) {
+        event.preventDefault();
+        form.post(`/records/${record.id}/convert-to-project`, { preserveScroll: true });
+    }
+
+    return (
+        <Modal title="确认中标并流转" closeHref={closeHref}>
+            <form onSubmit={submit}>
+                <div className="form-grid">
+                    <div className="notice form-notice wide">
+                        招投标「{record.title}」将标记为已中标，并创建对应项目主档。此动作不会自动覆盖已有项目。
+                    </div>
+                    <label className="wide">
+                        <span>接手业务员<b>*</b></span>
+                        <select
+                            aria-label="接手业务员"
+                            value={form.data.assignee_user_id}
+                            required
+                            onChange={(event) => form.setData('assignee_user_id', event.target.value)}
+                        >
+                            <option value="">请选择业务员</option>
+                            {businessUsers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                        </select>
+                    </label>
+                    {form.errors.assignee_user_id && <p className="form-error wide">{form.errors.assignee_user_id}</p>}
+                    <div className="form-actions wide">
+                        <span>系统会通知接手业务员与全部管理员。</span>
+                        <button type="submit" disabled={form.processing || !form.data.assignee_user_id}>
+                            {form.processing ? '正在流转...' : '确认中标并流转'}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </Modal>
     );
 }
 

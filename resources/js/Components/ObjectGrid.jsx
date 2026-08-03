@@ -472,7 +472,9 @@ function optionsFor(field, value, relationOptions) {
 
     return [
         { value: '', label: '未选择' },
-        ...(field.options || []).map((option) => ({ value: option, label: option })),
+        ...(field.options || [])
+            .filter((option) => !(field.restricted_options || []).includes(option) || option === value)
+            .map((option) => ({ value: option, label: option })),
     ];
 }
 
