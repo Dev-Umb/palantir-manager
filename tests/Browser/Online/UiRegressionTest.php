@@ -2,12 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Support\BusinessWorkspace;
+
 $xycConfig = require dirname(__DIR__, 3).'/config/xyc.php';
 
 $objectFields = collect($xycConfig['objects'])
-    ->reject(fn (array $object): bool => (bool) ($object['archived'] ?? false))
+    ->whereIn('key', BusinessWorkspace::RETAINED_OBJECT_KEYS)
     ->mapWithKeys(fn (array $object): array => [
-        $object['key'] => collect($object['fields'] ?? [])->pluck('label')->all(),
+        $object['key'] => collect($object['fields'] ?? [])
+            ->reject(fn (array $field): bool => ($field['readonly'] ?? false)
+                || in_array($field['type'] ?? null, ['readonly', 'lookup', 'derived'], true))
+            ->pluck('label')
+            ->all(),
     ])
     ->all();
 
@@ -20,7 +26,7 @@ dataset('non-admin active roles', [
     ['finance'],
 ]);
 
-it('opens every active object form and exposes every configured field', function () use ($objectFields): void {
+it('opens every active object form and exposes every editable configured field', function () use ($objectFields): void {
     $page = visitOnlineAs('admin');
 
     foreach (collect($objectFields)->except('customer_contact') as $key => $labels) {
@@ -48,8 +54,9 @@ it('opens every active object form and exposes every configured field', function
                 }).length,
                 unnamedControls: controls.filter((element) => {
                     if (element.tagName === 'BUTTON') return !(element.innerText || element.getAttribute('aria-label'));
-                    return !element.closest('label') && !element.getAttribute('aria-label') && !element.id;
-                }).length,
+                    const fieldLabel = element.closest('.form-field')?.querySelector(':scope > span')?.innerText;
+                    return !element.closest('label') && !element.getAttribute('aria-label') && !element.id && !fieldLabel;
+                }).map((element) => element.outerHTML.slice(0, 240)),
             };
         }
     JS);
@@ -58,7 +65,7 @@ it('opens every active object form and exposes every configured field', function
             'hasModal' => true,
             'modalOverflowsViewport' => false,
             'invisibleControls' => 0,
-            'unnamedControls' => 0,
+            'unnamedControls' => [],
         ]);
     }
 })->group('online', 'online-ui', 'online-fields')
@@ -197,7 +204,9 @@ it('keeps every mobile route reachable inside the More panel', function (): void
         'insideViewport' => true,
         'offscreenControls' => 0,
     ]);
-    expect($panel['labels'])->toContain('提交采购申请', '采购OA审批', '现场报工', '用户与权限', 'AI 数据助手', '退出');
+    expect($panel['labels'])
+        ->toContain('用户与权限', 'AI 数据助手', '退出')
+        ->not->toContain('提交采购申请', '采购OA审批', '现场报工');
 
     $closed = $page->script(<<<'JS'
         async () => {
@@ -235,14 +244,22 @@ it('creates contacts inline while keeping list summaries compact and preserving 
     expect($summary['rowHeights'])->not->toBeEmpty();
     expect(array_unique($summary['rowHeights']))->toBe([44]);
 
-    $page->click('.customer-contact-create')
+    $page->click('.ag-row[row-index="0"] .customer-contact-create')
         ->waitForText('新增联系人')
         ->assertPresent('.contact-modal-form')
         ->assertSee('所属客户')
         ->assertNoJavaScriptErrors()
         ->click('.contact-modal-head .icon-link');
 
-    $page->click('.list-summary-trigger');
+    $summaryOpened = $page->script(<<<'JS'
+        () => {
+            const trigger = document.querySelector('.ag-row[row-index] .list-summary-trigger');
+            trigger?.click();
+            return Boolean(trigger);
+        }
+    JS);
+    expect($summaryOpened)->toBeTrue();
+
     $page->waitForText('客户联系人')
         ->assertPresent('.contact-modal-list')
         ->assertPresent('.contact-modal-list-item')

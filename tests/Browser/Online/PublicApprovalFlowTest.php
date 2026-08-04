@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-it('validates submits rejects and cleans a public purchase request', function (): void {
+it('validates submits rejects and retains the approval audit trail', function (): void {
     $runId = (string) getenv('ONLINE_REGRESSION_RUN_ID');
     $reason = "{$runId} 公开采购边界";
 
@@ -40,27 +40,11 @@ it('validates submits rejects and cleans a public purchase request', function ()
     JS);
     expect($rejected)->toBeTrue();
 
-    $admin = visitOnlineAs('admin', "/objects/requisition?q={$runId}")
-        ->waitForText($reason);
-
-    $deleted = $admin->script(<<<JS
-        async () => {
-            window.confirm = () => true;
-            const row = [...document.querySelectorAll('.ag-row')].find((candidate) => candidate.innerText.includes('{$runId}'));
-            const trigger = row?.querySelector('.row-actions-menu-trigger');
-            if (!trigger) return false;
-            trigger.click();
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            document.querySelector('.row-actions-menu-popup button.danger')?.click();
-            await new Promise((resolve) => setTimeout(resolve, 1200));
-            return true;
-        }
-    JS);
-    expect($deleted)->toBeTrue();
-
-    $admin->refresh()
+    $procurement->refresh()
+        ->waitForText($reason)
+        ->assertSee('已驳回')
         ->wait(1)
-        ->assertDontSee($reason);
+        ->assertNoJavaScriptErrors();
 })->group('online', 'online-write', 'online-public', 'online-approval')
     ->skip(
         fn (): bool => getenv('ONLINE_REGRESSION_ENABLED') !== '1'

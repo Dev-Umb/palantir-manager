@@ -9,8 +9,12 @@ it('creates edits views searches and deletes a run-scoped customer through the b
 
     $page = visitOnlineAs('admin', '/objects/customer?mode=create')
         ->fill('input[name="name"]', $name)
-        ->fill('input[name="address"]', '边界地址 <script>alert(1)</script>')
-        ->fill('input[name="cooperation_history"]', str_repeat('回归', 120))
+        ->fill('input[name="address"]', '边界地址 <script>alert(1)</script>');
+
+    expect($page->script('() => Boolean(document.querySelector(\'input[name="cooperation_history"]\'))'))
+        ->toBeFalse();
+
+    $page->assertSee('合作历史')
         ->fill('input[name="remark"]', $runId)
         ->click('.modal-panel button[type="submit"]')
         ->waitForText($name)
