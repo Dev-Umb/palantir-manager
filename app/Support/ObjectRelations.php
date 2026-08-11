@@ -40,6 +40,9 @@ class ObjectRelations
     /** @var array<string, array{id: string, name: string, phone: string, customer_id: string}> */
     private array $contactDetailsById = [];
 
+    /** @var array<string, string|null> */
+    private array $customerNatureById = [];
+
     public function __construct(
         private ProjectVisibility $projectVisibility,
         private ReferenceGraphLock $referenceGraphLock,
@@ -1046,12 +1049,37 @@ class ObjectRelations
         if ($record->businessObject?->key === 'customer_contact') {
             $payload['project_ids'] = $this->projectIdsByContact[$record->id] ?? [];
         }
+        if ($record->businessObject?->key === 'project') {
+            $customerId = $payload['customer_id'] ?? null;
+            $payload['customer_nature'] = is_string($customerId)
+                ? ($this->customerNatureById[$customerId] ?? null)
+                : null;
+        }
 
         return $payload;
     }
 
     private function preloadDerivedRelations(Collection $records, ?User $user): void
     {
+        $projectCustomerIds = $records
+            ->filter(fn (ObjectRecord $record) => $record->businessObject?->key === 'project')
+            ->pluck('payload.customer_id')
+            ->filter(fn (mixed $customerId): bool => is_string($customerId) && $customerId !== '')
+            ->unique()
+            ->values();
+        if ($projectCustomerIds->isNotEmpty()) {
+            ObjectRecord::query()
+                ->whereIn('id', $projectCustomerIds->all())
+                ->whereRelation('businessObject', 'key', 'customer')
+                ->get(['id', 'payload'])
+                ->each(function (ObjectRecord $customer): void {
+                    $nature = $customer->payload['customer_nature'] ?? null;
+                    $this->customerNatureById[$customer->id] = is_string($nature) && $nature !== ''
+                        ? $nature
+                        : null;
+                });
+        }
+
         $customerIds = $records
             ->filter(fn (ObjectRecord $record) => $record->businessObject?->key === 'customer')
             ->pluck('id')
