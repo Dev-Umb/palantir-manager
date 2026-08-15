@@ -101,7 +101,8 @@ export default function Index({ objects = [], currentObject, records, subtotal =
         }
 
         createSubmittingRef.current = true;
-        createForm.transform((data) => withCustomerProfile(data, profile, overwriteConfirmed)).post(`/objects/${currentObject.id}`, {
+        createForm.transform((data) => withCustomerProfile(data, profile, overwriteConfirmed));
+        createForm.post(`/objects/${currentObject.id}`, {
             preserveScroll: true,
             onFinish: () => {
                 createSubmittingRef.current = false;
@@ -579,7 +580,8 @@ function EditRecordModal({ object, record, fields, relationOptions, closeHref, c
         }
 
         submittingRef.current = true;
-        updateForm.transform((data) => withCustomerProfile(data, profile, overwriteConfirmed)).put(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, {
+        updateForm.transform((data) => withCustomerProfile(data, profile, overwriteConfirmed));
+        updateForm.put(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, {
             preserveScroll: true,
             onFinish: () => {
                 submittingRef.current = false;

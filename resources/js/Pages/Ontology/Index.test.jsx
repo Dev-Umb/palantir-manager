@@ -40,18 +40,21 @@ vi.mock('@inertiajs/react', async () => {
         usePage: () => ({ props: { auth: { user: { id: inertia.userId }, permissions: inertia.permissions } } }),
         useForm: (initial) => {
             const [data, setFormData] = React.useState(initial);
+            const transformer = React.useRef((current) => current);
+            const hasTransformer = React.useRef(false);
+
             return {
                 data,
                 errors: {},
                 processing: false,
                 setData: (key, value) => setFormData((current) => ({ ...current, [key]: value })),
-                post: inertia.post,
-                put: (url, options) => inertia.put(url, data, options),
+                post: (url, options) => hasTransformer.current
+                    ? inertia.post(url, transformer.current(data), options)
+                    : inertia.post(url, options),
+                put: (url, options) => inertia.put(url, transformer.current(data), options),
                 transform: (callback) => {
-                    return {
-                        post: (url, options) => inertia.post(url, callback(data), options),
-                        put: (url, options) => inertia.put(url, callback(data), options),
-                    };
+                    transformer.current = callback;
+                    hasTransformer.current = true;
                 },
             };
         },
