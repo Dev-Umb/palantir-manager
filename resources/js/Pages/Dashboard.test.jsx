@@ -33,10 +33,10 @@ afterEach(cleanup);
 const cockpit = {
     meta: { scope: '全公司授权范围', as_of: '2026-08-04T10:30:00+08:00' },
     kpis: [
-        { key: 'occurred_amount', label: '当前公司产值', value: 4200000, format: 'currency', hint: '合同已发生金额', coverage: { valid: 3, total: 4 } },
+        { key: 'occurred_amount', label: '累计实际发生金额', value: 4200000, format: 'amount', hint: '已发生金额总计', coverage: { valid: 4, total: 5 } },
         { key: 'collection_rate', label: '回款率', value: 69, format: 'percentage', hint: '已付 / 已发生', coverage: { valid: 3, total: 4 } },
         { key: 'tender_win_rate', label: '中标率', value: 37.5, format: 'percentage', hint: '已中标 / 已决标', coverage: { valid: 8, total: 9 } },
-        { key: 'current_debt', label: '当前欠款', value: 1300000, format: 'currency', hint: '已发生 - 已付', coverage: { valid: 3, total: 4 } },
+        { key: 'current_debt', label: '当前欠款', value: 1300000, format: 'amount', hint: '3 个项目待跟进', coverage: { valid: 3, total: 5 } },
     ],
     panels: {
         cash_flow: {
@@ -121,9 +121,11 @@ describe('Company operations cockpit', () => {
         expect(screen.getByRole('link', { name: /查看项目主表/ })).toHaveAttribute('href', '/objects/project');
         expect(screen.getAllByText('—')).not.toHaveLength(0);
         expect(screen.getAllByText('420.0')).not.toHaveLength(0);
+        expect(screen.getAllByText('已发生金额总计')).not.toHaveLength(0);
         expect(screen.getByText('69.0')).toBeInTheDocument();
         expect(screen.getByText('37.5')).toBeInTheDocument();
         expect(screen.getByText('130.0')).toBeInTheDocument();
+        expect(screen.getByText('3 个项目待跟进')).toBeInTheDocument();
         expect(screen.getByText('合同金额')).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: '当前招投标管线' })).toBeInTheDocument();
         expect(screen.getByRole('img', { name: /活跃项目共6个/ })).toBeInTheDocument();

@@ -80,6 +80,10 @@ class BuildCompanyOperationsDashboard
             $cockpit['kpis'] = [...$cockpit['kpis'], ...$financeKpis['kpis']];
         }
 
+        if ($records->get('project') instanceof Collection) {
+            $cockpit['kpis'] = [...$cockpit['kpis'], ...$this->projectAmountKpis($projects)];
+        }
+
         if ($records->get('tender') instanceof Collection) {
             $tender = $this->tenderPanel($records->get('tender'));
             $cockpit['kpis'][] = $tender['kpi'];
@@ -197,22 +201,13 @@ class BuildCompanyOperationsDashboard
      */
     private function financeKpis(Collection $receivables): array
     {
-        $occurredTotal = 0.0;
-        $occurredValid = 0;
         $weightedPaid = 0.0;
         $weightedBase = 0.0;
-        $debt = 0.0;
         $ledgerValid = 0;
-        $debtProjects = 0;
 
         foreach ($receivables as $receivable) {
             $payload = $receivable->payload;
             $occurred = $this->nonNegativeNumber($payload['occurred_amount'] ?? null);
-            if ($occurred !== null) {
-                $occurredTotal += $occurred;
-                $occurredValid++;
-            }
-
             $contract = $this->nonNegativeNumber($payload['contract_amount'] ?? null);
             $paid = $this->nonNegativeNumber($payload['paid_amount'] ?? null);
             $base = $occurred !== null && $occurred > 0 ? $occurred : $contract;
@@ -223,25 +218,12 @@ class BuildCompanyOperationsDashboard
             $ledgerValid++;
             $weightedBase += $base;
             $weightedPaid += min($paid, $base);
-            $projectDebt = max($base - $paid, 0);
-            $debt += $projectDebt;
-            if ($projectDebt > 0) {
-                $debtProjects++;
-            }
         }
 
         $rate = $weightedBase > 0 ? round($weightedPaid / $weightedBase * 100, 1) : null;
 
         return [
             'kpis' => [
-                [
-                    'key' => 'occurred_amount',
-                    'label' => '累计实际发生金额',
-                    'value' => $occurredValid > 0 ? $occurredTotal : null,
-                    'format' => 'amount',
-                    'hint' => '产值口径',
-                    'coverage' => ['valid' => $occurredValid, 'total' => $receivables->count()],
-                ],
                 [
                     'key' => 'collection_rate',
                     'label' => '加权回款率',
@@ -252,14 +234,39 @@ class BuildCompanyOperationsDashboard
                         : '分母为 0，暂不可计算',
                     'coverage' => ['valid' => $ledgerValid, 'total' => $receivables->count()],
                 ],
-                [
-                    'key' => 'current_debt',
-                    'label' => '当前欠款',
-                    'value' => $ledgerValid > 0 ? $debt : null,
-                    'format' => 'amount',
-                    'hint' => "{$debtProjects} 个项目待跟进",
-                    'coverage' => ['valid' => $ledgerValid, 'total' => $receivables->count()],
-                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, ObjectRecord>  $projects
+     * @return array<int, array<string, mixed>>
+     */
+    private function projectAmountKpis(Collection $projects): array
+    {
+        $amounts = collect($this->projectAmounts($projects))->keyBy('key');
+        $occurred = $amounts->get('occurred_amount');
+        $unpaid = $amounts->get('unpaid_amount');
+        $projectsToFollowUp = $projects->filter(
+            fn (ObjectRecord $project): bool => ($this->finiteNumber($project->payload['unpaid_amount'] ?? null) ?? 0) > 0,
+        )->count();
+
+        return [
+            [
+                'key' => 'occurred_amount',
+                'label' => '累计实际发生金额',
+                'value' => $occurred['value'],
+                'format' => 'amount',
+                'hint' => '已发生金额总计',
+                'coverage' => $occurred['coverage'],
+            ],
+            [
+                'key' => 'current_debt',
+                'label' => '当前欠款',
+                'value' => $unpaid['value'],
+                'format' => 'amount',
+                'hint' => "{$projectsToFollowUp} 个项目待跟进",
+                'coverage' => $unpaid['coverage'],
             ],
         ];
     }

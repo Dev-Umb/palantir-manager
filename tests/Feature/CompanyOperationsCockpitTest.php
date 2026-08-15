@@ -30,7 +30,12 @@ class CompanyOperationsCockpitTest extends TestCase
     {
         $admin = $this->userWithRole('admin');
 
-        $this->record('project', ['name' => '未知状态项目', 'overall_status' => '未知状态']);
+        $this->record('project', [
+            'name' => '未知状态项目',
+            'overall_status' => '未知状态',
+            'occurred_amount' => 4200000,
+            'unpaid_amount' => 1300000,
+        ]);
         foreach (['投标中', '已中标', '已拿到加工函', '合同签署', '已完成'] as $status) {
             $this->record('project', ['name' => "{$status}项目", 'overall_status' => $status]);
         }
@@ -38,7 +43,7 @@ class CompanyOperationsCockpitTest extends TestCase
         $this->record('contract', ['amount' => 5800000, 'status' => '已签署']);
         $receivable = $this->record('receivable', [
             'contract_amount' => 5800000,
-            'occurred_amount' => 4200000,
+            'occurred_amount' => 5000000,
             'reconciled_amount' => 3600000,
             'paid_amount' => 2900000,
         ]);
@@ -80,13 +85,18 @@ class CompanyOperationsCockpitTest extends TestCase
                 ->where('cockpit.kpis.0.key', 'occurred_amount')
                 ->where('cockpit.kpis.0.value', fn (mixed $value): bool => (float) $value === 4200000.0)
                 ->where('cockpit.kpis.1.key', 'collection_rate')
-                ->where('cockpit.kpis.1.value', fn (mixed $value): bool => (float) $value === 69.0)
+                ->where('cockpit.kpis.0.hint', '已发生金额总计')
+                ->where('cockpit.kpis.1.value', fn (mixed $value): bool => (float) $value === 58.0)
                 ->where('cockpit.kpis.2.key', 'tender_win_rate')
                 ->where('cockpit.kpis.2.value', 37.5)
                 ->where('cockpit.kpis.3.key', 'current_debt')
                 ->where('cockpit.kpis.3.value', fn (mixed $value): bool => (float) $value === 1300000.0)
+                ->where('cockpit.kpis.3.hint', '1 个项目待跟进')
                 ->where('cockpit.panels.cash_flow.series.0.label', '合同金额')
                 ->where('cockpit.panels.cash_flow.series.0.value', fn (mixed $value): bool => (float) $value === 5800000.0)
+                ->where('cockpit.panels.cash_flow.series.1.value', fn (mixed $value): bool => (float) $value === 5000000.0)
+                ->where('cockpit.panels.project_amounts.company.0.value', fn (mixed $value): bool => (float) $value === 4200000.0)
+                ->where('cockpit.panels.project_amounts.company.2.value', fn (mixed $value): bool => (float) $value === 1300000.0)
                 ->where('cockpit.panels.project_status.active_total', 4)
                 ->where('cockpit.panels.project_status.completed_count', 1)
                 ->where('cockpit.panels.project_status.unmaintained_count', 1)
@@ -158,15 +168,24 @@ class CompanyOperationsCockpitTest extends TestCase
                 ->where('cockpit.panels.project_status.records_count', 1)
                 ->where('cockpit.panels.project_status.active_total', 1)
                 ->where('cockpit.panels.project_status.statuses.1.count', 1)
+                ->where('cockpit.kpis', function (Collection $kpis): bool {
+                    $occurred = $kpis->firstWhere('key', 'occurred_amount');
+                    $debt = $kpis->firstWhere('key', 'current_debt');
+
+                    return (float) $occurred['value'] === 100000.0
+                        && $occurred['coverage'] === ['valid' => 1, 'total' => 1]
+                        && (float) $debt['value'] === 80000.0
+                        && $debt['hint'] === '1 个项目待跟进'
+                        && $debt['coverage'] === ['valid' => 1, 'total' => 1];
+                })
                 ->where('cockpit.panels.project_amounts.company.0.value', fn (mixed $value): bool => (float) $value === 100000.0)
                 ->has('cockpit.panels.project_amounts.salespeople', 1)
                 ->where('cockpit.panels.project_amounts.salespeople.0.user_id', $owner->id)
                 ->where('cockpit.panels.project_amounts.salespeople.0.amounts.1.value', fn (mixed $value): bool => (float) $value === 20000.0)
                 ->has('cockpit.project_progresses', 1)
-                ->where('cockpit.kpis', fn (Collection $kpis): bool => $kpis
-                    ->pluck('key')
-                    ->intersect(['occurred_amount', 'collection_rate', 'current_debt'])
-                    ->isEmpty()));
+                ->where('cockpit.kpis', fn (Collection $kpis): bool => $kpis->pluck('key')->contains('occurred_amount')
+                    && $kpis->pluck('key')->contains('current_debt')
+                    && ! $kpis->pluck('key')->contains('collection_rate')));
     }
 
     public function test_project_master_amounts_are_totaled_by_company_and_existing_salesperson_without_deduplication(): void
@@ -198,6 +217,16 @@ class CompanyOperationsCockpitTest extends TestCase
                 ->where('cockpit.panels.project_amounts.company.1.coverage', ['valid' => 5, 'total' => 6])
                 ->where('cockpit.panels.project_amounts.company.2.value', fn (mixed $value): bool => (float) $value === 300.0)
                 ->where('cockpit.panels.project_amounts.company.2.coverage', ['valid' => 5, 'total' => 6])
+                ->where('cockpit.kpis', function (Collection $kpis): bool {
+                    $occurred = $kpis->firstWhere('key', 'occurred_amount');
+                    $debt = $kpis->firstWhere('key', 'current_debt');
+
+                    return (float) $occurred['value'] === 1000.0
+                        && $occurred['coverage'] === ['valid' => 5, 'total' => 6]
+                        && (float) $debt['value'] === 300.0
+                        && $debt['coverage'] === ['valid' => 5, 'total' => 6]
+                        && $debt['hint'] === '3 个项目待跟进';
+                })
                 ->has('cockpit.panels.project_amounts.salespeople', 2)
                 ->where('cockpit.panels.project_amounts.salespeople', function (Collection $salespeople) use ($firstSalesperson, $secondSalesperson): bool {
                     $byUserId = $salespeople->keyBy('user_id');
