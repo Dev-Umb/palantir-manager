@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import ObjectGrid, { columnBounds, fieldEditableForRecord, formatSubtotalValue, MIN_DATA_COLUMN_WIDTH, subtotalColumnWidth } from './ObjectGrid';
+import ObjectGrid, { columnBounds, fieldEditableForRecord, formatSubtotalValue, MIN_DATA_COLUMN_WIDTH, objectRecordHref, subtotalColumnWidth } from './ObjectGrid';
 import { formatObjectNumber } from './objectNumberFormatting';
 
 describe('ObjectGrid column resizing', () => {
@@ -31,6 +31,25 @@ describe('project number formatting', () => {
         expect(formatObjectNumber('project', field, 12)).toBe('12.00');
         expect(formatObjectNumber('contract', field, 12)).toBe(12);
         expect(formatObjectNumber('project', field, '')).toBe('');
+    });
+});
+
+describe('project record navigation', () => {
+    it('keeps the filtered project list context in detail and edit links', () => {
+        const listHref = '/objects/project?q=%E7%94%B2&filter_logic=and&filters%5B0%5D%5Bfield%5D=overall_status&page=2&per_page=10';
+
+        expect(objectRecordHref('project', 'project-1', 'detail', listHref)).toBe(
+            `${listHref}&record=project-1&mode=detail`,
+        );
+        expect(objectRecordHref('project', 'project-1', 'edit', listHref)).toBe(
+            `${listHref}&record=project-1&mode=edit`,
+        );
+    });
+
+    it('keeps the existing unfiltered link shape when no list context is supplied', () => {
+        expect(objectRecordHref('contract', 'contract-1', 'detail')).toBe(
+            '/objects/contract?record=contract-1&mode=detail',
+        );
     });
 });
 
@@ -739,13 +758,20 @@ describe('ObjectGrid date editing', () => {
                 fields={[{ key: 'name', label: '项目名称', type: 'text' }]}
                 can={{ update: true, delete: true }}
                 selectedRecordId={null}
+                recordListHref="/objects/project?q=%E7%94%B2&filters%5B0%5D%5Bfield%5D=overall_status&page=2"
                 relationOptions={{}}
                 onRecordChange={() => {}}
             />,
         );
 
-        expect((await screen.findByRole('link', { name: '查看 PRJ-001 详情' })).textContent).toContain('查看');
+        expect((await screen.findByRole('link', { name: '查看 PRJ-001 详情' })).getAttribute('href')).toBe(
+            '/objects/project?q=%E7%94%B2&filters%5B0%5D%5Bfield%5D=overall_status&page=2&record=project-1&mode=detail',
+        );
         expect(screen.getByRole('button', { name: 'PRJ-001 更多操作' })).not.toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'PRJ-001 更多操作' }));
+        expect((await screen.findByRole('link', { name: '编辑 PRJ-001' })).getAttribute('href')).toBe(
+            '/objects/project?q=%E7%94%B2&filters%5B0%5D%5Bfield%5D=overall_status&page=2&record=project-1&mode=edit',
+        );
     });
 
     it('shows a referenced project deletion failure in a dialog', async () => {

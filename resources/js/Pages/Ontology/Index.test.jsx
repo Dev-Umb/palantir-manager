@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { columnOrderStorageKey, columnWidthStorageKey } from '../../Components/objectGridColumnState';
-import Index, { objectListHref } from './Index';
+import Index, { objectListHref, recordListHrefForObject } from './Index';
 
 const inertia = vi.hoisted(() => ({
     userId: 42,
@@ -436,6 +436,8 @@ describe('project customer contact choices', () => {
         fireEvent.click(within(dialog).getByRole('button', { name: '保存' }));
 
         const returnTo = objectListHref('project', new URLSearchParams(window.location.search));
+        expect(recordListHrefForObject('project', new URLSearchParams(window.location.search))).toBe(returnTo);
+        expect(recordListHrefForObject('contract', new URLSearchParams(window.location.search))).toBeNull();
         expect(returnTo).toContain('q=%E7%94%B2');
         expect(returnTo).toContain('filters%5B0%5D%5Bfield%5D=overall_status');
         expect(returnTo).toContain('page=2');

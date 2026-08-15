@@ -26,6 +26,7 @@ export default function ObjectGrid({
     fields,
     can,
     selectedRecordId,
+    recordListHref = null,
     relationOptions,
     savedColumnWidths = {},
     onRecordChange,
@@ -170,10 +171,10 @@ export default function ObjectGrid({
             spanRows: sameRecordSpan,
             cellClass: 'action-cell',
             cellRenderer: (params) => params.data?.__record
-                ? <GridActions object={object} record={params.data.__record} can={can} onDelete={destroyRecord} />
+                ? <GridActions object={object} record={params.data.__record} can={can} onDelete={destroyRecord} recordListHref={recordListHref} />
                 : null,
         }];
-    }, [can, canCreateContact, destroyRecord, fields, object, onContactCreate, onContactOpen, relationOptions, rowData, savedColumnWidths, subtotal, subtotalLabelField]);
+    }, [can, canCreateContact, destroyRecord, fields, object, onContactCreate, onContactOpen, recordListHref, relationOptions, rowData, savedColumnWidths, subtotal, subtotalLabelField]);
 
     const saveColumnOrder = useCallback((event) => {
         if (event.finished === false) return;
@@ -448,7 +449,7 @@ function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOp
     );
 }
 
-function GridActions({ object, record, can, onDelete }) {
+function GridActions({ object, record, can, onDelete, recordListHref }) {
     const canUpdate = can.update && record.can_update !== false;
     function approve() {
         router.post(`/requests/${record.id}/approve`, {}, { preserveScroll: true });
@@ -475,7 +476,7 @@ function GridActions({ object, record, can, onDelete }) {
                 primary={(
                     <Link
                         className="grid-action"
-                        href={`/objects/${object.key}?record=${record.id}&mode=detail`}
+                        href={objectRecordHref(object.key, record.id, 'detail', recordListHref)}
                         preserveScroll
                         aria-label={`查看 ${record.code} 详情`}
                     >
@@ -485,7 +486,7 @@ function GridActions({ object, record, can, onDelete }) {
                 )}
                 secondary={[
                     canUpdate && (
-                        <Link key="edit" href={`/objects/${object.key}?record=${record.id}&mode=edit`} preserveScroll aria-label={`编辑 ${record.code}`}>
+                        <Link key="edit" href={objectRecordHref(object.key, record.id, 'edit', recordListHref)} preserveScroll aria-label={`编辑 ${record.code}`}>
                             <Pencil size={14} /> 编辑
                         </Link>
                     ),
@@ -511,6 +512,15 @@ function GridActions({ object, record, can, onDelete }) {
             />
         </div>
     );
+}
+
+export function objectRecordHref(objectKey, recordId, mode, listHref = null) {
+    const [path, query = ''] = (listHref || `/objects/${objectKey}`).split('?');
+    const params = new URLSearchParams(query);
+    params.set('record', recordId);
+    params.set('mode', mode);
+
+    return `${path}?${params.toString()}`;
 }
 
 function optionsFor(field, value, relationOptions) {

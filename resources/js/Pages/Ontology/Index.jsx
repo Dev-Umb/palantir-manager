@@ -155,6 +155,7 @@ export default function Index({ objects = [], currentObject, records, subtotal =
                                 fields={orderedFields}
                                 can={can}
                                 selectedRecordId={selectedRecordId}
+                                recordListHref={recordListHrefForObject(currentObject.key, params)}
                                 relationOptions={relationOptions}
                                 savedColumnWidths={columnWidths}
                                 onRecordChange={updateTableRecord}
@@ -879,6 +880,10 @@ export function objectListHref(objectKey, params) {
     const query = listParams.toString();
 
     return `/objects/${objectKey}${query ? `?${query}` : ''}`;
+}
+
+export function recordListHrefForObject(objectKey, params) {
+    return objectKey === 'project' ? objectListHref(objectKey, params) : null;
 }
 
 function itemCellValue(field, item, relationOptions) {
