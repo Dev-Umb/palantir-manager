@@ -5,9 +5,12 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
 
+const usePollMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
     Link: ({ children, ...props }) => <a {...props}>{children}</a>,
+    usePoll: usePollMock,
 }));
 
 vi.mock('../Components/Layout', () => ({ default: ({ children }) => <main>{children}</main> }));
@@ -64,6 +67,22 @@ const cockpit = {
             production: { url: null, total_ton: 680, planned_ton: 760, coverage: { valid: 5, total: 6 }, statuses: [{ status: '待开始', count: 1 }, { status: '生产中', count: 2 }, { status: '暂停', count: 0 }, { status: '已完成', count: 2 }] },
             shipment: { url: null, total_ton: 510, trend_coverage: { valid: 4, total: 6 }, undated_ton: 12, invalid_quantity_count: 1, monthly: [{ month: '2026-07', label: '07月', ton: 220 }, { month: '2026-08', label: '08月', ton: 278 }] },
         },
+        project_amounts: {
+            url: '/objects/project', projects_count: 5, unassigned_projects_count: 1, as_of: '2026-08-15T10:30:20+08:00',
+            company: [
+                { key: 'occurred_amount', label: '已发生金额总计', value: 4200000, coverage: { valid: 4, total: 5 } },
+                { key: 'paid_amount', label: '已回款金额总计', value: 2900000, coverage: { valid: 3, total: 5 } },
+                { key: 'unpaid_amount', label: '未回款金额总计', value: 1300000, coverage: { valid: 3, total: 5 } },
+            ],
+            salespeople: [{
+                user_id: 7, name: '业务员甲', projects_count: 4,
+                amounts: [
+                    { key: 'occurred_amount', label: '已发生金额总计', value: 4200000, coverage: { valid: 4, total: 4 } },
+                    { key: 'paid_amount', label: '已回款金额总计', value: 2900000, coverage: { valid: 3, total: 4 } },
+                    { key: 'unpaid_amount', label: '未回款金额总计', value: null, coverage: { valid: 0, total: 4 } },
+                ],
+            }],
+        },
     },
     project_progress: {
         url: '/objects/project?record=project-1&mode=detail', project_no: 'XYC-001', project_name: '智能物流中心',
@@ -94,6 +113,13 @@ describe('Company operations cockpit', () => {
         />);
 
         expect(screen.getByRole('heading', { name: '公司经营驾驶舱' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: '公司与业务员金额汇总' })).toBeInTheDocument();
+        expect(screen.getByLabelText('公司项目金额总计')).toHaveTextContent('4,200,000.00 元');
+        expect(screen.getAllByRole('cell', { name: '业务员甲' })).toHaveLength(2);
+        expect(screen.getByRole('cell', { name: /4 个/ })).toBeInTheDocument();
+        expect(screen.getByText(/1 条未分配或账号无效/)).toHaveTextContent('每 15 秒自动刷新');
+        expect(screen.getByRole('link', { name: /查看项目主表/ })).toHaveAttribute('href', '/objects/project');
+        expect(screen.getAllByText('—')).not.toHaveLength(0);
         expect(screen.getAllByText('420.0')).not.toHaveLength(0);
         expect(screen.getByText('69.0')).toBeInTheDocument();
         expect(screen.getByText('37.5')).toBeInTheDocument();
@@ -106,7 +132,7 @@ describe('Company operations cockpit', () => {
         expect(screen.getByText(/趋势覆盖 4\/6/)).toHaveTextContent('1 条吨位异常未计入');
         expect(screen.getAllByText('已拿到加工函')).toHaveLength(3);
         expect(screen.getByText('部分签署')).toBeInTheDocument();
-        expect(screen.getByText('业务员甲')).toBeInTheDocument();
+        expect(screen.getAllByText('业务员甲')).toHaveLength(2);
         expect(screen.getByText('回款提醒')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /进入项目表/ })).toHaveAttribute('href', '/objects/project');
         expect(screen.getByRole('link', { name: /查看明细/ })).toHaveAttribute('href', '/objects/project');
@@ -122,6 +148,7 @@ describe('Company operations cockpit', () => {
         expect(screen.queryByText('演示数据')).not.toBeInTheDocument();
         expect(screen.queryByText('进行中')).not.toBeInTheDocument();
         expect(screen.queryByText('预警')).not.toBeInTheDocument();
+        expect(usePollMock).toHaveBeenCalledWith(15000, { only: ['cockpit'] }, { mode: 'rest' });
     });
 
     it('shows a safe empty state without inventing zero KPIs', () => {

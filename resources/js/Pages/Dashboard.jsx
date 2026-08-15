@@ -1,9 +1,10 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePoll } from '@inertiajs/react';
 import { ArrowRight, Bell, Clock3, ShieldCheck } from 'lucide-react';
 import {
     CashFlowPanel,
     CockpitEmpty,
     CockpitKpis,
+    ProjectAmountPanel,
     ProductionDeliveryPanel,
     ProjectProgressPanel,
     ProjectStatusPanel,
@@ -12,6 +13,8 @@ import {
 import Layout from '../Components/Layout';
 
 export default function Dashboard({ cockpit = {}, recentProjects = [], notificationRisks = [] }) {
+    usePoll(15000, { only: ['cockpit'] }, { mode: 'rest' });
+
     const meta = cockpit.meta || {};
     const kpis = cockpit.kpis || [];
     const panels = cockpit.panels || {};
@@ -29,6 +32,7 @@ export default function Dashboard({ cockpit = {}, recentProjects = [], notificat
             </header>
 
             <CockpitKpis kpis={kpis} />
+            <ProjectAmountPanel panel={panels.project_amounts} />
             <RiskPanel risks={notificationRisks} />
 
             {hasCockpitData ? (

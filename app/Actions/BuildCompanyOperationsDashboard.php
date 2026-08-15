@@ -34,6 +34,12 @@ class BuildCompanyOperationsDashboard
 
     private const KPI_ORDER = ['occurred_amount', 'collection_rate', 'tender_win_rate', 'current_debt'];
 
+    private const PROJECT_AMOUNT_FIELDS = [
+        'occurred_amount' => '已发生金额总计',
+        'paid_amount' => '已回款金额总计',
+        'unpaid_amount' => '未回款金额总计',
+    ];
+
     public function __construct(
         private ProjectVisibility $projectVisibility,
         private ObjectRelations $relations,
@@ -57,10 +63,11 @@ class BuildCompanyOperationsDashboard
         $this->relations->preloadLabels($projects->take(8), $user);
 
         $projectProgresses = $this->projectProgresses($projects);
+        $asOf = now()->toISOString();
         $cockpit = [
             'meta' => [
                 'scope' => $this->isAdmin($user) ? '公司全量' : '我的可见范围',
-                'as_of' => now()->toISOString(),
+                'as_of' => $asOf,
             ],
             'kpis' => [],
             'panels' => [],
@@ -90,6 +97,7 @@ class BuildCompanyOperationsDashboard
 
         if ($records->get('project') instanceof Collection) {
             $cockpit['panels']['project_status'] = $this->projectStatusPanel($records->get('project'));
+            $cockpit['panels']['project_amounts'] = $this->projectAmountPanel($records->get('project'), $asOf);
         }
 
         $productionDelivery = $this->productionDeliveryPanel(
@@ -386,6 +394,86 @@ class BuildCompanyOperationsDashboard
     }
 
     /**
+     * @param  Collection<int, ObjectRecord>  $projects
+     * @return array<string, mixed>
+     */
+    private function projectAmountPanel(Collection $projects, string $asOf): array
+    {
+        $ownerIds = $projects
+            ->map(fn (ObjectRecord $project): ?int => $this->businessOwnerId($project))
+            ->filter()
+            ->unique()
+            ->values();
+        $ownerNames = User::query()
+            ->whereKey($ownerIds)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn (string $name, int|string $id): array => [(string) $id => $name]);
+        $projectsByOwner = $projects->groupBy(
+            fn (ObjectRecord $project): string => (string) ($this->businessOwnerId($project) ?? ''),
+        );
+
+        $salespeople = $ownerNames
+            ->map(function (string $name, string $ownerId) use ($projectsByOwner): array {
+                /** @var Collection<int, ObjectRecord> $ownedProjects */
+                $ownedProjects = $projectsByOwner->get($ownerId, collect());
+
+                return [
+                    'user_id' => (int) $ownerId,
+                    'name' => $name,
+                    'projects_count' => $ownedProjects->count(),
+                    'amounts' => $this->projectAmounts($ownedProjects),
+                ];
+            })
+            ->filter(fn (array $salesperson): bool => $salesperson['projects_count'] > 0)
+            ->sortBy([
+                ['name', 'asc'],
+                ['user_id', 'asc'],
+            ])
+            ->values()
+            ->all();
+        $assignedProjectCount = collect($salespeople)->sum('projects_count');
+
+        return [
+            'company' => $this->projectAmounts($projects),
+            'salespeople' => $salespeople,
+            'projects_count' => $projects->count(),
+            'unassigned_projects_count' => max($projects->count() - $assignedProjectCount, 0),
+            'as_of' => $asOf,
+            'url' => '/objects/project',
+        ];
+    }
+
+    /**
+     * @param  Collection<int, ObjectRecord>  $projects
+     * @return array<int, array{key: string, label: string, value: float|null, coverage: array{valid: int, total: int}}>
+     */
+    private function projectAmounts(Collection $projects): array
+    {
+        return collect(self::PROJECT_AMOUNT_FIELDS)
+            ->map(function (string $label, string $field) use ($projects): array {
+                $values = $projects
+                    ->map(fn (ObjectRecord $project): ?float => $this->finiteNumber($project->payload[$field] ?? null))
+                    ->filter(fn (?float $value): bool => $value !== null);
+
+                return [
+                    'key' => $field,
+                    'label' => $label,
+                    'value' => $values->isNotEmpty() ? $values->sum() : null,
+                    'coverage' => ['valid' => $values->count(), 'total' => $projects->count()],
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function businessOwnerId(ObjectRecord $project): ?int
+    {
+        $ownerId = filter_var($project->payload['business_owner_user_id'] ?? null, FILTER_VALIDATE_INT);
+
+        return $ownerId !== false && $ownerId > 0 ? $ownerId : null;
+    }
+
+    /**
      * @param  Collection<int, ObjectRecord>|null  $workOrders
      * @param  Collection<int, ObjectRecord>|null  $shipments
      * @return array<string, mixed>|null
@@ -523,13 +611,20 @@ class BuildCompanyOperationsDashboard
 
     private function nonNegativeNumber(mixed $value): ?float
     {
+        $number = $this->finiteNumber($value);
+
+        return $number !== null && $number >= 0 ? $number : null;
+    }
+
+    private function finiteNumber(mixed $value): ?float
+    {
         if (! is_numeric($value)) {
             return null;
         }
 
         $number = (float) $value;
 
-        return is_finite($number) && $number >= 0 ? $number : null;
+        return is_finite($number) ? $number : null;
     }
 
     private function date(mixed $value): ?CarbonImmutable

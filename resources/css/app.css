@@ -374,6 +374,18 @@ a.risk-row:hover { background: #fbfcfd; }
 .cockpit-kpi-context { display: flex; align-items: end; justify-content: space-between; gap: 8px; min-height: 30px; margin-top: 7px; color: var(--muted); font-size: 11px; }
 .cockpit-kpi-context span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.cockpit-project-amounts { display: grid; gap: 12px; margin-bottom: 12px; }
+.cockpit-project-amount-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.cockpit-project-amount-cards article { display: grid; gap: 6px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.cockpit-project-amount-cards span, .cockpit-project-amount-cards small { color: var(--muted); font-size: 11px; }
+.cockpit-project-amount-cards strong { overflow: hidden; color: var(--ink); font-size: 20px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.cockpit-salesperson-amounts { min-width: 760px; }
+.cockpit-salesperson-amounts td { vertical-align: middle; }
+.cockpit-salesperson-amounts td:not(:first-child) { font-variant-numeric: tabular-nums; }
+.cockpit-salesperson-amounts td strong { display: block; white-space: nowrap; }
+.cockpit-salesperson-amounts td small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+.cockpit-project-amount-empty { margin: 12px 0 0; }
+
 .cockpit-risk-panel { margin-bottom: 12px; }
 .cockpit-risk-empty { margin: 0; }
 .cockpit-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
@@ -1458,6 +1470,7 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
     .object-list-primary { flex-wrap: wrap; }
     .object-list-primary .object-search { flex: 1 0 100%; max-width: none; }
     .cockpit-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cockpit-project-amount-cards { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 980px) {
@@ -1465,6 +1478,7 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
     .rail { min-height: auto; }
     .kpi-grid, .board-grid, .role-grid, .form-grid, .detail-grid, .line-item-fields, .notification-risk-grid, .object-list-controls { grid-template-columns: 1fr; }
     .cockpit-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cockpit-project-amount-cards { grid-template-columns: 1fr; }
     .cockpit-chart-grid { grid-template-columns: 1fr; }
     .quick-choice-grid, .exception-choice .quick-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .shortage-fields > div { grid-template-columns: 1fr; }

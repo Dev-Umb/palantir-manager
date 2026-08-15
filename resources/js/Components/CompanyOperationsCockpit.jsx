@@ -48,6 +48,58 @@ export function CockpitKpis({ kpis = [] }) {
     );
 }
 
+export function ProjectAmountPanel({ panel }) {
+    if (!panel) return null;
+
+    return (
+        <section className="surface cockpit-project-amounts" aria-labelledby="project-amounts-title">
+            <PanelHeader
+                eyebrow="项目主档金额"
+                title="公司与业务员金额汇总"
+                id="project-amounts-title"
+                href={panel.url}
+                action="查看项目主表"
+            />
+            <div className="cockpit-project-amount-cards" aria-label="公司项目金额总计">
+                {panel.company.map((amount) => (
+                    <article key={amount.key}>
+                        <span>{amount.label}</span>
+                        <strong>{formatAmount(amount.value)}</strong>
+                        <small>{coverageText(amount.coverage)}</small>
+                    </article>
+                ))}
+            </div>
+            <div className="table-scroll">
+                <table className="data-table cockpit-salesperson-amounts">
+                    <thead>
+                        <tr><th>业务员</th><th>项目记录</th><th>已发生金额总计</th><th>已回款金额总计</th><th>未回款金额总计</th></tr>
+                    </thead>
+                    <tbody>
+                        {panel.salespeople.map((salesperson) => (
+                            <tr key={salesperson.user_id}>
+                                <td><strong>{salesperson.name}</strong></td>
+                                <td>{salesperson.projects_count} 个</td>
+                                {salesperson.amounts.map((amount) => (
+                                    <td key={amount.key}>
+                                        <strong>{formatAmount(amount.value)}</strong>
+                                        <small>{coverageText(amount.coverage)}</small>
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {!panel.salespeople.length && <p className="muted cockpit-project-amount-empty">暂无已分配给现有账号的项目记录。</p>}
+            </div>
+            <p className="cockpit-panel-foot">
+                共 {panel.projects_count} 条项目记录
+                {panel.unassigned_projects_count > 0 && ` · ${panel.unassigned_projects_count} 条未分配或账号无效，仅计入公司总计`}
+                {' · '}金额空值不参与合计 · 每 15 秒自动刷新 · 更新于 {formatPanelAsOf(panel.as_of)}
+            </p>
+        </section>
+    );
+}
+
 export function CashFlowPanel({ panel }) {
     if (!panel) return null;
 
@@ -285,6 +337,26 @@ function formatWan(value) {
     if (value === null || !Number.isFinite(Number(value))) return '—';
 
     return (Number(value) / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
+function formatAmount(value) {
+    if (value === null || !Number.isFinite(Number(value))) return '—';
+
+    return `${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 元`;
+}
+
+function formatPanelAsOf(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+
+    return new Intl.DateTimeFormat('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).format(date).replaceAll('/', '-');
 }
 
 function formatTon(value) {

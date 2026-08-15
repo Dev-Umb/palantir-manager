@@ -133,11 +133,17 @@ class CompanyOperationsCockpitTest extends TestCase
             'name' => '我的项目',
             'business_owner_user_id' => (string) $owner->id,
             'overall_status' => '已中标',
+            'occurred_amount' => 100000,
+            'paid_amount' => 20000,
+            'unpaid_amount' => 80000,
         ], $owner);
         $this->record('project', [
             'name' => '他人项目',
             'business_owner_user_id' => (string) $other->id,
             'overall_status' => '合同签署',
+            'occurred_amount' => 900000,
+            'paid_amount' => 900000,
+            'unpaid_amount' => 0,
         ], $other);
         $this->record('receivable', [
             'occurred_amount' => 5000000,
@@ -152,11 +158,61 @@ class CompanyOperationsCockpitTest extends TestCase
                 ->where('cockpit.panels.project_status.records_count', 1)
                 ->where('cockpit.panels.project_status.active_total', 1)
                 ->where('cockpit.panels.project_status.statuses.1.count', 1)
+                ->where('cockpit.panels.project_amounts.company.0.value', fn (mixed $value): bool => (float) $value === 100000.0)
+                ->has('cockpit.panels.project_amounts.salespeople', 1)
+                ->where('cockpit.panels.project_amounts.salespeople.0.user_id', $owner->id)
+                ->where('cockpit.panels.project_amounts.salespeople.0.amounts.1.value', fn (mixed $value): bool => (float) $value === 20000.0)
                 ->has('cockpit.project_progresses', 1)
                 ->where('cockpit.kpis', fn (Collection $kpis): bool => $kpis
                     ->pluck('key')
                     ->intersect(['occurred_amount', 'collection_rate', 'current_debt'])
                     ->isEmpty()));
+    }
+
+    public function test_project_master_amounts_are_totaled_by_company_and_existing_salesperson_without_deduplication(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $firstSalesperson = $this->userWithRole('business');
+        $secondSalesperson = $this->userWithRole('business');
+
+        foreach ([
+            ['business_owner_user_id' => (string) $firstSalesperson->id, 'occurred_amount' => 100, 'paid_amount' => 40, 'unpaid_amount' => 60],
+            ['business_owner_user_id' => (string) $firstSalesperson->id, 'occurred_amount' => 200, 'paid_amount' => null, 'unpaid_amount' => 150],
+            ['business_owner_user_id' => (string) $firstSalesperson->id, 'occurred_amount' => 0, 'paid_amount' => 0, 'unpaid_amount' => 0],
+            ['business_owner_user_id' => (string) $secondSalesperson->id, 'occurred_amount' => 300, 'paid_amount' => 200, 'unpaid_amount' => -10],
+            ['business_owner_user_id' => null, 'occurred_amount' => 400, 'paid_amount' => 300, 'unpaid_amount' => 100],
+            ['business_owner_user_id' => '999999', 'occurred_amount' => '无效金额', 'paid_amount' => -1, 'unpaid_amount' => null],
+        ] as $payload) {
+            $this->record('project', ['name' => '同名项目', 'customer_id' => '同一客户', ...$payload]);
+        }
+
+        $this->actingAs($admin)
+            ->get('/')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('cockpit.panels.project_amounts.projects_count', 6)
+                ->where('cockpit.panels.project_amounts.unassigned_projects_count', 2)
+                ->where('cockpit.panels.project_amounts.company.0.value', fn (mixed $value): bool => (float) $value === 1000.0)
+                ->where('cockpit.panels.project_amounts.company.0.coverage', ['valid' => 5, 'total' => 6])
+                ->where('cockpit.panels.project_amounts.company.1.value', fn (mixed $value): bool => (float) $value === 539.0)
+                ->where('cockpit.panels.project_amounts.company.1.coverage', ['valid' => 5, 'total' => 6])
+                ->where('cockpit.panels.project_amounts.company.2.value', fn (mixed $value): bool => (float) $value === 300.0)
+                ->where('cockpit.panels.project_amounts.company.2.coverage', ['valid' => 5, 'total' => 6])
+                ->has('cockpit.panels.project_amounts.salespeople', 2)
+                ->where('cockpit.panels.project_amounts.salespeople', function (Collection $salespeople) use ($firstSalesperson, $secondSalesperson): bool {
+                    $byUserId = $salespeople->keyBy('user_id');
+                    $first = $byUserId->get($firstSalesperson->id);
+                    $second = $byUserId->get($secondSalesperson->id);
+
+                    return $first['projects_count'] === 3
+                        && (float) $first['amounts'][0]['value'] === 300.0
+                        && (float) $first['amounts'][1]['value'] === 40.0
+                        && (float) $first['amounts'][2]['value'] === 210.0
+                        && $second['projects_count'] === 1
+                        && (float) $second['amounts'][0]['value'] === 300.0
+                        && (float) $second['amounts'][2]['value'] === -10.0;
+                })
+                ->where('cockpit.panels.project_amounts.as_of', fn (mixed $value): bool => is_string($value) && $value !== ''));
     }
 
     public function test_zero_finance_base_is_not_reported_as_zero_percent(): void
