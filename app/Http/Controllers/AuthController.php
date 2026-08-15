@@ -29,7 +29,7 @@ class AuthController extends Controller
         if (Auth::attempt($credentials, (bool) $request->boolean('remember'))) {
             $request->session()->regenerate();
 
-            return redirect()->intended(route('dashboard'));
+            return redirect()->intended($this->loginFallback($request->user()));
         }
 
         return back()->withErrors(['email' => '账号或密码不正确。'])->onlyInput('email');
@@ -69,5 +69,16 @@ class AuthController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    private function loginFallback(User $user): string
+    {
+        $roles = $user->roles()->pluck('name');
+        $isBusinessOnly = $roles->contains('business')
+            && $roles->intersect(['admin', 'finance', 'tender'])->isEmpty();
+
+        return $isBusinessOnly
+            ? route('objects.index', ['object' => 'project'])
+            : route('dashboard');
     }
 }
