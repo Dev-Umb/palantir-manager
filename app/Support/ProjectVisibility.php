@@ -262,10 +262,13 @@ class ProjectVisibility
             return $query->whereRaw('1 = 0');
         }
 
-        $visibleCustomers = $this->scopeCustomers(
-            $customerObject->records()->select('id'),
-            $user,
-        );
+        $visibleCustomersQuery = $customerObject->records();
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $visibleCustomersQuery->selectRaw('id::text');
+        } else {
+            $visibleCustomersQuery->select('id');
+        }
+        $visibleCustomers = $this->scopeCustomers($visibleCustomersQuery, $user);
 
         return $query->whereIn('payload->customer_id', $visibleCustomers);
     }
