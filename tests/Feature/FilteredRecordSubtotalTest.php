@@ -147,6 +147,23 @@ class FilteredRecordSubtotalTest extends TestCase
                 ->where('subtotal', null));
     }
 
+    public function test_per_page_is_clamped_between_ten_and_one_hundred_with_fifty_as_the_invalid_default(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        foreach ([
+            '1' => 10,
+            '37' => 37,
+            '101' => 100,
+            'invalid' => 50,
+        ] as $requested => $expected) {
+            $this->actingAs($admin)
+                ->get('/objects/project?'.http_build_query(['per_page' => $requested]))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page->where('records.per_page', $expected));
+        }
+    }
+
     private function record(string $objectKey, array $payload, ?User $creator = null): ObjectRecord
     {
         $this->recordSequence++;

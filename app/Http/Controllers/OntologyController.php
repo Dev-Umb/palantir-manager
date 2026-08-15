@@ -712,7 +712,7 @@ class OntologyController extends Controller
             return 50;
         }
 
-        return max(1, min(100, (int) $requested));
+        return max(10, min(100, (int) $requested));
     }
 
     private function safeCsvCell(mixed $value): string

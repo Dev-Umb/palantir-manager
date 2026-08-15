@@ -117,7 +117,7 @@ export function CashFlowPanel({ panel }) {
                         <span className="cockpit-bar-track" aria-hidden="true">
                             <span className={`cockpit-bar-fill ${item.key}`} style={{ width: `${barWidth(item.value, maximum)}%` }} />
                         </span>
-                        <strong>{formatWan(item.value)}</strong>
+                        <strong>{formatAmount(item.value)}</strong>
                     </div>
                 ))}
             </div>
@@ -336,13 +336,13 @@ function formatKpi(kpi) {
 function formatWan(value) {
     if (value === null || !Number.isFinite(Number(value))) return '—';
 
-    return (Number(value) / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    return (Number(value) / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatAmount(value) {
     if (value === null || !Number.isFinite(Number(value))) return '—';
 
-    return `${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 元`;
+    return `${formatWan(value)} 万元`;
 }
 
 function formatPanelAsOf(value) {

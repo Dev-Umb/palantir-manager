@@ -114,17 +114,19 @@ describe('Company operations cockpit', () => {
 
         expect(screen.getByRole('heading', { name: '公司经营驾驶舱' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: '公司与业务员金额汇总' })).toBeInTheDocument();
-        expect(screen.getByLabelText('公司项目金额总计')).toHaveTextContent('4,200,000.00 元');
+        expect(screen.getByLabelText('公司项目金额总计')).toHaveTextContent('420.00 万元');
         expect(screen.getAllByRole('cell', { name: '业务员甲' })).toHaveLength(2);
         expect(screen.getByRole('cell', { name: /4 个/ })).toBeInTheDocument();
         expect(screen.getByText(/1 条未分配或账号无效/)).toHaveTextContent('每 15 秒自动刷新');
         expect(screen.getByRole('link', { name: /查看项目主表/ })).toHaveAttribute('href', '/objects/project');
         expect(screen.getAllByText('—')).not.toHaveLength(0);
-        expect(screen.getAllByText('420.0')).not.toHaveLength(0);
+        expect(screen.getAllByText('420.00')).not.toHaveLength(0);
         expect(screen.getAllByText('已发生金额总计')).not.toHaveLength(0);
         expect(screen.getByText('69.0')).toBeInTheDocument();
         expect(screen.getByText('37.5')).toBeInTheDocument();
-        expect(screen.getByText('130.0')).toBeInTheDocument();
+        expect(screen.getByText('130.00')).toBeInTheDocument();
+        expect(screen.getByText('500.00 万元')).toBeInTheDocument();
+        expect(screen.getByText(/预算金额 800.00 万元/)).toBeInTheDocument();
         expect(screen.getByText('3 个项目待跟进')).toBeInTheDocument();
         expect(screen.getByText('合同金额')).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: '当前招投标管线' })).toBeInTheDocument();
@@ -158,7 +160,7 @@ describe('Company operations cockpit', () => {
 
         expect(screen.getByText('暂无可展示的经营数据')).toBeInTheDocument();
         expect(screen.queryByText('0.0%')).not.toBeInTheDocument();
-        expect(screen.queryByText('0.0万元')).not.toBeInTheDocument();
+        expect(screen.queryByText('0.00万元')).not.toBeInTheDocument();
     });
 
     it('renders an em dash for unavailable KPI values', () => {

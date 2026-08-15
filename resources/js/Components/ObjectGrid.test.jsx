@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import ObjectGrid, { columnBounds, fieldEditableForRecord, MIN_DATA_COLUMN_WIDTH } from './ObjectGrid';
+import ObjectGrid, { columnBounds, fieldEditableForRecord, formatSubtotalValue, MIN_DATA_COLUMN_WIDTH, subtotalColumnWidth } from './ObjectGrid';
 
 describe('ObjectGrid column resizing', () => {
     it('allows every ordinary data column type to shrink to about three Chinese characters', () => {
@@ -47,7 +47,7 @@ describe('ObjectGrid filtered subtotal', () => {
                     payload: { name: '真实最后项目', occurred_amount: 200 },
                     display: {},
                 }]}
-                subtotal={{ label: '小计', values: { occurred_amount: 1234.5 } }}
+                subtotal={{ label: '小计', values: { occurred_amount: 1319435985.269999 } }}
                 fields={[
                     { key: 'name', label: '项目名称', type: 'text' },
                     { key: 'occurred_amount', label: '已发生金额', type: 'number' },
@@ -64,11 +64,20 @@ describe('ObjectGrid filtered subtotal', () => {
         const subtotalGridRow = subtotalLabel.closest('[role="row"]');
 
         expect(subtotalGridRow).not.toBeNull();
-        expect(within(subtotalGridRow).getByText('1,234.5')).not.toBeNull();
+        expect(within(subtotalGridRow).getByText('1,319,435,985.27')).not.toBeNull();
         expect(within(subtotalGridRow).queryByRole('button')).toBeNull();
         expect(within(subtotalGridRow).queryByRole('link')).toBeNull();
-        fireEvent.doubleClick(within(subtotalGridRow).getByRole('gridcell', { name: '1,234.5' }));
+        fireEvent.doubleClick(within(subtotalGridRow).getByRole('gridcell', { name: '1,319,435,985.27' }));
         expect(document.querySelector('.grid-inline-editor')).toBeNull();
+    });
+
+    it('formats finite subtotals to two decimals and reserves room for billion-scale totals', () => {
+        const field = { key: 'occurred_amount', type: 'number' };
+
+        expect(formatSubtotalValue(1319435985.269999)).toBe('1,319,435,985.27');
+        expect(formatSubtotalValue('not-a-number')).toBeNull();
+        expect(subtotalColumnWidth(field, 1319435985.269999)).toBeGreaterThan(160);
+        expect(subtotalColumnWidth({ key: 'name', type: 'text' }, 1319435985.269999)).toBe(0);
     });
 
     it('does not invent a subtotal row when the server omits it', async () => {

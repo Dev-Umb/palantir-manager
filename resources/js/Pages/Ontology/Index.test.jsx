@@ -191,6 +191,23 @@ describe('Ontology multi-condition filters', () => {
         expect(within(dialog).getByRole('button', { name: /添加条件/ })).toBeInTheDocument();
         expect(within(dialog).getByRole('button', { name: '应用筛选' })).toBeInTheDocument();
     });
+
+    it('offers page sizes from 10 to 100 in increments of 10', () => {
+        window.history.replaceState({}, '', '/objects/project?per_page=30');
+        render(<Index
+            objects={[{ id: 3, key: 'project', label: '业务项目', group: '业务与合同' }]}
+            currentObject={{ id: 3, key: 'project', label: '业务项目', group: '业务与合同', fields: [] }}
+            records={{ data: [], per_page: 30 }}
+            can={{ create: false, update: false, delete: false }}
+            relationOptions={{}}
+        />);
+
+        const selector = screen.getByRole('combobox', { name: '每页条数' });
+
+        expect(selector).toHaveValue('30');
+        expect(within(selector).getAllByRole('option').map((option) => option.value))
+            .toEqual(['10', '20', '30', '40', '50', '60', '70', '80', '90', '100']);
+    });
 });
 
 describe('Ontology personal field order', () => {

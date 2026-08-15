@@ -75,53 +75,58 @@ export default function ObjectGrid({
         }
     }, [object.label]);
     const columnDefs = useMemo(() => {
-        const dataColumns = fields.map((field) => ({
-            field: field.key,
-            headerName: field.label,
-            width: savedColumnWidths[field.key] ?? columnWidth(field, object.key, rowData, relationOptions),
-            minWidth: columnBounds(field).min,
-            maxWidth: columnBounds(field).max,
-            wrapHeaderText: true,
-            autoHeaderHeight: true,
-            sortable: false,
-            filter: false,
-            cellClass: numericField(field) ? 'numeric-cell' : undefined,
-            spanRows: isItemField(field) ? false : sameRecordSpan,
-            editable: (params) => !params.data?.__subtotal
-                && can.update
-                && params.data?.__record?.can_update !== false
-                && !field.readonly
-                && fieldEditableForRecord(field, params.data?.__record)
-                && !(object.key === 'customer' && field.key === 'cooperation_history')
-                && !['readonly', 'lookup', 'derived', 'file', 'files'].includes(field.type),
-            cellEditor: GridEditor,
-            cellEditorParams: (params) => ({
-                fieldConfig: field,
-                relationOptions: scopedRelationOptions(
-                    relationOptions,
-                    params.data?.__record?.payload,
-                    params.data?.__record?.display,
-                    params.data?.__record?.id,
-                ),
-            }),
-            cellEditorPopup: ['relation', 'select', 'account'].includes(field.type),
-            cellEditorPopupPosition: 'under',
-            valueGetter: (params) => rawRowValue(field, params.data),
-            valueSetter: (params) => {
-                if (field.system || field.readonly) return false;
-                params.data[field.key] = params.newValue;
-                return true;
-            },
-            cellRenderer: (params) => {
-                if (params.data?.__subtotal) {
-                    return <SubtotalCell field={field} value={params.value} showLabel={field.key === subtotalLabelField} />;
-                }
+        const dataColumns = fields.map((field) => {
+            const bounds = columnBounds(field);
+            const subtotalWidth = subtotalColumnWidth(field, subtotal?.values?.[field.key], field.key === subtotalLabelField);
 
-                return object.key === 'customer' && field.key === 'cooperation_history'
-                    ? <CooperationHistoryCell projects={params.data?.__record?.cooperation_projects || []} />
-                    : renderValue(object, field, params.data?.__record, params.value, relationOptions, params.data);
-            },
-        }));
+            return {
+                field: field.key,
+                headerName: field.label,
+                width: Math.max(savedColumnWidths[field.key] ?? columnWidth(field, object.key, rowData, relationOptions), subtotalWidth),
+                minWidth: Math.max(bounds.min, subtotalWidth),
+                maxWidth: Math.max(bounds.max, subtotalWidth),
+                wrapHeaderText: true,
+                autoHeaderHeight: true,
+                sortable: false,
+                filter: false,
+                cellClass: numericField(field) ? 'numeric-cell' : undefined,
+                spanRows: isItemField(field) ? false : sameRecordSpan,
+                editable: (params) => !params.data?.__subtotal
+                    && can.update
+                    && params.data?.__record?.can_update !== false
+                    && !field.readonly
+                    && fieldEditableForRecord(field, params.data?.__record)
+                    && !(object.key === 'customer' && field.key === 'cooperation_history')
+                    && !['readonly', 'lookup', 'derived', 'file', 'files'].includes(field.type),
+                cellEditor: GridEditor,
+                cellEditorParams: (params) => ({
+                    fieldConfig: field,
+                    relationOptions: scopedRelationOptions(
+                        relationOptions,
+                        params.data?.__record?.payload,
+                        params.data?.__record?.display,
+                        params.data?.__record?.id,
+                    ),
+                }),
+                cellEditorPopup: ['relation', 'select', 'account'].includes(field.type),
+                cellEditorPopupPosition: 'under',
+                valueGetter: (params) => rawRowValue(field, params.data),
+                valueSetter: (params) => {
+                    if (field.system || field.readonly) return false;
+                    params.data[field.key] = params.newValue;
+                    return true;
+                },
+                cellRenderer: (params) => {
+                    if (params.data?.__subtotal) {
+                        return <SubtotalCell field={field} value={params.value} showLabel={field.key === subtotalLabelField} />;
+                    }
+
+                    return object.key === 'customer' && field.key === 'cooperation_history'
+                        ? <CooperationHistoryCell projects={params.data?.__record?.cooperation_projects || []} />
+                        : renderValue(object, field, params.data?.__record, params.value, relationOptions, params.data);
+                },
+            };
+        });
 
         if (object.key === 'customer') {
             const nameIndex = fields.findIndex((field) => field.key === 'name');
@@ -167,7 +172,7 @@ export default function ObjectGrid({
                 ? <GridActions object={object} record={params.data.__record} can={can} onDelete={destroyRecord} />
                 : null,
         }];
-    }, [can, canCreateContact, destroyRecord, fields, object, onContactCreate, onContactOpen, relationOptions, rowData, savedColumnWidths, subtotalLabelField]);
+    }, [can, canCreateContact, destroyRecord, fields, object, onContactCreate, onContactOpen, relationOptions, rowData, savedColumnWidths, subtotal, subtotalLabelField]);
 
     const saveColumnOrder = useCallback((event) => {
         if (event.finished === false) return;
@@ -281,7 +286,7 @@ export default function ObjectGrid({
                         noRowsOverlayComponent={GridEmptyState}
                         noRowsOverlayComponentParams={{ objectLabel: businessText(object.label), canCreate: can.create }}
                         getRowId={({ data }) => data.id}
-                        getRowHeight={() => 44}
+                        getRowHeight={({ data }) => data?.__subtotal ? 56 : 44}
                         enableCellSpan
                         maintainColumnOrder
                         alwaysShowHorizontalScroll
@@ -320,9 +325,7 @@ function subtotalRow(subtotal) {
 }
 
 function SubtotalCell({ field, value, showLabel }) {
-    const total = field.type === 'number' && Number.isFinite(Number(value))
-        ? Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 10 })
-        : null;
+    const total = field.type === 'number' ? formatSubtotalValue(value) : null;
 
     if (showLabel && total !== null) {
         return <span className="subtotal-cell"><b>小计</b><span>{total}</span></span>;
@@ -332,6 +335,24 @@ function SubtotalCell({ field, value, showLabel }) {
     }
 
     return total === null ? null : <strong className="subtotal-value">{total}</strong>;
+}
+
+export function formatSubtotalValue(value) {
+    if (!Number.isFinite(Number(value))) return null;
+
+    return Number(value).toLocaleString('zh-CN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+}
+
+export function subtotalColumnWidth(field, value, showLabel = false) {
+    if (field.type !== 'number') return 0;
+
+    const formatted = formatSubtotalValue(value);
+    if (formatted === null) return 0;
+
+    return Math.min(280, textWidth(formatted) + 60 + (showLabel ? 44 : 0));
 }
 
 function GridHeader({ displayName }) {

@@ -17,6 +17,7 @@ import { scopedRelationOptions } from '../../Components/objectGridRows';
 import { businessText } from '../../businessLanguage';
 
 const ObjectGrid = lazy(() => import('../../Components/ObjectGrid'));
+export const PAGE_SIZE_OPTIONS = Array.from({ length: 10 }, (_, index) => (index + 1) * 10);
 
 export default function Index({ objects = [], currentObject, records, subtotal = null, can, relationOptions, selectedRecordId, selectedRecord: selectedRecordProp = null, businessUsers = [] }) {
     const { auth } = usePage().props;
@@ -318,9 +319,9 @@ function ObjectListControls({ objectKey, params, records, fields = [], relationO
                 <label>
                     <span className="sr-only">每页</span>
                     <select name="per_page" aria-label="每页条数" defaultValue={String(records.per_page || 50)}>
-                        <option value="25">25 条</option>
-                        <option value="50">50 条</option>
-                        <option value="100">100 条</option>
+                        {PAGE_SIZE_OPTIONS.map((pageSize) => (
+                            <option value={pageSize} key={pageSize}>{pageSize} 条</option>
+                        ))}
                     </select>
                 </label>
                 <label>

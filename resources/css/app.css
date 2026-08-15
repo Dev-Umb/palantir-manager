@@ -486,8 +486,10 @@ a.risk-row:hover { background: #fbfcfd; }
 .object-grid .ag-header-cell-resize:focus-within { opacity: 1; }
 .object-grid.has-zebra .ag-row-even:not(.ag-row-hover):not(.selected-row-grid) .ag-cell { background: #fbfcfe; }
 .object-grid .numeric-cell { justify-content: flex-end; font-variant-numeric: tabular-nums; text-align: right; }
-.object-grid .subtotal-row-grid .ag-cell { border-top: 2px solid #91a9ba; background: #eef4f8; color: var(--ink); font-weight: 700; }
+.object-grid .subtotal-row-grid .ag-cell { border-top: 2px solid #91a9ba; padding-block: 8px; background: #eef4f8; color: var(--ink); font-weight: 700; }
 .object-grid .subtotal-row-grid.ag-row-hover .ag-cell { background: #e7f0f6; }
+.object-grid .subtotal-row-grid .ag-cell-wrapper,
+.object-grid .subtotal-row-grid .ag-cell-value { height: 100%; align-items: center; }
 .object-grid .subtotal-cell { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .object-grid .subtotal-label { color: var(--steel); white-space: nowrap; }
 .object-grid .subtotal-value { font-variant-numeric: tabular-nums; white-space: nowrap; }
