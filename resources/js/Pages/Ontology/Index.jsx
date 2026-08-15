@@ -329,7 +329,7 @@ function ObjectListControls({ objectKey, params, records, fields = [], relationO
                 <label>
                     <span className="sr-only">排序</span>
                     <select name="sort" aria-label="排序字段" defaultValue={params.get('sort') || ''}>
-                        <option value="">默认（最近更新）</option>
+                        <option value="">{objectKey === 'project' ? '默认（项目名称）' : '默认（最近更新）'}</option>
                         {sortable.map((field) => <option value={field.key} key={field.key}>{field.label}</option>)}
                     </select>
                 </label>

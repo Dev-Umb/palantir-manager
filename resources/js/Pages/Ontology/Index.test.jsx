@@ -178,6 +178,7 @@ describe('Ontology multi-condition filters', () => {
         const primaryRow = container.querySelector('.object-list-primary');
         expect(primaryRow).toContainElement(screen.getByRole('searchbox', { name: '搜索记录' }));
         expect(primaryRow).toContainElement(screen.getByRole('combobox', { name: '排序字段' }));
+        expect(within(screen.getByRole('combobox', { name: '排序字段' })).getByRole('option', { name: '默认（项目名称）' })).toBeInTheDocument();
         expect(primaryRow).toContainElement(screen.getByRole('button', { name: /应用/ }));
         expect(primaryRow).toContainElement(screen.getByRole('button', { name: '筛选' }));
         expect(primaryRow).toContainElement(screen.getByRole('link', { name: /导出/ }));
@@ -190,6 +191,22 @@ describe('Ontology multi-condition filters', () => {
         expect(dialog).toBeInTheDocument();
         expect(within(dialog).getByRole('button', { name: /添加条件/ })).toBeInTheDocument();
         expect(within(dialog).getByRole('button', { name: '应用筛选' })).toBeInTheDocument();
+    });
+
+    it('keeps the existing default sorting label for non-project objects', () => {
+        window.history.replaceState({}, '', '/objects/contract');
+        render(<Index
+            objects={[{ id: 4, key: 'contract', label: '合同表', group: '业务与合同' }]}
+            currentObject={{ id: 4, key: 'contract', label: '合同表', group: '业务与合同', fields: [] }}
+            records={{ data: [], per_page: 50 }}
+            can={{ create: false, update: false, delete: false }}
+            relationOptions={{}}
+        />);
+
+        const selector = screen.getByRole('combobox', { name: '排序字段' });
+
+        expect(within(selector).getByRole('option', { name: '默认（最近更新）' })).toBeInTheDocument();
+        expect(within(selector).queryByRole('option', { name: '默认（项目名称）' })).not.toBeInTheDocument();
     });
 
     it('offers page sizes from 10 to 100 in increments of 10', () => {

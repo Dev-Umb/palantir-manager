@@ -675,6 +675,8 @@ class OntologyController extends Controller
     {
         $sort = $request->query('sort');
         if (! is_string($sort) || $sort === '') {
+            $this->applyDefaultProjectSort($query, $object);
+
             return;
         }
 
@@ -683,14 +685,20 @@ class OntologyController extends Controller
             && ! in_array($candidate['type'] ?? null, ['relation', 'multirelation', 'multiaccount', 'creatable_relation', 'file'], true)
         );
         if (! $field) {
+            $this->applyDefaultProjectSort($query, $object);
+
             return;
         }
 
         $direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $isProjectTitleField = $object->key === 'project' && ($field['key'] ?? null) === $object->title_field;
         $query->reorder();
+        if ($object->key === 'project' && ! $isProjectTitleField) {
+            $query->orderBy('title');
+        }
         if (($field['system'] ?? null) === 'code') {
             $query->orderBy('code', $direction);
-        } elseif (($field['system'] ?? null) === 'title') {
+        } elseif (($field['system'] ?? null) === 'title' || $isProjectTitleField) {
             $query->orderBy('title', $direction);
         } elseif (in_array($field['type'] ?? null, ['number', 'range'], true)) {
             $driver = DB::connection()->getDriverName();
@@ -703,6 +711,17 @@ class OntologyController extends Controller
             $query->orderBy("payload->{$field['key']}", $direction);
         }
         $query->orderBy('id', $direction);
+    }
+
+    private function applyDefaultProjectSort(Builder|Relation $query, BusinessObject $object): void
+    {
+        if ($object->key !== 'project') {
+            return;
+        }
+
+        $query->reorder()
+            ->orderBy('title')
+            ->orderBy('id');
     }
 
     private function perPage(Request $request): int
