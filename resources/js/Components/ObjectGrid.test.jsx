@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ObjectGrid, { columnBounds, fieldEditableForRecord, MIN_DATA_COLUMN_WIDTH } from './ObjectGrid';
 
@@ -19,6 +19,73 @@ describe('ObjectGrid column resizing', () => {
         expect(MIN_DATA_COLUMN_WIDTH).toBe(72);
         expect(fields.map((field) => columnBounds(field).min))
             .toEqual(fields.map(() => MIN_DATA_COLUMN_WIDTH));
+    });
+});
+
+describe('ObjectGrid filtered subtotal', () => {
+    beforeEach(() => {
+        globalThis.ResizeObserver = class {
+            observe() {}
+            unobserve() {}
+            disconnect() {}
+        };
+    });
+
+    afterEach(() => {
+        cleanup();
+        vi.restoreAllMocks();
+    });
+
+    it('appends a read-only subtotal after the real last record', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'project', label: '业务项目' }}
+                records={[{
+                    id: 'project-last',
+                    code: 'XYC-LAST',
+                    title: '真实最后项目',
+                    payload: { name: '真实最后项目', occurred_amount: 200 },
+                    display: {},
+                }]}
+                subtotal={{ label: '小计', values: { occurred_amount: 1234.5 } }}
+                fields={[
+                    { key: 'name', label: '项目名称', type: 'text' },
+                    { key: 'occurred_amount', label: '已发生金额', type: 'number' },
+                ]}
+                can={{ update: true, delete: true }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        expect(await screen.findByText('真实最后项目')).not.toBeNull();
+        const subtotalLabel = await screen.findByText('小计');
+        const subtotalGridRow = subtotalLabel.closest('[role="row"]');
+
+        expect(subtotalGridRow).not.toBeNull();
+        expect(within(subtotalGridRow).getByText('1,234.5')).not.toBeNull();
+        expect(within(subtotalGridRow).queryByRole('button')).toBeNull();
+        expect(within(subtotalGridRow).queryByRole('link')).toBeNull();
+        fireEvent.doubleClick(within(subtotalGridRow).getByRole('gridcell', { name: '1,234.5' }));
+        expect(document.querySelector('.grid-inline-editor')).toBeNull();
+    });
+
+    it('does not invent a subtotal row when the server omits it', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'customer', label: '客户信息' }}
+                records={[]}
+                fields={[{ key: 'name', label: '客户名称', type: 'text' }]}
+                can={{ update: true, delete: true, create: true }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        expect(await screen.findByText('暂无客户信息记录')).not.toBeNull();
+        expect(screen.queryByText('小计')).toBeNull();
     });
 });
 

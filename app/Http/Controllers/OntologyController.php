@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\AcknowledgeWorkflowTask;
+use App\Actions\BuildFilteredRecordSubtotal;
 use App\Actions\CreateObjectRecord;
 use App\Actions\ReassignTenderBusinessOwner;
 use App\Actions\ResolveInboundMaterials;
@@ -44,6 +45,7 @@ class OntologyController extends Controller
         private AcknowledgeWorkflowTask $workflowTasks,
         private BusinessWorkspace $workspace,
         private ReassignTenderBusinessOwner $tenderBusinessOwner,
+        private BuildFilteredRecordSubtotal $filteredRecordSubtotal,
     ) {}
 
     public function index(Request $request, ?string $object = null): Response|RedirectResponse
@@ -62,6 +64,7 @@ class OntologyController extends Controller
             : $visible->first();
 
         abort_unless($current, 403);
+        $currentFields = $this->workspace->fieldsForUser($current, $request->user());
 
         $recordsQuery = $this->authorizedRecordsQuery($current, $request)
             ->with('businessObject')
@@ -78,9 +81,13 @@ class OntologyController extends Controller
         $this->applySearch($recordsQuery, $current, $this->searchQuery($request));
         $this->applyFilters($recordsQuery, $current, $request);
         $this->applySort($recordsQuery, $current, $request);
+        $subtotalQuery = clone $recordsQuery;
         $records = $recordsQuery
             ->paginate($this->perPage($request))
             ->withQueryString();
+        $subtotal = $records->onLastPage() && $records->total() > 0
+            ? $this->filteredRecordSubtotal->handle($subtotalQuery, $currentFields)
+            : null;
         $recordsForLabels = $records->getCollection();
         if ($selected && ! $recordsForLabels->contains('id', $selected->id)) {
             $recordsForLabels = $recordsForLabels->concat([$selected]);
@@ -108,7 +115,7 @@ class OntologyController extends Controller
             ];
         }
         $currentForUser = $current->toArray();
-        $currentForUser['fields'] = $this->workspace->fieldsForUser($current, $request->user());
+        $currentForUser['fields'] = $currentFields;
 
         return Inertia::render('Ontology/Index', [
             'objects' => $visible->map(function (BusinessObject $object) use ($request): array {
@@ -119,6 +126,7 @@ class OntologyController extends Controller
             }),
             'currentObject' => $currentForUser,
             'records' => $records->through(fn (ObjectRecord $record) => $this->relations->formatRecord($record, $request->user())),
+            'subtotal' => $subtotal,
             'relationOptions' => $relationOptions,
             'selectedRecordId' => $selected?->id,
             'selectedRecord' => $selected ? $this->relations->formatRecord($selected, $request->user()) : null,

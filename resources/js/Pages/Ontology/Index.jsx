@@ -18,7 +18,7 @@ import { businessText } from '../../businessLanguage';
 
 const ObjectGrid = lazy(() => import('../../Components/ObjectGrid'));
 
-export default function Index({ objects = [], currentObject, records, can, relationOptions, selectedRecordId, selectedRecord: selectedRecordProp = null, businessUsers = [] }) {
+export default function Index({ objects = [], currentObject, records, subtotal = null, can, relationOptions, selectedRecordId, selectedRecord: selectedRecordProp = null, businessUsers = [] }) {
     const { auth } = usePage().props;
     const params = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
     const mode = params.get('mode');
@@ -149,6 +149,7 @@ export default function Index({ objects = [], currentObject, records, can, relat
                                 key={storageKey}
                                 object={currentObject}
                                 records={tableRecords}
+                                subtotal={subtotal}
                                 fields={orderedFields}
                                 can={can}
                                 selectedRecordId={selectedRecordId}

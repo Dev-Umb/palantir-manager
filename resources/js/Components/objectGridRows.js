@@ -58,6 +58,7 @@ export function flatExportRows(records, fields) {
 
 export function rawRowValue(field, row) {
     if (!row) return '';
+    if (row.__subtotal) return row.__subtotalValues?.[field.key] ?? '';
     if (field.system === 'code') return row._code;
     if (field.system === 'title') return row._title;
 

@@ -21,6 +21,7 @@ export const MIN_DATA_COLUMN_WIDTH = 72;
 export default function ObjectGrid({
     object,
     records,
+    subtotal = null,
     fields,
     can,
     selectedRecordId,
@@ -39,7 +40,12 @@ export default function ObjectGrid({
         message: can.update ? '双击有编辑权限的单元格可修改，修改后会自动保存' : '当前为只读视图',
     });
     const [feedback, setFeedback] = useState(null);
-    const rowData = useMemo(() => expandObjectRecords(records, fields), [fields, records]);
+    const subtotalLabelField = useMemo(() => fields[0]?.key || null, [fields]);
+    const rowData = useMemo(() => {
+        const dataRows = expandObjectRecords(records, fields);
+
+        return subtotal ? [...dataRows, subtotalRow(subtotal)] : dataRows;
+    }, [fields, records, subtotal]);
     const fieldKeys = useMemo(() => fields.map((field) => field.key), [fields]);
     const destroyRecord = useCallback(async (record) => {
         try {
@@ -81,7 +87,8 @@ export default function ObjectGrid({
             filter: false,
             cellClass: numericField(field) ? 'numeric-cell' : undefined,
             spanRows: isItemField(field) ? false : sameRecordSpan,
-            editable: (params) => can.update
+            editable: (params) => !params.data?.__subtotal
+                && can.update
                 && params.data?.__record?.can_update !== false
                 && !field.readonly
                 && fieldEditableForRecord(field, params.data?.__record)
@@ -105,9 +112,15 @@ export default function ObjectGrid({
                 params.data[field.key] = params.newValue;
                 return true;
             },
-            cellRenderer: (params) => object.key === 'customer' && field.key === 'cooperation_history'
-                ? <CooperationHistoryCell projects={params.data?.__record?.cooperation_projects || []} />
-                : renderValue(object, field, params.data?.__record, params.value, relationOptions, params.data),
+            cellRenderer: (params) => {
+                if (params.data?.__subtotal) {
+                    return <SubtotalCell field={field} value={params.value} showLabel={field.key === subtotalLabelField} />;
+                }
+
+                return object.key === 'customer' && field.key === 'cooperation_history'
+                    ? <CooperationHistoryCell projects={params.data?.__record?.cooperation_projects || []} />
+                    : renderValue(object, field, params.data?.__record, params.value, relationOptions, params.data);
+            },
         }));
 
         if (object.key === 'customer') {
@@ -154,7 +167,7 @@ export default function ObjectGrid({
                 ? <GridActions object={object} record={params.data.__record} can={can} onDelete={destroyRecord} />
                 : null,
         }];
-    }, [can, canCreateContact, destroyRecord, fields, object, onContactCreate, onContactOpen, relationOptions, rowData, savedColumnWidths]);
+    }, [can, canCreateContact, destroyRecord, fields, object, onContactCreate, onContactOpen, relationOptions, rowData, savedColumnWidths, subtotalLabelField]);
 
     const saveColumnOrder = useCallback((event) => {
         if (event.finished === false) return;
@@ -280,7 +293,10 @@ export default function ObjectGrid({
                         onColumnResized={saveColumnWidths}
                         onBodyScroll={(event) => updateVisibleFieldCount(event.api)}
                         onGridSizeChanged={(event) => updateVisibleFieldCount(event.api)}
-                        rowClassRules={{ 'selected-row-grid': (params) => params.data?.__recordId === selectedRecordId }}
+                        rowClassRules={{
+                            'selected-row-grid': (params) => params.data?.__recordId === selectedRecordId,
+                            'subtotal-row-grid': (params) => params.data?.__subtotal === true,
+                        }}
                         stopEditingWhenCellsLoseFocus
                         theme="legacy"
                     />
@@ -293,6 +309,29 @@ export default function ObjectGrid({
             />
         </div>
     );
+}
+
+function subtotalRow(subtotal) {
+    return {
+        id: '__filtered-subtotal__',
+        __subtotal: true,
+        __subtotalValues: subtotal.values || {},
+    };
+}
+
+function SubtotalCell({ field, value, showLabel }) {
+    const total = field.type === 'number' && Number.isFinite(Number(value))
+        ? Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 10 })
+        : null;
+
+    if (showLabel && total !== null) {
+        return <span className="subtotal-cell"><b>小计</b><span>{total}</span></span>;
+    }
+    if (showLabel) {
+        return <b className="subtotal-label">小计</b>;
+    }
+
+    return total === null ? null : <strong className="subtotal-value">{total}</strong>;
 }
 
 function GridHeader({ displayName }) {
