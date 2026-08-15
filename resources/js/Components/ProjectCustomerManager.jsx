@@ -5,14 +5,23 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
     const [open, setOpen] = useState(false);
     const [customer, setCustomer] = useState(null);
     const [customerDraft, setCustomerDraft] = useState(emptyCustomer());
-    const [contactDraft, setContactDraft] = useState({ id: '', name: '', phone: '' });
+    const [contactDraft, setContactDraft] = useState(emptyContact());
     const [errors, setErrors] = useState([]);
     const [notice, setNotice] = useState('');
     const [saving, setSaving] = useState(false);
-    const savingRef = useRef(false);
+    const customerRef = useRef(null);
+    const customerDraftRef = useRef(emptyCustomer());
+    const contactDraftRef = useRef(emptyContact());
+    const requestInFlightRef = useRef(false);
+    const busyRef = useRef(false);
+    const queuedSaveRef = useRef(false);
+    const queuedModeRef = useRef('auto');
+    const inFlightSignatureRef = useRef('');
 
     useEffect(() => {
         if (!open || !customerId) return;
+        setLatestCustomer(null);
+        setLatestContactDraft(emptyContact());
         loadCustomer(customerId);
     }, [customerId, open]);
 
@@ -24,8 +33,9 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
             setErrors(['客户资料读取失败。']);
             return;
         }
-        setCustomer(data.customer);
-        setCustomerDraft({
+
+        setLatestCustomer(data.customer);
+        setLatestCustomerDraft({
             name: data.customer.payload?.name || data.customer.title || '',
             address: data.customer.payload?.address || '',
             level: data.customer.payload?.level || '',
@@ -34,80 +44,148 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
     }
 
     function startNewCustomer() {
-        setCustomer(null);
-        setCustomerDraft(emptyCustomer());
-        setContactDraft({ id: '', name: '', phone: '' });
+        setLatestCustomer(null);
+        setLatestCustomerDraft(emptyCustomer());
+        setLatestContactDraft(emptyContact());
         setErrors([]);
         setNotice('');
         setOpen(true);
     }
 
-    async function saveCustomer() {
-        if (!beginSaving()) return;
-        setErrors([]);
-        setNotice('');
-        try {
-            const response = await fetch(customer ? `/project-customers/${customer.id}` : '/project-customers', {
-                method: customer ? 'PUT' : 'POST',
-                headers: jsonHeaders(),
-                body: JSON.stringify(customerDraft),
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(firstError(data));
-            setCustomer(data.customer);
-            onCustomerSelected?.(data.customer.id);
-            setNotice('客户已保存并选中，请继续保存项目。');
-        } catch (error) {
-            setErrors([error.message || '客户保存失败。']);
-        } finally {
-            finishSaving();
-        }
-    }
-
-    async function saveContact() {
-        if (!customer) {
-            setErrors(['请先保存客户，再新增联系人。']);
+    function queueCombinedSave(mode = 'auto') {
+        const currentCustomer = customerRef.current;
+        const currentContact = normalizedContactDraft();
+        if (mode === 'auto' && !currentCustomer) return;
+        if (mode !== 'auto' && customerId && !currentCustomer) {
+            setErrors(['客户资料仍在加载，请稍后再保存。']);
             return;
         }
-        if (!beginSaving()) return;
+        if (!currentContact && hasPartialContactDraft()) {
+            setErrors(['联系人姓名不能为空。']);
+            setNotice('');
+            return;
+        }
+
+        const signature = saveSignature(currentCustomer, customerDraftRef.current, currentContact);
+        if (requestInFlightRef.current && inFlightSignatureRef.current === signature) return;
+
+        queuedSaveRef.current = true;
+        if (mode !== 'auto') queuedModeRef.current = mode;
+        void flushCombinedSave();
+    }
+
+    async function flushCombinedSave() {
+        if (requestInFlightRef.current || !queuedSaveRef.current) return;
+
+        const currentCustomer = customerRef.current;
+        const currentContact = normalizedContactDraft();
+        if (!currentContact && hasPartialContactDraft()) {
+            queuedSaveRef.current = false;
+            setErrors(['联系人姓名不能为空。']);
+            finishBusy();
+            return;
+        }
+
+        const mode = queuedModeRef.current;
+        const payload = {
+            ...customerDraftRef.current,
+            ...(currentContact ? { contact: currentContact } : {}),
+        };
+        queuedSaveRef.current = false;
+        queuedModeRef.current = 'auto';
+        requestInFlightRef.current = true;
+        inFlightSignatureRef.current = saveSignature(currentCustomer, customerDraftRef.current, currentContact);
+        beginBusy();
         setErrors([]);
         setNotice('');
+
         try {
-            const editing = Boolean(contactDraft.id);
-            const response = await fetch(editing
-                ? `/project-customers/${customer.id}/contacts/${contactDraft.id}`
-                : `/project-customers/${customer.id}/contacts`, {
-                method: editing ? 'PUT' : 'POST',
+            const response = await fetch(currentCustomer ? `/project-customers/${currentCustomer.id}` : '/project-customers', {
+                method: currentCustomer ? 'PUT' : 'POST',
                 headers: jsonHeaders(),
-                body: JSON.stringify({ name: contactDraft.name, phone: contactDraft.phone }),
+                body: JSON.stringify(payload),
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(firstError(data));
-            setContactDraft({ id: '', name: '', phone: '' });
-            onContactSelected?.(data.contact.id);
-            await loadCustomer(customer.id);
-            setNotice('联系人已保存并选中，请继续保存项目。');
+
+            setLatestCustomer(data.customer);
+            onCustomerSelected?.(data.customer.id);
+            if (data.contact) {
+                setLatestContactDraft(queuedSaveRef.current
+                    ? { ...contactDraftRef.current, id: data.contact.id }
+                    : {
+                        id: data.contact.id,
+                        name: data.contact.name || '',
+                        phone: data.contact.phone || '',
+                    });
+                onContactSelected?.(data.contact.id);
+            }
+            setNotice(mode === 'auto'
+                ? '客户和联系人已自动保存。'
+                : data.contact
+                    ? '客户和联系人已保存并选中，请继续保存项目。'
+                    : '客户已保存并选中，请继续保存项目。');
         } catch (error) {
-            setErrors([error.message || '联系人保存失败。']);
+            queuedSaveRef.current = false;
+            setErrors([error.message || '客户和联系人保存失败。']);
         } finally {
-            finishSaving();
+            requestInFlightRef.current = false;
+            inFlightSignatureRef.current = '';
+            if (queuedSaveRef.current) {
+                void flushCombinedSave();
+            } else {
+                finishBusy();
+            }
         }
     }
 
-    function beginSaving() {
-        if (savingRef.current) return false;
+    function beginBusy() {
+        if (busyRef.current) return;
 
-        savingRef.current = true;
+        busyRef.current = true;
         setSaving(true);
         onSavingChange?.(true);
-
-        return true;
     }
 
-    function finishSaving() {
-        savingRef.current = false;
+    function finishBusy() {
+        if (!busyRef.current) return;
+
+        busyRef.current = false;
         setSaving(false);
         onSavingChange?.(false);
+    }
+
+    function setLatestCustomer(nextCustomer) {
+        customerRef.current = nextCustomer;
+        setCustomer(nextCustomer);
+    }
+
+    function setLatestCustomerDraft(nextDraft) {
+        customerDraftRef.current = nextDraft;
+        setCustomerDraft(nextDraft);
+    }
+
+    function setLatestContactDraft(nextDraft) {
+        contactDraftRef.current = nextDraft;
+        setContactDraft(nextDraft);
+    }
+
+    function normalizedContactDraft() {
+        const draft = contactDraftRef.current;
+        const name = draft.name.trim();
+        if (!name) return null;
+
+        return {
+            ...(draft.id ? { id: draft.id } : {}),
+            name,
+            phone: draft.phone.trim(),
+        };
+    }
+
+    function hasPartialContactDraft() {
+        const draft = contactDraftRef.current;
+
+        return Boolean(draft.id || draft.phone.trim());
     }
 
     function preventProjectSubmit(event) {
@@ -131,27 +209,26 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
                 <div className="embedded-manager" role="dialog" aria-label="维护客户与联系人" onKeyDown={preventProjectSubmit}>
                     <div className="embedded-manager-head"><strong>{customer ? '编辑客户资料' : '新增客户资料'}</strong><button type="button" className="icon-link" aria-label="关闭客户维护" onClick={() => setOpen(false)}><X size={15} /></button></div>
                     <div className="embedded-manager-fields">
-                        <label><span>客户名称*</span><input value={customerDraft.name} onChange={(event) => setCustomerDraft({ ...customerDraft, name: event.target.value })} /></label>
-                        <label><span>客户等级</span><select value={customerDraft.level} onChange={(event) => setCustomerDraft({ ...customerDraft, level: event.target.value })}><option value="">未选择</option><option>A</option><option>B</option><option>C</option></select></label>
-                        <label className="wide"><span>地址</span><input value={customerDraft.address} onChange={(event) => setCustomerDraft({ ...customerDraft, address: event.target.value })} /></label>
-                        <label className="wide"><span>备注</span><input value={customerDraft.remark} onChange={(event) => setCustomerDraft({ ...customerDraft, remark: event.target.value })} /></label>
+                        <label><span>客户名称*</span><input value={customerDraft.name} onChange={(event) => setLatestCustomerDraft({ ...customerDraftRef.current, name: event.target.value })} /></label>
+                        <label><span>客户等级</span><select value={customerDraft.level} onChange={(event) => setLatestCustomerDraft({ ...customerDraftRef.current, level: event.target.value })}><option value="">未选择</option><option>A</option><option>B</option><option>C</option></select></label>
+                        <label className="wide"><span>地址</span><input value={customerDraft.address} onChange={(event) => setLatestCustomerDraft({ ...customerDraftRef.current, address: event.target.value })} /></label>
+                        <label className="wide"><span>备注</span><input value={customerDraft.remark} onChange={(event) => setLatestCustomerDraft({ ...customerDraftRef.current, remark: event.target.value })} /></label>
                     </div>
-                    <button type="button" onClick={saveCustomer} disabled={saving}>{saving ? '保存中…' : '保存客户'}</button>
-                    {customer && (
-                        <div className="embedded-contacts">
-                            <strong>联系人</strong>
-                            {(customer.contacts || []).map((contact) => (
-                                <button type="button" className="contact-maintain-row" key={contact.id} onClick={() => setContactDraft({ id: contact.id, name: contact.name || '', phone: contact.phone || '' })}>
-                                    <span>{contact.name}</span><small>{contact.phone || '未填写电话'}</small><Pencil size={13} />
-                                </button>
-                            ))}
-                            <div className="embedded-manager-fields">
-                                <label><span>联系人姓名*</span><input value={contactDraft.name} onChange={(event) => setContactDraft({ ...contactDraft, name: event.target.value })} /></label>
-                                <label><span>联系电话</span><input value={contactDraft.phone} onChange={(event) => setContactDraft({ ...contactDraft, phone: event.target.value })} /></label>
-                            </div>
-                            <button type="button" className="secondary-button" onClick={saveContact} disabled={saving}>{contactDraft.id ? '保存联系人修改' : '新增联系人'}</button>
+                    <button type="button" onClick={() => queueCombinedSave('manual')} disabled={saving || Boolean(customerId && !customer)}>{saving ? '保存中…' : customerId && !customer ? '客户加载中…' : '保存客户'}</button>
+                    <div className="embedded-contacts">
+                        <strong>联系人</strong>
+                        {(customer?.contacts || []).map((contact) => (
+                            <button type="button" disabled={saving} className="contact-maintain-row" key={contact.id} onClick={() => setLatestContactDraft({ id: contact.id, name: contact.name || '', phone: contact.phone || '' })}>
+                                <span>{contact.name}</span><small>{contact.phone || '未填写电话'}</small><Pencil size={13} />
+                            </button>
+                        ))}
+                        <div className="embedded-manager-fields">
+                            <label><span>联系人姓名*</span><input value={contactDraft.name} onChange={(event) => setLatestContactDraft({ ...contactDraftRef.current, name: event.target.value })} onBlur={() => queueCombinedSave('auto')} /></label>
+                            <label><span>联系电话</span><input value={contactDraft.phone} onChange={(event) => setLatestContactDraft({ ...contactDraftRef.current, phone: event.target.value })} onBlur={() => queueCombinedSave('auto')} /></label>
                         </div>
-                    )}
+                        <button type="button" className="secondary-button" onClick={() => queueCombinedSave('manual')} disabled={saving}>{contactDraft.id ? '保存联系人修改' : '新增联系人'}</button>
+                        <small className="muted">联系人输入完成并离开输入框后会自动保存。</small>
+                    </div>
                     {notice && <p className="notice form-notice" role="status">{notice}</p>}
                     {errors.map((error) => <p className="form-error" key={error}>{error}</p>)}
                 </div>
@@ -162,6 +239,14 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
 
 function emptyCustomer() {
     return { name: '', address: '', level: '', remark: '' };
+}
+
+function emptyContact() {
+    return { id: '', name: '', phone: '' };
+}
+
+function saveSignature(customer, customerDraft, contactDraft) {
+    return JSON.stringify({ customerId: customer?.id || '', customerDraft, contactDraft });
 }
 
 function jsonHeaders() {

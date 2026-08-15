@@ -11,6 +11,7 @@ use App\Support\ObjectRelations;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ProjectCustomerController extends Controller
 {
@@ -32,15 +33,24 @@ class ProjectCustomerController extends Controller
     {
         $this->authorizeCustomerManager($request);
         $data = $this->customerData($request);
-        $customer = $writer->handle(
-            BusinessObject::where('key', 'customer')->firstOrFail(),
-            $data,
-            $request->user(),
-            'project.customer.create',
-        );
+        $contactData = $this->combinedContactData($request);
+        [$customer, $contact] = DB::transaction(function () use ($data, $contactData, $request, $writer): array {
+            $customer = $writer->handle(
+                BusinessObject::where('key', 'customer')->firstOrFail(),
+                $data,
+                $request->user(),
+                'project.customer.create',
+            );
+            $contact = $this->saveCombinedContact($customer, $contactData, $request, $writer);
+
+            return [$customer, $contact];
+        });
         $this->relations->preloadLabels(collect([$customer]), $request->user());
 
-        return response()->json(['customer' => $this->relations->formatRecord($customer, $request->user())], 201);
+        return response()->json([
+            'customer' => $this->relations->formatRecord($customer, $request->user()),
+            'contact' => $contact ? $this->contactResponse($contact) : null,
+        ], 201);
     }
 
     public function update(Request $request, ObjectRecord $customer, CreateObjectRecord $writer): JsonResponse
@@ -48,8 +58,10 @@ class ProjectCustomerController extends Controller
         $this->authorizeCustomerManager($request);
         $this->guardObject($customer, 'customer');
         $data = $this->customerData($request);
+        $contactData = $this->combinedContactData($request);
 
-        DB::transaction(function () use ($customer, $data, $request, $writer): void {
+        $contact = DB::transaction(function () use ($customer, $data, $contactData, $request, $writer): ?ObjectRecord {
+            $this->relations->lockReferenceGraph();
             $locked = ObjectRecord::query()->lockForUpdate()->findOrFail($customer->id);
             $before = $locked->payload ?? [];
             $payload = $writer->normalizePayload($locked->businessObject, [...$before, ...$data], $before);
@@ -61,12 +73,17 @@ class ProjectCustomerController extends Controller
                 'subject_id' => $locked->id,
                 'payload' => ['before' => $before, 'after' => $payload],
             ]);
+
+            return $this->saveCombinedContact($locked, $contactData, $request, $writer);
         });
 
         $fresh = $customer->fresh(['businessObject']);
         $this->relations->preloadLabels(collect([$fresh]), $request->user());
 
-        return response()->json(['customer' => $this->relations->formatRecord($fresh, $request->user())]);
+        return response()->json([
+            'customer' => $this->relations->formatRecord($fresh, $request->user()),
+            'contact' => $contact ? $this->contactResponse($contact) : null,
+        ]);
     }
 
     public function storeContact(Request $request, ObjectRecord $customer, CreateObjectRecord $writer): JsonResponse
@@ -127,6 +144,73 @@ class ProjectCustomerController extends Controller
             'name' => ['required', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:100'],
         ]);
+    }
+
+    /** @return array{id: string|null, name: string, phone: string|null}|null */
+    private function combinedContactData(Request $request): ?array
+    {
+        if (! $request->has('contact')) {
+            return null;
+        }
+
+        $validated = $request->validate([
+            'contact' => ['required', 'array'],
+            'contact.id' => ['nullable', 'uuid'],
+            'contact.name' => ['required', 'string', 'max:100'],
+            'contact.phone' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        return [
+            'id' => $validated['contact']['id'] ?? null,
+            'name' => $validated['contact']['name'],
+            'phone' => $validated['contact']['phone'] ?? null,
+        ];
+    }
+
+    /** @param array{id: string|null, name: string, phone: string|null}|null $data */
+    private function saveCombinedContact(
+        ObjectRecord $customer,
+        ?array $data,
+        Request $request,
+        CreateObjectRecord $writer,
+    ): ?ObjectRecord {
+        if ($data === null) {
+            return null;
+        }
+
+        if (! $data['id']) {
+            return $writer->handle(
+                BusinessObject::where('key', 'customer_contact')->firstOrFail(),
+                ['name' => $data['name'], 'phone' => $data['phone'], 'customer_id' => $customer->id],
+                $request->user(),
+                'project.customer_contact.create',
+            );
+        }
+
+        $contact = ObjectRecord::query()
+            ->with('businessObject')
+            ->lockForUpdate()
+            ->find($data['id']);
+        if (! $contact
+            || $contact->businessObject->key !== 'customer_contact'
+            || ($contact->payload['customer_id'] ?? null) !== $customer->id) {
+            throw ValidationException::withMessages([
+                'contact.id' => '联系人不属于当前客户。',
+            ]);
+        }
+
+        $before = $contact->payload ?? [];
+        $payload = [...$before, 'name' => $data['name'], 'phone' => $data['phone']];
+        $contact->update(['payload' => $payload, 'title' => $data['name']]);
+        AuditLog::create([
+            'user_id' => $request->user()->id,
+            'action' => 'project.customer_contact.update',
+            'subject_type' => 'customer_contact',
+            'subject_id' => $contact->id,
+            'payload' => ['before' => $before, 'after' => $payload],
+        ]);
+
+        return $contact;
     }
 
     private function authorizeCustomerManager(Request $request): void

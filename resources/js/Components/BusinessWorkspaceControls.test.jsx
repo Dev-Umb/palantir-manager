@@ -72,20 +72,152 @@ describe('business workspace field controls', () => {
 });
 
 describe('project customer manager', () => {
-    it('creates a customer through the restricted project API and selects the original record id', async () => {
+    it('creates a customer and its drafted contact in one request and selects both records', async () => {
         const onCustomerSelected = vi.fn();
+        const onContactSelected = vi.fn();
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                customer: { id: 'customer-1', title: '演示客户', payload: { name: '演示客户' }, contacts: [] },
+                contact: { id: 'contact-1', name: '张经理', phone: '13800138000', customer_id: 'customer-1' },
+            }),
+        });
+        render(<ProjectCustomerManager customerId="" onCustomerSelected={onCustomerSelected} onContactSelected={onContactSelected} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /新增客户/ }));
+        fireEvent.change(screen.getByLabelText('客户名称*'), { target: { value: '演示客户' } });
+        fireEvent.change(screen.getByLabelText('联系人姓名*'), { target: { value: '张经理' } });
+        fireEvent.change(screen.getByLabelText('联系电话'), { target: { value: '13800138000' } });
+        fireEvent.click(screen.getByRole('button', { name: '保存客户' }));
+
+        await waitFor(() => expect(fetch).toHaveBeenCalledWith('/project-customers', expect.objectContaining({ method: 'POST' })));
+        expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(expect.objectContaining({
+            name: '演示客户',
+            contact: { name: '张经理', phone: '13800138000' },
+        }));
+        expect(onCustomerSelected).toHaveBeenCalledWith('customer-1');
+        expect(onContactSelected).toHaveBeenCalledWith('contact-1');
+    });
+
+    it('does not send an empty contact when saving a customer', async () => {
         vi.spyOn(globalThis, 'fetch').mockResolvedValue({
             ok: true,
             json: async () => ({ customer: { id: 'customer-1', title: '演示客户', payload: { name: '演示客户' }, contacts: [] } }),
         });
-        render(<ProjectCustomerManager customerId="" onCustomerSelected={onCustomerSelected} />);
+        render(<ProjectCustomerManager customerId="" />);
 
         fireEvent.click(screen.getByRole('button', { name: /新增客户/ }));
         fireEvent.change(screen.getByLabelText('客户名称*'), { target: { value: '演示客户' } });
         fireEvent.click(screen.getByRole('button', { name: '保存客户' }));
 
-        await waitFor(() => expect(fetch).toHaveBeenCalledWith('/project-customers', expect.objectContaining({ method: 'POST' })));
-        expect(onCustomerSelected).toHaveBeenCalledWith('customer-1');
+        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+        expect(JSON.parse(fetch.mock.calls[0][1].body)).not.toHaveProperty('contact');
+    });
+
+    it('keeps customer and contact drafts visible when combined saving fails', async () => {
+        vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: false,
+            json: async () => ({ errors: { 'contact.name': ['联系人保存失败。'] } }),
+        });
+        render(<ProjectCustomerManager customerId="" />);
+
+        fireEvent.click(screen.getByRole('button', { name: /新增客户/ }));
+        fireEvent.change(screen.getByLabelText('客户名称*'), { target: { value: '保留草稿客户' } });
+        fireEvent.change(screen.getByLabelText('联系人姓名*'), { target: { value: '保留草稿联系人' } });
+        fireEvent.click(screen.getByRole('button', { name: '保存客户' }));
+
+        expect(await screen.findByText('联系人保存失败。')).toBeInTheDocument();
+        expect(screen.getByLabelText('客户名称*')).toHaveValue('保留草稿客户');
+        expect(screen.getByLabelText('联系人姓名*')).toHaveValue('保留草稿联系人');
+    });
+
+    it('automatically saves an existing contact when its phone field loses focus', async () => {
+        const onContactSelected = vi.fn();
+        vi.spyOn(globalThis, 'fetch')
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ customer: {
+                    id: 'customer-1',
+                    title: '演示客户',
+                    payload: { name: '演示客户' },
+                    contacts: [{ id: 'contact-1', name: '张经理', phone: '13800138000' }],
+                } }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    customer: { id: 'customer-1', title: '演示客户', payload: { name: '演示客户' }, contacts: [] },
+                    contact: { id: 'contact-1', name: '张经理', phone: '13900139000', customer_id: 'customer-1' },
+                }),
+            });
+        render(<ProjectCustomerManager customerId="customer-1" onContactSelected={onContactSelected} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /维护当前客户/ }));
+        fireEvent.click(await screen.findByRole('button', { name: /张经理/ }));
+        const phone = screen.getByLabelText('联系电话');
+        fireEvent.change(phone, { target: { value: '13900139000' } });
+        fireEvent.blur(phone);
+
+        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+        expect(fetch.mock.calls[1][0]).toBe('/project-customers/customer-1');
+        expect(JSON.parse(fetch.mock.calls[1][1].body).contact).toEqual({
+            id: 'contact-1',
+            name: '张经理',
+            phone: '13900139000',
+        });
+        expect(onContactSelected).toHaveBeenCalledWith('contact-1');
+        expect(await screen.findByRole('status')).toHaveTextContent('客户和联系人已自动保存');
+    });
+
+    it('queues the latest contact draft when another blur occurs during saving', async () => {
+        let resolveFirstSave;
+        const firstSave = new Promise((resolve) => {
+            resolveFirstSave = resolve;
+        });
+        vi.spyOn(globalThis, 'fetch')
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ customer: {
+                    id: 'customer-1',
+                    title: '演示客户',
+                    payload: { name: '演示客户' },
+                    contacts: [{ id: 'contact-1', name: '张经理', phone: '13800138000' }],
+                } }),
+            })
+            .mockReturnValueOnce(firstSave)
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    customer: { id: 'customer-1', title: '演示客户', payload: { name: '演示客户' }, contacts: [] },
+                    contact: { id: 'contact-1', name: '张总', phone: '13900139000', customer_id: 'customer-1' },
+                }),
+            });
+        render(<ProjectCustomerManager customerId="customer-1" />);
+
+        fireEvent.click(screen.getByRole('button', { name: /维护当前客户/ }));
+        fireEvent.click(await screen.findByRole('button', { name: /张经理/ }));
+        const name = screen.getByLabelText('联系人姓名*');
+        const phone = screen.getByLabelText('联系电话');
+        fireEvent.change(name, { target: { value: '张总' } });
+        fireEvent.blur(name);
+        fireEvent.change(phone, { target: { value: '13900139000' } });
+        fireEvent.blur(phone);
+
+        expect(fetch).toHaveBeenCalledTimes(2);
+        resolveFirstSave({
+            ok: true,
+            json: async () => ({
+                customer: { id: 'customer-1', title: '演示客户', payload: { name: '演示客户' }, contacts: [] },
+                contact: { id: 'contact-1', name: '张总', phone: '13800138000', customer_id: 'customer-1' },
+            }),
+        });
+
+        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+        expect(JSON.parse(fetch.mock.calls[2][1].body).contact).toEqual({
+            id: 'contact-1',
+            name: '张总',
+            phone: '13900139000',
+        });
     });
 
     it('prevents Enter in embedded customer fields from submitting the project form', () => {

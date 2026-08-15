@@ -427,6 +427,99 @@ class BusinessContractWorkflowTest extends TestCase
         $this->assertSame($customerId, ObjectRecord::findOrFail($contactId)->payload['customer_id']);
     }
 
+    public function test_project_customer_api_atomically_creates_customer_with_contact(): void
+    {
+        $business = $this->userWithRole('business', '业务员');
+
+        $response = $this->actingAs($business)->postJson('/project-customers', [
+            'name' => '组合保存客户',
+            'address' => '组合保存地址',
+            'level' => 'B',
+            'remark' => '组合保存备注',
+            'contact' => [
+                'name' => '组合联系人',
+                'phone' => '13800138000',
+            ],
+        ])->assertCreated();
+
+        $customer = ObjectRecord::findOrFail($response->json('customer.id'));
+        $contact = ObjectRecord::findOrFail($response->json('contact.id'));
+
+        $this->assertSame('组合保存客户', $customer->title);
+        $this->assertSame('组合联系人', $contact->title);
+        $this->assertSame($customer->id, $contact->payload['customer_id']);
+        $this->assertSame('13800138000', $contact->payload['phone']);
+    }
+
+    public function test_project_customer_api_atomically_updates_customer_with_its_contact(): void
+    {
+        $business = $this->userWithRole('business', '业务员');
+        $created = $this->actingAs($business)->postJson('/project-customers', [
+            'name' => '更新前客户',
+            'contact' => ['name' => '更新前联系人', 'phone' => '13000000000'],
+        ])->assertCreated();
+        $customerId = $created->json('customer.id');
+        $contactId = $created->json('contact.id');
+
+        $this->actingAs($business)->putJson("/project-customers/{$customerId}", [
+            'name' => '更新后客户',
+            'address' => null,
+            'level' => null,
+            'remark' => null,
+            'contact' => [
+                'id' => $contactId,
+                'name' => '更新后联系人',
+                'phone' => '13900000000',
+            ],
+        ])->assertOk()
+            ->assertJsonPath('contact.id', $contactId)
+            ->assertJsonPath('contact.name', '更新后联系人');
+
+        $this->assertSame('更新后客户', ObjectRecord::findOrFail($customerId)->title);
+        $this->assertSame('更新后联系人', ObjectRecord::findOrFail($contactId)->title);
+    }
+
+    public function test_project_customer_combined_validation_failure_does_not_update_customer(): void
+    {
+        $business = $this->userWithRole('business', '业务员');
+        $created = $this->actingAs($business)->postJson('/project-customers', [
+            'name' => '不可部分更新客户',
+        ])->assertCreated();
+        $customerId = $created->json('customer.id');
+
+        $this->actingAs($business)->putJson("/project-customers/{$customerId}", [
+            'name' => '不应保存的新名称',
+            'contact' => ['name' => '', 'phone' => '13800138000'],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('contact.name');
+
+        $this->assertSame('不可部分更新客户', ObjectRecord::findOrFail($customerId)->title);
+    }
+
+    public function test_project_customer_combined_update_rejects_contact_from_another_customer(): void
+    {
+        $business = $this->userWithRole('business', '业务员');
+        $first = $this->actingAs($business)->postJson('/project-customers', [
+            'name' => '第一客户',
+        ])->assertCreated();
+        $second = $this->actingAs($business)->postJson('/project-customers', [
+            'name' => '第二客户',
+            'contact' => ['name' => '第二客户联系人'],
+        ])->assertCreated();
+
+        $this->actingAs($business)->putJson("/project-customers/{$first->json('customer.id')}", [
+            'name' => '不应更新的第一客户',
+            'contact' => [
+                'id' => $second->json('contact.id'),
+                'name' => '越权联系人',
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('contact.id');
+
+        $this->assertSame('第一客户', ObjectRecord::findOrFail($first->json('customer.id'))->title);
+        $this->assertSame('第二客户联系人', ObjectRecord::findOrFail($second->json('contact.id'))->title);
+    }
+
     public function test_finance_can_view_customer_table_but_cannot_modify_it_or_view_contact_table(): void
     {
         $finance = $this->userWithRole('finance', '财务');
