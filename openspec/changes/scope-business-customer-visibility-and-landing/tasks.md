@@ -25,4 +25,4 @@
 - [x] 5.1 Add PHPUnit Feature allow/deny coverage for lists, detail, export, relation options, embedded customer routes, contacts, and retained roles.
 - [x] 5.2 Add PHPUnit Feature coverage for option priority, selected-value preservation, search, and login redirect precedence.
 - [x] 5.3 Run Pint, focused tests, strict OpenSpec validation, production build, and the full quality gate.
-- [ ] 5.4 If deployment is separately authorized, back up affected code, deploy without data writes, and perform read-only online verification.
+- [x] 5.4 If deployment is separately authorized, back up affected code, deploy without data writes, and perform read-only online verification.
