@@ -13,6 +13,7 @@ import { FieldControl } from './FieldControl';
 import MultiComboBox from './MultiComboBox';
 import RowActions from './RowActions';
 import { columnOrderFromState, columnWidthsFromState } from './objectGridColumnState';
+import { formatObjectNumber } from './objectNumberFormatting';
 import { expandObjectRecords, isItemField, rawRowValue, sameRecordSpan, scopedRelationOptions, updateRecordField } from './objectGridRows';
 
 const modules = [CellSpanModule, CellStyleModule, ClientSideRowModelApiModule, ClientSideRowModelModule, ColumnApiModule, CustomEditorModule, DateFilterModule, LocaleModule, NumberFilterModule, RowApiModule, RowStyleModule, ScrollApiModule, TextFilterModule, TooltipModule];
@@ -581,7 +582,9 @@ function renderValue(object, field, record, value, relationOptions, row = null) 
         return <span title={record?.display?.[field.key] || ''}>{record?.display?.[field.key] || '—'}</span>;
     }
 
-    return <span title={String(value)}>{String(value)}</span>;
+    const formatted = formatObjectNumber(object.key, field, value);
+
+    return <span title={String(formatted)}>{String(formatted)}</span>;
 }
 
 function displayValueFor(field, value, relationOptions) {
@@ -663,7 +666,7 @@ function displayText(field, row, relationOptions, objectKey) {
         return relationGridText(objectKey, field, text);
     }
 
-    return row[field.key] ?? '';
+    return formatObjectNumber(objectKey, field, row[field.key] ?? '');
 }
 
 function relationGridText(objectKey, field, text) {

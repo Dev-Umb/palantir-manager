@@ -4,7 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { columnOrderStorageKey, columnWidthStorageKey } from '../../Components/objectGridColumnState';
-import Index from './Index';
+import Index, { objectListHref } from './Index';
 
 const inertia = vi.hoisted(() => ({
     userId: 42,
@@ -393,7 +393,7 @@ describe('project customer contact choices', () => {
                 customer_contact_ids: ['甲联系人'],
             },
         };
-        window.history.replaceState({}, '', '/objects/project?mode=edit&record=project-1');
+        window.history.replaceState({}, '', '/objects/project?q=%E7%94%B2&sort=name&direction=asc&filter_logic=and&filters%5B0%5D%5Bfield%5D=overall_status&filters%5B0%5D%5Boperator%5D=equals&filters%5B0%5D%5Bvalue%5D=%E5%B7%B2%E4%B8%AD%E6%A0%87&page=2&mode=edit&record=project-1');
         render(
             <Index
                 currentObject={{
@@ -435,8 +435,14 @@ describe('project customer contact choices', () => {
         expect(within(dialog).getByText('客户已变更，已清除 1 位不属于新客户的联系人。')).toBeInTheDocument();
         fireEvent.click(within(dialog).getByRole('button', { name: '保存' }));
 
+        const returnTo = objectListHref('project', new URLSearchParams(window.location.search));
+        expect(returnTo).toContain('q=%E7%94%B2');
+        expect(returnTo).toContain('filters%5B0%5D%5Bfield%5D=overall_status');
+        expect(returnTo).toContain('page=2');
+        expect(returnTo).not.toContain('mode=edit');
+        expect(returnTo).not.toContain('record=project-1');
         expect(inertia.put).toHaveBeenCalledWith(
-            '/records/project-1',
+            `/records/project-1?return_to=${encodeURIComponent(returnTo)}`,
             {
                 payload: {
                     customer_id: 'customer-b',

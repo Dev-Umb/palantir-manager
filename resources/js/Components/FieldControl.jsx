@@ -156,7 +156,7 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
     }
 
     if (field.type === 'number') {
-        return <input {...common} type="number" step="any" min={field.min} max={field.max} />;
+        return <input {...common} type="number" step={field.step ?? 'any'} min={field.min} max={field.max} />;
     }
 
     if (field.type === 'range') {

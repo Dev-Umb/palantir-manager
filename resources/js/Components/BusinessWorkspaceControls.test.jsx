@@ -12,6 +12,19 @@ afterEach(() => {
 });
 
 describe('business workspace field controls', () => {
+    it('uses the configured two-decimal step while allowing negative project amounts', () => {
+        const { container } = render(<FieldControl
+            field={{ key: 'occurred_amount', type: 'number', step: 0.01 }}
+            value="-12.34"
+            onChange={() => {}}
+        />);
+        const input = container.querySelector('input[type="number"]');
+
+        expect(input).toHaveAttribute('step', '0.01');
+        expect(input).not.toHaveAttribute('min');
+        expect(input).toHaveValue(-12.34);
+    });
+
     it('accepts multiple append uploads and renders existing attachment links', () => {
         const onChange = vi.fn();
         const { container } = render(<FieldControl

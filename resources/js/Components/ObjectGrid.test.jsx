@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ObjectGrid, { columnBounds, fieldEditableForRecord, formatSubtotalValue, MIN_DATA_COLUMN_WIDTH, subtotalColumnWidth } from './ObjectGrid';
+import { formatObjectNumber } from './objectNumberFormatting';
 
 describe('ObjectGrid column resizing', () => {
     it('allows every ordinary data column type to shrink to about three Chinese characters', () => {
@@ -19,6 +20,17 @@ describe('ObjectGrid column resizing', () => {
         expect(MIN_DATA_COLUMN_WIDTH).toBe(72);
         expect(fields.map((field) => columnBounds(field).min))
             .toEqual(fields.map(() => MIN_DATA_COLUMN_WIDTH));
+    });
+});
+
+describe('project number formatting', () => {
+    it('shows project numbers with two decimals without changing other objects', () => {
+        const field = { key: 'occurred_amount', type: 'number' };
+
+        expect(formatObjectNumber('project', field, -1234.555)).toBe('-1,234.56');
+        expect(formatObjectNumber('project', field, 12)).toBe('12.00');
+        expect(formatObjectNumber('contract', field, 12)).toBe(12);
+        expect(formatObjectNumber('project', field, '')).toBe('');
     });
 });
 
@@ -708,7 +720,7 @@ describe('ObjectGrid date editing', () => {
             />,
         );
 
-        expect(await screen.findByRole('gridcell', { name: '0' })).not.toBeNull();
+        expect(await screen.findByRole('gridcell', { name: '0.00' })).not.toBeNull();
         expect((await screen.findByText('—')).classList.contains('empty-value')).toBe(true);
         expect(Number.parseInt(document.querySelector('.ag-row')?.style.height || '0', 10)).toBe(44);
     });

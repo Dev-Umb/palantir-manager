@@ -15,6 +15,7 @@ import {
 } from '../../Components/objectGridColumnState';
 import { scopedRelationOptions } from '../../Components/objectGridRows';
 import { businessText } from '../../businessLanguage';
+import { formatObjectNumber } from '../../Components/objectNumberFormatting';
 
 const ObjectGrid = lazy(() => import('../../Components/ObjectGrid'));
 export const PAGE_SIZE_OPTIONS = Array.from({ length: 10 }, (_, index) => (index + 1) * 10);
@@ -26,7 +27,7 @@ export default function Index({ objects = [], currentObject, records, subtotal =
     const [tableRecords, setTableRecords] = useState(records.data);
     const [contactModal, setContactModal] = useState(null);
     const selectedRecord = tableRecords.find((record) => record.id === selectedRecordId) || selectedRecordProp;
-    const closeHref = `/objects/${currentObject.key}`;
+    const closeHref = objectListHref(currentObject.key, params);
     const storageKey = columnOrderStorageKey(auth.user?.id ?? 'anonymous', currentObject.key);
     const widthStorageKey = columnWidthStorageKey(auth.user?.id ?? 'anonymous', currentObject.key);
     const [columnOrder, setColumnOrder] = useState(() => readColumnOrder(storageKey));
@@ -492,7 +493,7 @@ function EditRecordModal({ object, record, fields, relationOptions, closeHref, c
 
     function update(event) {
         event.preventDefault();
-        updateForm.put(`/records/${record.id}`, { preserveScroll: true });
+        updateForm.put(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, { preserveScroll: true });
     }
 
     return (
@@ -637,7 +638,7 @@ function RecordDetail({ object, record, fields, relationOptions, contactCan, onC
                 {commonFields.map((field) => (
                     <div key={field.key}>
                         <span>{field.label}</span>
-                        <strong>{cellValue(field, record, relationOptions) || '未填写'}</strong>
+                        <strong>{cellValue(object.key, field, record, relationOptions) || '未填写'}</strong>
                     </div>
                 ))}
             </div>
@@ -861,14 +862,23 @@ function defaults(fields, params = null) {
     return payload;
 }
 
-function cellValue(field, record, relationOptions) {
+function cellValue(objectKey, field, record, relationOptions) {
     const value = record.display?.[field.key] ?? record.payload?.[field.key];
-    if (!value) return '';
+    if (value === null || value === undefined || value === '') return '';
     if (field.type === 'relation') return <span className="relation-chip">{value}</span>;
     if (['multirelation', 'multiaccount'].includes(field.type)) return (Array.isArray(value) ? value : []).map((label, index) => <span className="relation-chip" key={`${label}-${index}`}>{label}</span>);
     if (field.type === 'file') return <a className="relation-chip" href={value} target="_blank" rel="noreferrer">查看附件</a>;
     if (field.type === 'files') return (Array.isArray(value) ? value : []).map((url, index) => <a className="relation-chip" href={url} target="_blank" rel="noreferrer" key={`${url}-${index}`}>附件 {index + 1}</a>);
-    return String(value);
+    return String(formatObjectNumber(objectKey, field, value));
+}
+
+export function objectListHref(objectKey, params) {
+    const listParams = new URLSearchParams(params);
+    listParams.delete('mode');
+    listParams.delete('record');
+    const query = listParams.toString();
+
+    return `/objects/${objectKey}${query ? `?${query}` : ''}`;
 }
 
 function itemCellValue(field, item, relationOptions) {

@@ -117,9 +117,32 @@ class CreateObjectRecord
             default => $payload,
         };
 
+        $payload = $this->roundProjectNumbers($object, $payload);
         $payload = $this->fillProjectNumber($object, $payload, $existingPayload);
 
         return $this->snapshotRelations($object, $payload, $existingPayload);
+    }
+
+    private function roundProjectNumbers(BusinessObject $object, array $payload): array
+    {
+        if ($object->key !== 'project') {
+            return $payload;
+        }
+
+        foreach ($object->fields ?? [] as $field) {
+            $key = $field['key'] ?? null;
+            if (($field['type'] ?? null) !== 'number'
+                || ! is_string($key)
+                || ! array_key_exists($key, $payload)
+                || $payload[$key] === null
+                || $payload[$key] === '') {
+                continue;
+            }
+
+            $payload[$key] = round((float) $payload[$key], 2);
+        }
+
+        return $payload;
     }
 
     private function normalizeTender(array $payload, ?User $user): array

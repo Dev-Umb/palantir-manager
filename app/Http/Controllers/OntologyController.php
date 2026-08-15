@@ -408,7 +408,7 @@ class OntologyController extends Controller
             ]);
         }
 
-        return redirect()->route('objects.index', $object->key)->with('status', $status);
+        return redirect($this->objectReturnUrl($request, $object))->with('status', $status);
     }
 
     public function destroy(Request $request, ObjectRecord $record, CreateObjectRecord $writer): RedirectResponse|JsonResponse
@@ -934,11 +934,27 @@ class OntologyController extends Controller
         if ($type === 'range' && array_key_exists('max', $field)) {
             $rules[] = 'max:'.$field['max'];
         }
-        if ($object->key === 'project' && $type === 'number') {
-            $rules[] = 'min:0';
-        }
 
         return $rules;
+    }
+
+    private function objectReturnUrl(Request $request, BusinessObject $object): string
+    {
+        $fallback = route('objects.index', $object->key, absolute: false);
+        $returnTo = $request->query('return_to');
+        if (! is_string($returnTo)) {
+            return $fallback;
+        }
+
+        $parts = parse_url($returnTo);
+        if ($parts === false
+            || isset($parts['scheme'])
+            || isset($parts['host'])
+            || ($parts['path'] ?? null) !== $fallback) {
+            return $fallback;
+        }
+
+        return $fallback.(isset($parts['query']) && $parts['query'] !== '' ? '?'.$parts['query'] : '');
     }
 
     private function statusWithFinanceWarning(Request $request, string $status): string
