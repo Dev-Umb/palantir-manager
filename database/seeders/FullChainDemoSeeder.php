@@ -230,7 +230,16 @@ class FullChainDemoSeeder extends Seeder
                 $payload['contract_amount_synced_by'] = $users['finance']->id;
             }
 
-            return [$key => $this->upsertRecord($writer, 'project', "full-chain-project-{$key}", $payload, $owner)];
+            $project = $this->upsertRecord(
+                $writer,
+                'project',
+                "full-chain-project-{$key}",
+                $payload,
+                $users['admin'],
+            );
+            $project->update(['created_by' => $owner?->id]);
+
+            return [$key => $project->refresh()];
         })->all();
     }
 

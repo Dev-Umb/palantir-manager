@@ -779,9 +779,7 @@ class ObjectRelations
                 ->get(['id', 'business_object_id', 'code', 'title', 'payload']);
         }
 
-        $availableQuery = $target->records()
-            ->orderByDesc('created_at')
-            ->orderBy('id');
+        $availableQuery = $target->records();
         $this->scopeOptionQuery($availableQuery, $target, $user);
         $this->applyStructuralOptionFilters(
             $availableQuery,
@@ -792,6 +790,7 @@ class ObjectRelations
         );
         $this->applyAvailabilityOptionFilters($availableQuery, $source, $field, $target, $editingRecord);
         $this->applyOptionSearch($availableQuery, $target, $search);
+        $this->applyOptionOrder($availableQuery, $source, $field, $target);
 
         $availableItems = collect($this->formatOptionRecords(
             $availableQuery
@@ -996,6 +995,37 @@ class ObjectRelations
                 $query->orWhere("payload->{$key}", $operator, $pattern);
             }
         });
+    }
+
+    private function applyOptionOrder(
+        $query,
+        BusinessObject $source,
+        array $field,
+        BusinessObject $target,
+    ): void {
+        if ($source->key !== 'project'
+            || ($field['key'] ?? null) !== 'customer_id'
+            || $target->key !== 'customer') {
+            $query->orderByDesc('created_at')->orderBy('id');
+
+            return;
+        }
+
+        $recordsTable = (new ObjectRecord)->getTable();
+        $driver = DB::connection()->getDriverName();
+        $projectCustomerExpression = $driver === 'pgsql'
+            ? "option_projects.payload->>'customer_id'"
+            : "json_extract(option_projects.payload, '$.customer_id')";
+        $customerIdExpression = $driver === 'pgsql'
+            ? "{$recordsTable}.id::text"
+            : "{$recordsTable}.id";
+        $linkedCustomerOrder = "case when exists (select 1 from {$recordsTable} as option_projects "
+            ."where option_projects.business_object_id = ? and {$projectCustomerExpression} = {$customerIdExpression}) "
+            .'then 1 else 0 end';
+
+        $query->orderByRaw("{$linkedCustomerOrder} asc", [$source->id])
+            ->orderByDesc('created_at')
+            ->orderBy('id');
     }
 
     private function optionsForObject(BusinessObject $object, ?User $user = null): array

@@ -8,6 +8,7 @@ use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Support\BusinessWorkspace;
 use App\Support\ObjectRelations;
+use App\Support\ProjectVisibility;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,12 +18,14 @@ class ProjectCustomerController extends Controller
     public function __construct(
         private BusinessWorkspace $workspace,
         private ObjectRelations $relations,
+        private ProjectVisibility $projectVisibility,
     ) {}
 
     public function show(Request $request, ObjectRecord $customer): JsonResponse
     {
         $this->authorizeCustomerManager($request);
         $this->guardObject($customer, 'customer');
+        $this->guardVisible($request, $customer);
         $this->relations->preloadLabels(collect([$customer]), $request->user());
 
         return response()->json(['customer' => $this->relations->formatRecord($customer, $request->user())]);
@@ -47,6 +50,7 @@ class ProjectCustomerController extends Controller
     {
         $this->authorizeCustomerManager($request);
         $this->guardObject($customer, 'customer');
+        $this->guardVisible($request, $customer);
         $data = $this->customerData($request);
 
         DB::transaction(function () use ($customer, $data, $request, $writer): void {
@@ -73,6 +77,7 @@ class ProjectCustomerController extends Controller
     {
         $this->authorizeCustomerManager($request);
         $this->guardObject($customer, 'customer');
+        $this->guardVisible($request, $customer);
         $data = $this->contactData($request);
         $contact = $writer->handle(
             BusinessObject::where('key', 'customer_contact')->firstOrFail(),
@@ -89,6 +94,8 @@ class ProjectCustomerController extends Controller
         $this->authorizeCustomerManager($request);
         $this->guardObject($customer, 'customer');
         $this->guardObject($contact, 'customer_contact');
+        $this->guardVisible($request, $customer);
+        $this->guardVisible($request, $contact);
         abort_unless(($contact->payload['customer_id'] ?? null) === $customer->id, 404);
         $data = $this->contactData($request);
 
@@ -137,6 +144,11 @@ class ProjectCustomerController extends Controller
     private function guardObject(ObjectRecord $record, string $key): void
     {
         abort_unless($record->businessObject->key === $key, 404);
+    }
+
+    private function guardVisible(Request $request, ObjectRecord $record): void
+    {
+        abort_unless($this->projectVisibility->allowsRecord($request->user(), $record), 404);
     }
 
     /** @return array{id: string, name: string, phone: string|null, customer_id: string} */

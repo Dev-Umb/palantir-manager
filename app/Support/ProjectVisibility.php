@@ -7,6 +7,7 @@ use App\Models\ObjectRecord;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\DB;
 
 class ProjectVisibility
 {
@@ -41,8 +42,22 @@ class ProjectVisibility
             return $query;
         }
 
+        $roles = $this->roles($user);
         if ($this->isAdmin($user)) {
             return $query;
+        }
+
+        if (in_array($object->key, ['customer', 'customer_contact'], true)
+            && $this->hasElevatedCustomerScope($roles)) {
+            return $query;
+        }
+
+        if (in_array('business', $roles, true) && $object->key === 'customer') {
+            return $this->scopeCustomers($query, $user);
+        }
+
+        if (in_array('business', $roles, true) && $object->key === 'customer_contact') {
+            return $this->scopeCustomerContacts($query, $user);
         }
 
         $projectField = $this->projectField($object);
@@ -167,6 +182,92 @@ class ProjectVisibility
     private function isAdmin(User $user): bool
     {
         return in_array('admin', $this->roles($user), true);
+    }
+
+    /** @param array<int, string> $roles */
+    private function hasElevatedCustomerScope(array $roles): bool
+    {
+        return collect(['admin', 'finance', 'tender'])->contains(
+            fn (string $role): bool => in_array($role, $roles, true),
+        );
+    }
+
+    private function scopeCustomers(Builder|Relation $query, User $user): Builder|Relation
+    {
+        $projectObjectId = BusinessObject::query()->where('key', 'project')->value('id');
+        if (! $projectObjectId) {
+            return $query->where('created_by', $user->id);
+        }
+
+        $recordsTable = (new ObjectRecord)->getTable();
+        $driver = DB::connection()->getDriverName();
+        $projectCustomerExpression = $driver === 'pgsql'
+            ? "customer_projects.payload->>'customer_id'"
+            : "json_extract(customer_projects.payload, '$.customer_id')";
+        $projectOwnerExpression = $driver === 'pgsql'
+            ? "customer_projects.payload->>'business_owner_user_id'"
+            : "json_extract(customer_projects.payload, '$.business_owner_user_id')";
+        $customerIdExpression = $driver === 'pgsql'
+            ? "{$recordsTable}.id::text"
+            : "{$recordsTable}.id";
+
+        return $query->where(function (Builder $customers) use (
+            $projectObjectId,
+            $recordsTable,
+            $projectCustomerExpression,
+            $projectOwnerExpression,
+            $customerIdExpression,
+            $user,
+        ): void {
+            $customers->whereExists(function ($projects) use (
+                $projectObjectId,
+                $recordsTable,
+                $projectCustomerExpression,
+                $projectOwnerExpression,
+                $customerIdExpression,
+                $user,
+            ): void {
+                $projects->selectRaw('1')
+                    ->from("{$recordsTable} as customer_projects")
+                    ->where('customer_projects.business_object_id', $projectObjectId)
+                    ->whereRaw("{$projectCustomerExpression} = {$customerIdExpression}")
+                    ->whereRaw("{$projectOwnerExpression} = ?", [(string) $user->id]);
+            })->orWhere(function (Builder $createdCustomers) use (
+                $projectObjectId,
+                $recordsTable,
+                $projectCustomerExpression,
+                $customerIdExpression,
+                $user,
+            ): void {
+                $createdCustomers->where('created_by', $user->id)
+                    ->whereNotExists(function ($projects) use (
+                        $projectObjectId,
+                        $recordsTable,
+                        $projectCustomerExpression,
+                        $customerIdExpression,
+                    ): void {
+                        $projects->selectRaw('1')
+                            ->from("{$recordsTable} as customer_projects")
+                            ->where('customer_projects.business_object_id', $projectObjectId)
+                            ->whereRaw("{$projectCustomerExpression} = {$customerIdExpression}");
+                    });
+            });
+        });
+    }
+
+    private function scopeCustomerContacts(Builder|Relation $query, User $user): Builder|Relation
+    {
+        $customerObject = BusinessObject::query()->where('key', 'customer')->first();
+        if (! $customerObject) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $visibleCustomers = $this->scopeCustomers(
+            $customerObject->records()->select('id'),
+            $user,
+        );
+
+        return $query->whereIn('payload->customer_id', $visibleCustomers);
     }
 
     private function projectField(BusinessObject $object): ?array
