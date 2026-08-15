@@ -40,8 +40,8 @@ class ObjectRelations
     /** @var array<string, array{id: string, name: string, phone: string, customer_id: string}> */
     private array $contactDetailsById = [];
 
-    /** @var array<string, string|null> */
-    private array $customerNatureById = [];
+    /** @var array<string, array{id: string, name: string, address: string, level: string, customer_nature: string}> */
+    private array $customerDetailsById = [];
 
     public function __construct(
         private ProjectVisibility $projectVisibility,
@@ -201,6 +201,10 @@ class ObjectRelations
                 ->filter()
                 ->values()
                 ->all();
+            $customerId = $payload['customer_id'] ?? null;
+            $formatted['customer'] = is_string($customerId)
+                ? ($this->customerDetailsById[$customerId] ?? null)
+                : null;
         }
 
         return $formatted;
@@ -264,10 +268,16 @@ class ObjectRelations
 
     public function preloadLabels(Collection $records, ?User $user = null): void
     {
+        $this->labelCache = [];
+        $this->accountLabelCache = [];
+        $this->projectIdsByContact = [];
+        $this->contactsByCustomer = [];
+        $this->projectsByCustomer = [];
+        $this->contactDetailsById = [];
+        $this->customerDetailsById = [];
         $records->each(fn (ObjectRecord $record) => $record->loadMissing('businessObject'));
-        $this->preloadDerivedRelations($records, $user);
-
         $this->preloadRelationLabels($records);
+        $this->preloadDerivedRelations($records, $user);
     }
 
     public function preloadRelationLabels(Collection $records): void
@@ -345,6 +355,9 @@ class ObjectRelations
             $this->labelCache[$id] = $record ? $this->brief($record) : null;
             if ($record?->businessObject?->key === 'customer_contact') {
                 $this->contactDetailsById[$record->id] = $this->contactDetails($record);
+            }
+            if ($record?->businessObject?->key === 'customer') {
+                $this->customerDetailsById[$record->id] = $this->customerDetails($record);
             }
         }
     }
@@ -1051,9 +1064,10 @@ class ObjectRelations
         }
         if ($record->businessObject?->key === 'project') {
             $customerId = $payload['customer_id'] ?? null;
-            $payload['customer_nature'] = is_string($customerId)
-                ? ($this->customerNatureById[$customerId] ?? null)
-                : null;
+            $customer = is_string($customerId) ? ($this->customerDetailsById[$customerId] ?? null) : null;
+            $payload['customer_address'] = $customer['address'] ?? null;
+            $payload['customer_level'] = $customer['level'] ?? null;
+            $payload['customer_nature'] = ($customer['customer_nature'] ?? '') ?: null;
         }
 
         return $payload;
@@ -1066,17 +1080,15 @@ class ObjectRelations
             ->pluck('payload.customer_id')
             ->filter(fn (mixed $customerId): bool => is_string($customerId) && $customerId !== '')
             ->unique()
+            ->reject(fn (string $customerId): bool => array_key_exists($customerId, $this->customerDetailsById))
             ->values();
         if ($projectCustomerIds->isNotEmpty()) {
             ObjectRecord::query()
                 ->whereIn('id', $projectCustomerIds->all())
                 ->whereRelation('businessObject', 'key', 'customer')
-                ->get(['id', 'payload'])
+                ->get(['id', 'title', 'payload'])
                 ->each(function (ObjectRecord $customer): void {
-                    $nature = $customer->payload['customer_nature'] ?? null;
-                    $this->customerNatureById[$customer->id] = is_string($nature) && $nature !== ''
-                        ? $nature
-                        : null;
+                    $this->customerDetailsById[$customer->id] = $this->customerDetails($customer);
                 });
         }
 
@@ -1203,15 +1215,36 @@ class ObjectRelations
         ];
     }
 
+    /** @return array{id: string, name: string, address: string, level: string, customer_nature: string} */
+    private function customerDetails(ObjectRecord $customer): array
+    {
+        $payload = $customer->payload ?? [];
+
+        return [
+            'id' => $customer->id,
+            'name' => trim((string) ($payload['name'] ?? $customer->title)),
+            'address' => trim((string) ($payload['address'] ?? '')),
+            'level' => trim((string) ($payload['level'] ?? '')),
+            'customer_nature' => trim((string) ($payload['customer_nature'] ?? '')),
+        ];
+    }
+
     private function optionMeta(ObjectRecord $record, BusinessObject $object, ?Collection $related = null): array
     {
         return match ($object->key) {
+            'customer' => [
+                'name' => trim((string) ($record->payload['name'] ?? $record->title)),
+                'address' => trim((string) ($record->payload['address'] ?? '')),
+                'level' => trim((string) ($record->payload['level'] ?? '')),
+                'customer_nature' => trim((string) ($record->payload['customer_nature'] ?? '')),
+            ],
             'project' => [
                 'customer_id' => $record->payload['customer_id'] ?? null,
                 'project_no' => $record->payload['project_no'] ?? $record->code,
             ],
             'customer_contact' => [
                 'customer_id' => $record->payload['customer_id'] ?? null,
+                'name' => trim((string) ($record->payload['name'] ?? $record->title)),
                 'phone' => $record->payload['phone'] ?? '',
             ],
             'production_team' => [

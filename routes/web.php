@@ -10,6 +10,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OntologyController;
 use App\Http\Controllers\ProjectContractAmountController;
 use App\Http\Controllers\ProjectCustomerController;
+use App\Http\Controllers\ProjectCustomerProfilePreviewController;
 use App\Http\Controllers\RbacController;
 use App\Http\Controllers\RelationOptionsController;
 use App\Http\Controllers\RequisitionController;
@@ -92,6 +93,8 @@ Route::middleware('auth')->group(function () {
         ->name('projects.contract-amount.sync');
     Route::get('/project-customers/{customer}', [ProjectCustomerController::class, 'show'])->name('project-customers.show');
     Route::post('/project-customers', [ProjectCustomerController::class, 'store'])->name('project-customers.store');
+    Route::post('/project-customer-profile/preview', ProjectCustomerProfilePreviewController::class)
+        ->name('project-customer-profile.preview');
     Route::put('/project-customers/{customer}', [ProjectCustomerController::class, 'update'])->name('project-customers.update');
     Route::post('/project-customers/{customer}/contacts', [ProjectCustomerController::class, 'storeContact'])->name('project-customers.contacts.store');
     Route::put('/project-customers/{customer}/contacts/{contact}', [ProjectCustomerController::class, 'updateContact'])->name('project-customers.contacts.update');

@@ -3,7 +3,12 @@ import { Download, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, X } from 
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Layout from '../../Components/Layout';
 import CustomerContactModal from '../../Components/CustomerContactModal';
-import ProjectCustomerManager from '../../Components/ProjectCustomerManager';
+import ProjectCustomerInlineFields, {
+    CustomerProfileConflictDialog,
+    normalizedProjectCustomerProfile,
+    previewProjectCustomerProfile,
+    projectCustomerProfile,
+} from '../../Components/ProjectCustomerInlineFields';
 import { SchemaForm } from '../../Components/FieldControl';
 import LineItemsEditor, { emptyItem } from '../../Components/LineItemsEditor';
 import {
@@ -38,8 +43,10 @@ export default function Index({ objects = [], currentObject, records, subtotal =
     );
     const createForm = useForm({ payload: defaults(currentObject.fields, params) });
     const createSubmittingRef = useRef(false);
-    const createRelatedSavingRef = useRef(false);
-    const [createRelatedSaving, setCreateRelatedSaving] = useState(false);
+    const createCheckingCustomerRef = useRef(false);
+    const [createCheckingCustomer, setCreateCheckingCustomer] = useState(false);
+    const [createCustomerError, setCreateCustomerError] = useState('');
+    const [createCustomerConflicts, setCreateCustomerConflicts] = useState([]);
     const contactCan = {
         create: (auth.permissions || []).includes('object.customer_contact.create'),
         update: (auth.permissions || []).includes('object.customer_contact.update'),
@@ -65,22 +72,41 @@ export default function Index({ objects = [], currentObject, records, subtotal =
         setTableRecords((current) => current.map((record) => record.id === nextRecord.id ? nextRecord : record));
     }
 
-    function create(event) {
+    async function create(event) {
         event.preventDefault();
-        if (createSubmittingRef.current || createRelatedSavingRef.current) return;
+        await submitCreateProject(false, false);
+    }
+
+    async function submitCreateProject(overwriteConfirmed, skipPreview) {
+        if (createSubmittingRef.current || createCheckingCustomerRef.current) return;
+
+        const profile = createForm.data.payload.customer_profile;
+        if (currentObject.key === 'project' && can.manage_customers && profile && !skipPreview) {
+            createCheckingCustomerRef.current = true;
+            setCreateCheckingCustomer(true);
+            setCreateCustomerError('');
+            try {
+                const preview = await previewProjectCustomerProfile(profile);
+                if (preview.conflicts?.length) {
+                    setCreateCustomerConflicts(preview.conflicts);
+                    return;
+                }
+            } catch (error) {
+                setCreateCustomerError(error.message || '客户资料检查失败。');
+                return;
+            } finally {
+                createCheckingCustomerRef.current = false;
+                setCreateCheckingCustomer(false);
+            }
+        }
 
         createSubmittingRef.current = true;
-        createForm.post(`/objects/${currentObject.id}`, {
+        createForm.transform((data) => withCustomerProfile(data, profile, overwriteConfirmed)).post(`/objects/${currentObject.id}`, {
             preserveScroll: true,
             onFinish: () => {
                 createSubmittingRef.current = false;
             },
         });
-    }
-
-    function setCreateCustomerSaving(isSaving) {
-        createRelatedSavingRef.current = isSaving;
-        setCreateRelatedSaving(isSaving);
     }
 
     function saveColumnOrder(order) {
@@ -193,15 +219,25 @@ export default function Index({ objects = [], currentObject, records, subtotal =
                             fields={orderedFields}
                             payload={createForm.data.payload}
                             setPayload={(payload) => createForm.setData('payload', payload)}
-                            processing={createForm.processing || createRelatedSaving}
-                            errors={createForm.errors}
+                            processing={createForm.processing || createCheckingCustomer}
+                            errors={{ ...createForm.errors, customer_profile: createCustomerError }}
                             submitLabel={`新建${objectLabel}`}
                             relationOptions={relationOptions}
                             canManageCustomers={can.manage_customers}
-                            onRelatedSavingChange={setCreateCustomerSaving}
                         />
                     </form>
                 </Modal>
+            )}
+            {createCustomerConflicts.length > 0 && (
+                <CustomerProfileConflictDialog
+                    conflicts={createCustomerConflicts}
+                    processing={createForm.processing}
+                    onCancel={() => setCreateCustomerConflicts([])}
+                    onConfirm={() => {
+                        setCreateCustomerConflicts([]);
+                        submitCreateProject(true, true);
+                    }}
+                />
             )}
             {mode === 'detail' && selectedRecord && (
                 <Modal title={`${selectedRecord.code} · 详情`} closeHref={closeHref}>
@@ -509,15 +545,41 @@ function exportUrlFor(objectKey, params) {
 function EditRecordModal({ object, record, fields, relationOptions, closeHref, canManageCustomers = false }) {
     const updateForm = useForm({ payload: payloadForEdit(record.payload, fields) });
     const submittingRef = useRef(false);
-    const relatedSavingRef = useRef(false);
-    const [relatedSaving, setRelatedSaving] = useState(false);
+    const checkingCustomerRef = useRef(false);
+    const [checkingCustomer, setCheckingCustomer] = useState(false);
+    const [customerError, setCustomerError] = useState('');
+    const [customerConflicts, setCustomerConflicts] = useState([]);
 
-    function update(event) {
+    async function update(event) {
         event.preventDefault();
-        if (submittingRef.current || relatedSavingRef.current) return;
+        await submitUpdate(false, false);
+    }
+
+    async function submitUpdate(overwriteConfirmed, skipPreview) {
+        if (submittingRef.current || checkingCustomerRef.current) return;
+
+        const profile = updateForm.data.payload.customer_profile;
+        if (object.key === 'project' && canManageCustomers && profile && !skipPreview) {
+            checkingCustomerRef.current = true;
+            setCheckingCustomer(true);
+            setCustomerError('');
+            try {
+                const preview = await previewProjectCustomerProfile(profile);
+                if (preview.conflicts?.length) {
+                    setCustomerConflicts(preview.conflicts);
+                    return;
+                }
+            } catch (error) {
+                setCustomerError(error.message || '客户资料检查失败。');
+                return;
+            } finally {
+                checkingCustomerRef.current = false;
+                setCheckingCustomer(false);
+            }
+        }
 
         submittingRef.current = true;
-        updateForm.put(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, {
+        updateForm.transform((data) => withCustomerProfile(data, profile, overwriteConfirmed)).put(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, {
             preserveScroll: true,
             onFinish: () => {
                 submittingRef.current = false;
@@ -525,31 +587,50 @@ function EditRecordModal({ object, record, fields, relationOptions, closeHref, c
         });
     }
 
-    function setCustomerSaving(isSaving) {
-        relatedSavingRef.current = isSaving;
-        setRelatedSaving(isSaving);
-    }
-
     return (
-        <Modal title={`${record.code} · 编辑`} closeHref={closeHref}>
-            <form onSubmit={update}>
-                <RecordForm
-                    objectKey={object.key}
-                    record={record}
-                    fields={fields}
-                    payload={updateForm.data.payload}
-                    setPayload={(payload) => updateForm.setData('payload', payload)}
-                    processing={updateForm.processing || relatedSaving}
-                    errors={updateForm.errors}
-                    submitLabel="保存"
-                    relationOptions={relationOptions}
-                    recordDisplay={record.display}
-                    canManageCustomers={canManageCustomers}
-                    onRelatedSavingChange={setCustomerSaving}
+        <>
+            <Modal title={`${record.code} · 编辑`} closeHref={closeHref}>
+                <form onSubmit={update}>
+                    <RecordForm
+                        objectKey={object.key}
+                        record={record}
+                        fields={fields}
+                        payload={updateForm.data.payload}
+                        setPayload={(payload) => updateForm.setData('payload', payload)}
+                        processing={updateForm.processing || checkingCustomer}
+                        errors={{ ...updateForm.errors, customer_profile: customerError }}
+                        submitLabel="保存"
+                        relationOptions={relationOptions}
+                        recordDisplay={record.display}
+                        canManageCustomers={canManageCustomers}
+                    />
+                </form>
+            </Modal>
+            {customerConflicts.length > 0 && (
+                <CustomerProfileConflictDialog
+                    conflicts={customerConflicts}
+                    processing={updateForm.processing}
+                    onCancel={() => setCustomerConflicts([])}
+                    onConfirm={() => {
+                        setCustomerConflicts([]);
+                        submitUpdate(true, true);
+                    }}
                 />
-            </form>
-        </Modal>
+            )}
+        </>
     );
+}
+
+function withCustomerProfile(data, profile, overwriteConfirmed) {
+    if (!profile) return data;
+
+    return {
+        ...data,
+        payload: {
+            ...data.payload,
+            customer_profile: normalizedProjectCustomerProfile(profile, overwriteConfirmed),
+        },
+    };
 }
 
 function payloadForEdit(payload, fields) {
@@ -581,17 +662,19 @@ function Modal({ title, closeHref, children }) {
     );
 }
 
-function RecordForm({ objectKey, record = null, fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {}, canManageCustomers = false, onRelatedSavingChange }) {
+function RecordForm({ objectKey, record = null, fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {}, canManageCustomers = false }) {
     const itemFields = fields.filter((field) => field.scope === 'item');
+    const customerProfileFieldKeys = new Set(['customer_id', 'customer_contact_ids', 'customer_address', 'customer_level', 'customer_nature']);
     const formFields = objectKey === 'customer'
         ? fields.filter((field) => field.key !== 'cooperation_history')
-        : fields;
+        : fields.filter((field) => !(objectKey === 'project' && canManageCustomers && customerProfileFieldKeys.has(field.key)));
     const [contactClearNotice, setContactClearNotice] = useState('');
     const scopedOptions = scopedRelationOptions(relationOptions, payload, recordDisplay);
     const selectedTeam = scopedOptions.team_id?.items?.find((item) => item.id === payload.team_id);
     const shownLeader = Object.prototype.hasOwnProperty.call(payload, 'team_leader_name')
         ? payload.team_leader_name
         : selectedTeam?.meta?.leader_name;
+    const customerProfile = payload.customer_profile || projectCustomerProfile(payload, record, relationOptions);
 
     function setField(key, value) {
         const next = { ...payload, [key]: value };
@@ -612,6 +695,15 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
         setPayload(next);
     }
 
+    function setCustomerProfile(profile) {
+        setPayload({
+            ...payload,
+            customer_id: profile.customer_id || '',
+            customer_contact_ids: profile.contacts.filter((contact) => contact.id).map((contact) => contact.id),
+            customer_profile: profile,
+        });
+    }
+
     return (
         <SchemaForm
             fields={formFields}
@@ -625,11 +717,11 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
                 <CustomerProjectHistory projects={record?.cooperation_projects || []} />
             )}
             {objectKey === 'project' && canManageCustomers && (
-                <ProjectCustomerManager
-                    customerId={payload.customer_id}
-                    onCustomerSelected={(customerId) => setField('customer_id', customerId)}
-                    onContactSelected={(contactId) => setField('customer_contact_ids', [...new Set([...(payload.customer_contact_ids || []), contactId])])}
-                    onSavingChange={onRelatedSavingChange}
+                <ProjectCustomerInlineFields
+                    profile={customerProfile}
+                    onChange={setCustomerProfile}
+                    customerOptions={relationOptions.customer_id || {}}
+                    contactOptions={scopedOptions.customer_contact_ids || {}}
                 />
             )}
             {itemFields.length > 0 && (
@@ -647,7 +739,7 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
                 </div>
             )}
             {contactClearNotice && <p className="notice form-notice" role="status">{contactClearNotice}</p>}
-            {Object.values(errors || {}).map((error, index) => (
+            {Object.values(errors || {}).filter(Boolean).map((error, index) => (
                 <p className="form-error" key={`${error}-${index}`}>{error}</p>
             ))}
         </SchemaForm>

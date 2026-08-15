@@ -151,6 +151,8 @@ return [
                 $field('name', '项目名称', 'text', ['required' => true]),
                 $multirelation('customer_contact_ids', '客户联系人', 'customer_contact'),
                 $relation('customer_id', '客户名称', 'customer', ['required' => true]),
+                $field('customer_address', '客户地址', 'lookup'),
+                $field('customer_level', '客户等级', 'lookup'),
                 $field('customer_nature', '客户性质', 'lookup'),
                 $code('project_no', '项目编号'),
                 $field('business_owner_user_id', '负责业务员', 'account'),

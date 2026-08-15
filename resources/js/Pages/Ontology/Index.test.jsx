@@ -40,7 +40,6 @@ vi.mock('@inertiajs/react', async () => {
         usePage: () => ({ props: { auth: { user: { id: inertia.userId }, permissions: inertia.permissions } } }),
         useForm: (initial) => {
             const [data, setFormData] = React.useState(initial);
-
             return {
                 data,
                 errors: {},
@@ -48,6 +47,12 @@ vi.mock('@inertiajs/react', async () => {
                 setData: (key, value) => setFormData((current) => ({ ...current, [key]: value })),
                 post: inertia.post,
                 put: (url, options) => inertia.put(url, data, options),
+                transform: (callback) => {
+                    return {
+                        post: (url, options) => inertia.post(url, callback(data), options),
+                        put: (url, options) => inertia.put(url, callback(data), options),
+                    };
+                },
             };
         },
     };
@@ -364,7 +369,7 @@ describe('project customer contact choices', () => {
         vi.restoreAllMocks();
     });
 
-    it('keeps the project submit action locked while a new customer is still saving', async () => {
+    it('keeps the form intact and only submits after customer conflicts are confirmed', async () => {
         let resolveRequest;
         const request = new Promise((resolve) => {
             resolveRequest = resolve;
@@ -387,19 +392,41 @@ describe('project customer contact choices', () => {
             />,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: /新增客户/ }));
+        fireEvent.change(screen.getByLabelText('项目名称'), { target: { value: '演示项目' } });
         fireEvent.change(screen.getByLabelText('客户名称*'), { target: { value: '演示客户' } });
-        fireEvent.click(screen.getByRole('button', { name: '保存客户' }));
+        fireEvent.change(screen.getByLabelText('客户地址'), { target: { value: '演示地址' } });
 
         const projectSubmit = container.querySelector('.modal-body > form button[type="submit"]');
+        fireEvent.click(projectSubmit);
         expect(projectSubmit).toBeDisabled();
 
         resolveRequest({
             ok: true,
-            json: async () => ({ customer: { id: 'customer-1', title: '演示客户', payload: { name: '演示客户' }, contacts: [] } }),
+            json: async () => ({
+                customer: { id: 'customer-1', name: '演示客户', address: '演示地址' },
+                conflicts: [{ field: 'level', label: '客户等级', current: 'B', submitted: 'A' }],
+            }),
         });
 
-        await waitFor(() => expect(projectSubmit).toBeEnabled());
+        const conflictDialog = await screen.findByRole('dialog', { name: '客户资料冲突' });
+        expect(inertia.post).not.toHaveBeenCalled();
+        expect(screen.getByPlaceholderText('搜索已有客户，或直接输入新客户名称')).toHaveValue('演示客户');
+        fireEvent.click(within(conflictDialog).getByRole('button', { name: '确认覆盖并保存' }));
+
+        await waitFor(() => expect(inertia.post).toHaveBeenCalledWith(
+            '/objects/3',
+            expect.objectContaining({
+                payload: expect.objectContaining({
+                    name: '演示项目',
+                    customer_profile: expect.objectContaining({
+                        name: '演示客户',
+                        address: '演示地址',
+                        overwrite_confirmed: true,
+                    }),
+                }),
+            }),
+            expect.objectContaining({ preserveScroll: true }),
+        ));
     });
 
     it('shows no contact candidates before a customer is selected', async () => {

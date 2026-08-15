@@ -8,8 +8,10 @@ use App\Actions\CreateObjectRecord;
 use App\Actions\ReassignTenderBusinessOwner;
 use App\Actions\ResolveInboundMaterials;
 use App\Actions\SyncProjectContractAmount;
+use App\Actions\SyncProjectCustomerProfile;
 use App\Actions\SyncProjectFinance;
 use App\Actions\SyncProjectNotifications;
+use App\Http\Requests\PreviewProjectCustomerProfileRequest;
 use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
@@ -24,6 +26,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
@@ -46,6 +49,7 @@ class OntologyController extends Controller
         private BusinessWorkspace $workspace,
         private ReassignTenderBusinessOwner $tenderBusinessOwner,
         private BuildFilteredRecordSubtotal $filteredRecordSubtotal,
+        private SyncProjectCustomerProfile $projectCustomerProfile,
     ) {}
 
     public function index(Request $request, ?string $object = null): Response|RedirectResponse
@@ -231,6 +235,7 @@ class OntologyController extends Controller
         abort_unless($this->workspace->allowsDirectObjectAccess($object), 404);
         abort_unless($request->user()->canDo("object.{$object->key}.create") && $this->canCreate($object, $request->user()), 403);
 
+        $customerProfile = $this->projectCustomerProfileData($request, $object);
         $payload = $this->applySystemPayload(
             $object,
             $this->scopeWritablePayload($object, $this->validatePayload($request, $object), [], $request->user()),
@@ -243,8 +248,13 @@ class OntologyController extends Controller
             $this->guardContractEvidence($payload);
         }
         $this->guardTenderStatus($object, $payload);
-        $record = DB::transaction(function () use ($object, $payload, $request, $writer): ObjectRecord {
+        $record = DB::transaction(function () use ($object, $payload, $customerProfile, $request, $writer): ObjectRecord {
             $this->relations->lockReferenceGraph();
+            if ($object->key === 'project' && $customerProfile) {
+                $customerResult = $this->projectCustomerProfile->handle($customerProfile, $request->user(), $writer);
+                $payload['customer_id'] = $customerResult['customer_id'];
+                $payload['customer_contact_ids'] = $customerResult['contact_ids'];
+            }
             if ($object->key === 'inbound') {
                 $payload = $this->inboundMaterials->handle($payload, $request->user());
             }
@@ -282,6 +292,7 @@ class OntologyController extends Controller
             abort_unless($this->projectVisibility->allowsProjectUpdate($request->user(), $record), 403);
         }
 
+        $customerProfile = $this->projectCustomerProfileData($request, $object);
         $payload = $this->applySystemPayload(
             $object,
             $this->scopeWritablePayload(
@@ -292,7 +303,7 @@ class OntologyController extends Controller
             ),
             $request->user(),
         );
-        DB::transaction(function () use ($record, $object, $payload, $writer, $request): void {
+        DB::transaction(function () use ($record, $object, $payload, $customerProfile, $writer, $request): void {
             $this->relations->lockReferenceGraph();
             if (in_array($object->key, ['stock_ledger', 'material'], true)) {
                 BusinessObject::query()->whereKey($object->id)->lockForUpdate()->firstOrFail();
@@ -300,6 +311,11 @@ class OntologyController extends Controller
             $lockedRecord = ObjectRecord::query()->lockForUpdate()->findOrFail($record->id);
             $oldPayload = $lockedRecord->payload ?? [];
             $payload = $this->mergeReadonlyPayload($object, $payload, $oldPayload);
+            if ($object->key === 'project' && $customerProfile) {
+                $customerResult = $this->projectCustomerProfile->handle($customerProfile, $request->user(), $writer);
+                $payload['customer_id'] = $customerResult['customer_id'];
+                $payload['customer_contact_ids'] = $customerResult['contact_ids'];
+            }
             if ($object->key === 'team_log'
                 && ($lockedRecord->payload['team_id'] ?? null) !== ($payload['team_id'] ?? null)) {
                 unset($payload['team_leader_name']);
@@ -806,7 +822,11 @@ class OntologyController extends Controller
                 continue;
             }
 
-            if (in_array($field['type'], ['multirelation', 'multiaccount'], true)) {
+            if ($object->key === 'project'
+                && $request->has('payload.customer_profile')
+                && ($field['key'] ?? null) === 'customer_id') {
+                $rules["payload.{$field['key']}"] = ['nullable', 'string'];
+            } elseif (in_array($field['type'], ['multirelation', 'multiaccount'], true)) {
                 $rules["payload.{$field['key']}"] = [
                     ! empty($field['required']) ? 'required' : 'nullable',
                     'array',
@@ -905,6 +925,30 @@ class OntologyController extends Controller
         $request->attributes->set('cleared_project_contact_count', $contactResult['cleared_count']);
 
         return $payload;
+    }
+
+    /**
+     * @return array{customer_id: string|null, name: string, address: string, level: string, customer_nature: string, overwrite_confirmed: bool, contacts: array<int, array{id: string|null, name: string, phone: string}>}|null
+     */
+    private function projectCustomerProfileData(Request $request, BusinessObject $object): ?array
+    {
+        if ($object->key !== 'project' || ! $request->has('payload.customer_profile')) {
+            return null;
+        }
+
+        abort_unless(
+            $this->workspace->isAdmin($request->user()) || $this->workspace->isBusiness($request->user()),
+            403,
+        );
+        $rules = [
+            'payload.customer_profile' => ['required', 'array'],
+            ...PreviewProjectCustomerProfileRequest::profileRules('payload.customer_profile.'),
+        ];
+        $validated = Validator::make($request->all(), $rules)->validate();
+
+        return PreviewProjectCustomerProfileRequest::normalizeProfile(
+            data_get($validated, 'payload.customer_profile', []),
+        );
     }
 
     private function applySystemPayload(BusinessObject $object, array $payload, ?User $user): array

@@ -638,6 +638,18 @@ input:focus, select:focus, textarea:focus { border-color: var(--steel); box-shad
 .project-customer-manager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; }
 .project-customer-manager > div:first-child { display: grid; gap: 4px; }
 .project-customer-manager > div:first-child span { color: var(--muted); font-size: 12px; }
+.project-customer-inline { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px 16px; margin: 4px 0 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.project-customer-inline legend { padding: 0 7px; color: var(--steel); font-size: 13px; font-weight: 750; }
+.project-customer-inline > .muted { margin: -4px 0 2px; font-size: 12px; }
+.project-customer-inline label { min-width: 0; }
+.customer-profile-option { width: 100%; display: grid; justify-items: start; gap: 2px; text-align: left; }
+.customer-profile-option small { color: var(--muted); font-size: 11px; }
+.project-contact-selector { display: grid; gap: 6px; }
+.project-contact-selector > span { color: var(--muted); font-size: 12px; font-weight: 650; }
+.project-contact-rows { display: grid; gap: 10px; padding-top: 4px; }
+.project-contact-rows-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.project-contact-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; align-items: end; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.project-contact-row .icon-link { margin-bottom: 1px; }
 .embedded-manager { position: fixed; z-index: 80; inset: 12% 18%; overflow: auto; padding: 20px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 24px 80px rgba(15, 23, 42, .25); }
 .embedded-manager-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .embedded-manager-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
@@ -900,6 +912,16 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
 .modal-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .modal-body { min-height: 0; overflow: auto; padding: 18px; }
 .contact-modal-backdrop { z-index: 50; }
+.customer-conflict-backdrop { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: 24px; background: rgba(21, 27, 34, .48); }
+.customer-conflict-dialog { width: min(620px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 24px 80px rgba(15, 23, 42, .28); }
+.customer-conflict-dialog h3 { margin: 0 0 8px; }
+.customer-conflict-dialog > p { margin: 0 0 16px; color: var(--muted); line-height: 1.6; }
+.customer-conflict-dialog dl { display: grid; gap: 8px; margin: 0; }
+.customer-conflict-dialog dl > div { display: grid; grid-template-columns: minmax(90px, .45fr) minmax(0, 1.55fr); gap: 10px; padding: 10px 12px; border-radius: var(--radius); background: var(--surface-2); }
+.customer-conflict-dialog dt { font-weight: 700; }
+.customer-conflict-dialog dd { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; margin: 0; overflow-wrap: anywhere; }
+.customer-conflict-dialog dd strong { color: var(--steel); }
+.customer-conflict-dialog .form-actions { justify-content: flex-end; }
 .contact-modal-panel { width: min(540px, 100%); }
 .contact-modal-head { padding: 18px 20px 16px; }
 .contact-modal-head > div { min-width: 0; display: grid; gap: 7px; }
@@ -1518,11 +1540,17 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
     .advanced-filter-row { grid-template-columns: 1fr; }
     .contract-sync-card { align-items: stretch; flex-direction: column; }
     .project-customer-manager { align-items: stretch; flex-direction: column; }
+    .project-customer-inline { grid-template-columns: 1fr; }
+    .project-contact-row { grid-template-columns: 1fr 1fr 38px; }
     .embedded-manager { inset: 4% 3%; }
     .embedded-manager-fields { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
+    .project-contact-row { grid-template-columns: 1fr 38px; }
+    .project-contact-row label { grid-column: 1 / -1; }
+    .project-contact-row .icon-link { grid-column: 2; grid-row: 1; }
+    .customer-conflict-dialog dl > div { grid-template-columns: 1fr; }
     .cockpit-page-head { align-items: flex-start; flex-direction: column; }
     .cockpit-page-meta { justify-content: flex-start; }
     .cockpit-kpi-grid { grid-template-columns: 1fr; }
