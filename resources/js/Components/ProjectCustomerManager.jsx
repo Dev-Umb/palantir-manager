@@ -1,13 +1,15 @@
 import { Pencil, Plus, Users, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-export default function ProjectCustomerManager({ customerId, onCustomerSelected, onContactSelected }) {
+export default function ProjectCustomerManager({ customerId, onCustomerSelected, onContactSelected, onSavingChange }) {
     const [open, setOpen] = useState(false);
     const [customer, setCustomer] = useState(null);
     const [customerDraft, setCustomerDraft] = useState(emptyCustomer());
     const [contactDraft, setContactDraft] = useState({ id: '', name: '', phone: '' });
     const [errors, setErrors] = useState([]);
+    const [notice, setNotice] = useState('');
     const [saving, setSaving] = useState(false);
+    const savingRef = useRef(false);
 
     useEffect(() => {
         if (!open || !customerId) return;
@@ -36,12 +38,14 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
         setCustomerDraft(emptyCustomer());
         setContactDraft({ id: '', name: '', phone: '' });
         setErrors([]);
+        setNotice('');
         setOpen(true);
     }
 
     async function saveCustomer() {
-        setSaving(true);
+        if (!beginSaving()) return;
         setErrors([]);
+        setNotice('');
         try {
             const response = await fetch(customer ? `/project-customers/${customer.id}` : '/project-customers', {
                 method: customer ? 'PUT' : 'POST',
@@ -52,10 +56,11 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
             if (!response.ok) throw new Error(firstError(data));
             setCustomer(data.customer);
             onCustomerSelected?.(data.customer.id);
+            setNotice('客户已保存并选中，请继续保存项目。');
         } catch (error) {
             setErrors([error.message || '客户保存失败。']);
         } finally {
-            setSaving(false);
+            finishSaving();
         }
     }
 
@@ -64,8 +69,9 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
             setErrors(['请先保存客户，再新增联系人。']);
             return;
         }
-        setSaving(true);
+        if (!beginSaving()) return;
         setErrors([]);
+        setNotice('');
         try {
             const editing = Boolean(contactDraft.id);
             const response = await fetch(editing
@@ -80,10 +86,34 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
             setContactDraft({ id: '', name: '', phone: '' });
             onContactSelected?.(data.contact.id);
             await loadCustomer(customer.id);
+            setNotice('联系人已保存并选中，请继续保存项目。');
         } catch (error) {
             setErrors([error.message || '联系人保存失败。']);
         } finally {
-            setSaving(false);
+            finishSaving();
+        }
+    }
+
+    function beginSaving() {
+        if (savingRef.current) return false;
+
+        savingRef.current = true;
+        setSaving(true);
+        onSavingChange?.(true);
+
+        return true;
+    }
+
+    function finishSaving() {
+        savingRef.current = false;
+        setSaving(false);
+        onSavingChange?.(false);
+    }
+
+    function preventProjectSubmit(event) {
+        if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+            event.preventDefault();
+            event.stopPropagation();
         }
     }
 
@@ -98,7 +128,7 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
                 {customerId && <button type="button" className="secondary-button small-action" onClick={() => setOpen(true)}><Users size={14} /> 维护当前客户</button>}
             </div>
             {open && (
-                <div className="embedded-manager" role="dialog" aria-label="维护客户与联系人">
+                <div className="embedded-manager" role="dialog" aria-label="维护客户与联系人" onKeyDown={preventProjectSubmit}>
                     <div className="embedded-manager-head"><strong>{customer ? '编辑客户资料' : '新增客户资料'}</strong><button type="button" className="icon-link" aria-label="关闭客户维护" onClick={() => setOpen(false)}><X size={15} /></button></div>
                     <div className="embedded-manager-fields">
                         <label><span>客户名称*</span><input value={customerDraft.name} onChange={(event) => setCustomerDraft({ ...customerDraft, name: event.target.value })} /></label>
@@ -122,6 +152,7 @@ export default function ProjectCustomerManager({ customerId, onCustomerSelected,
                             <button type="button" className="secondary-button" onClick={saveContact} disabled={saving}>{contactDraft.id ? '保存联系人修改' : '新增联系人'}</button>
                         </div>
                     )}
+                    {notice && <p className="notice form-notice" role="status">{notice}</p>}
                     {errors.map((error) => <p className="form-error" key={error}>{error}</p>)}
                 </div>
             )}

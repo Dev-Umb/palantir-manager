@@ -37,6 +37,9 @@ export default function Index({ objects = [], currentObject, records, subtotal =
         [columnOrder, currentObject.fields],
     );
     const createForm = useForm({ payload: defaults(currentObject.fields, params) });
+    const createSubmittingRef = useRef(false);
+    const createRelatedSavingRef = useRef(false);
+    const [createRelatedSaving, setCreateRelatedSaving] = useState(false);
     const contactCan = {
         create: (auth.permissions || []).includes('object.customer_contact.create'),
         update: (auth.permissions || []).includes('object.customer_contact.update'),
@@ -64,7 +67,20 @@ export default function Index({ objects = [], currentObject, records, subtotal =
 
     function create(event) {
         event.preventDefault();
-        createForm.post(`/objects/${currentObject.id}`, { preserveScroll: true });
+        if (createSubmittingRef.current || createRelatedSavingRef.current) return;
+
+        createSubmittingRef.current = true;
+        createForm.post(`/objects/${currentObject.id}`, {
+            preserveScroll: true,
+            onFinish: () => {
+                createSubmittingRef.current = false;
+            },
+        });
+    }
+
+    function setCreateCustomerSaving(isSaving) {
+        createRelatedSavingRef.current = isSaving;
+        setCreateRelatedSaving(isSaving);
     }
 
     function saveColumnOrder(order) {
@@ -177,11 +193,12 @@ export default function Index({ objects = [], currentObject, records, subtotal =
                             fields={orderedFields}
                             payload={createForm.data.payload}
                             setPayload={(payload) => createForm.setData('payload', payload)}
-                            processing={createForm.processing}
+                            processing={createForm.processing || createRelatedSaving}
                             errors={createForm.errors}
                             submitLabel={`新建${objectLabel}`}
                             relationOptions={relationOptions}
                             canManageCustomers={can.manage_customers}
+                            onRelatedSavingChange={setCreateCustomerSaving}
                         />
                     </form>
                 </Modal>
@@ -491,10 +508,26 @@ function exportUrlFor(objectKey, params) {
 
 function EditRecordModal({ object, record, fields, relationOptions, closeHref, canManageCustomers = false }) {
     const updateForm = useForm({ payload: payloadForEdit(record.payload, fields) });
+    const submittingRef = useRef(false);
+    const relatedSavingRef = useRef(false);
+    const [relatedSaving, setRelatedSaving] = useState(false);
 
     function update(event) {
         event.preventDefault();
-        updateForm.put(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, { preserveScroll: true });
+        if (submittingRef.current || relatedSavingRef.current) return;
+
+        submittingRef.current = true;
+        updateForm.put(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, {
+            preserveScroll: true,
+            onFinish: () => {
+                submittingRef.current = false;
+            },
+        });
+    }
+
+    function setCustomerSaving(isSaving) {
+        relatedSavingRef.current = isSaving;
+        setRelatedSaving(isSaving);
     }
 
     return (
@@ -506,12 +539,13 @@ function EditRecordModal({ object, record, fields, relationOptions, closeHref, c
                     fields={fields}
                     payload={updateForm.data.payload}
                     setPayload={(payload) => updateForm.setData('payload', payload)}
-                    processing={updateForm.processing}
+                    processing={updateForm.processing || relatedSaving}
                     errors={updateForm.errors}
                     submitLabel="保存"
                     relationOptions={relationOptions}
                     recordDisplay={record.display}
                     canManageCustomers={canManageCustomers}
+                    onRelatedSavingChange={setCustomerSaving}
                 />
             </form>
         </Modal>
@@ -547,7 +581,7 @@ function Modal({ title, closeHref, children }) {
     );
 }
 
-function RecordForm({ objectKey, record = null, fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {}, canManageCustomers = false }) {
+function RecordForm({ objectKey, record = null, fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {}, canManageCustomers = false, onRelatedSavingChange }) {
     const itemFields = fields.filter((field) => field.scope === 'item');
     const formFields = objectKey === 'customer'
         ? fields.filter((field) => field.key !== 'cooperation_history')
@@ -595,6 +629,7 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
                     customerId={payload.customer_id}
                     onCustomerSelected={(customerId) => setField('customer_id', customerId)}
                     onContactSelected={(contactId) => setField('customer_contact_ids', [...new Set([...(payload.customer_contact_ids || []), contactId])])}
+                    onSavingChange={onRelatedSavingChange}
                 />
             )}
             {itemFields.length > 0 && (

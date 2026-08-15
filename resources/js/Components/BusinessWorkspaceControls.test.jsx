@@ -87,4 +87,48 @@ describe('project customer manager', () => {
         await waitFor(() => expect(fetch).toHaveBeenCalledWith('/project-customers', expect.objectContaining({ method: 'POST' })));
         expect(onCustomerSelected).toHaveBeenCalledWith('customer-1');
     });
+
+    it('prevents Enter in embedded customer fields from submitting the project form', () => {
+        const submitProject = vi.fn((event) => event.preventDefault());
+        render(
+            <form onSubmit={submitProject}>
+                <ProjectCustomerManager customerId="" />
+            </form>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /新增客户/ }));
+        const enterEventAccepted = fireEvent.keyDown(screen.getByLabelText('客户名称*'), {
+            key: 'Enter',
+            code: 'Enter',
+        });
+
+        expect(enterEventAccepted).toBe(false);
+        expect(submitProject).not.toHaveBeenCalled();
+    });
+
+    it('locks customer saves synchronously and reports the related-data busy state', async () => {
+        let resolveRequest;
+        const onSavingChange = vi.fn();
+        const request = new Promise((resolve) => {
+            resolveRequest = resolve;
+        });
+        vi.spyOn(globalThis, 'fetch').mockReturnValue(request);
+        render(<ProjectCustomerManager customerId="" onSavingChange={onSavingChange} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /新增客户/ }));
+        fireEvent.change(screen.getByLabelText('客户名称*'), { target: { value: '演示客户' } });
+        const saveButton = screen.getByRole('button', { name: '保存客户' });
+        saveButton.click();
+        saveButton.click();
+
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(onSavingChange).toHaveBeenCalledWith(true);
+
+        resolveRequest({
+            ok: true,
+            json: async () => ({ customer: { id: 'customer-1', title: '演示客户', payload: { name: '演示客户' }, contacts: [] } }),
+        });
+
+        await waitFor(() => expect(onSavingChange).toHaveBeenLastCalledWith(false));
+    });
 });

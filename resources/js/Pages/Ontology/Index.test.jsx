@@ -359,7 +359,48 @@ describe('customer contact detail list', () => {
 
 describe('project customer contact choices', () => {
     beforeEach(() => window.localStorage.clear());
-    afterEach(cleanup);
+    afterEach(() => {
+        cleanup();
+        vi.restoreAllMocks();
+    });
+
+    it('keeps the project submit action locked while a new customer is still saving', async () => {
+        let resolveRequest;
+        const request = new Promise((resolve) => {
+            resolveRequest = resolve;
+        });
+        vi.spyOn(globalThis, 'fetch').mockReturnValue(request);
+        window.history.replaceState({}, '', '/objects/project?mode=create');
+        const { container } = render(
+            <Index
+                currentObject={{
+                    id: 3,
+                    key: 'project',
+                    group: '业务',
+                    label: '项目主档',
+                    fields: [{ key: 'name', label: '项目名称', type: 'text' }],
+                }}
+                records={{ data: [] }}
+                can={{ create: true, update: true, delete: true, manage_customers: true }}
+                relationOptions={{}}
+                selectedRecordId={null}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /新增客户/ }));
+        fireEvent.change(screen.getByLabelText('客户名称*'), { target: { value: '演示客户' } });
+        fireEvent.click(screen.getByRole('button', { name: '保存客户' }));
+
+        const projectSubmit = container.querySelector('.modal-body > form button[type="submit"]');
+        expect(projectSubmit).toBeDisabled();
+
+        resolveRequest({
+            ok: true,
+            json: async () => ({ customer: { id: 'customer-1', title: '演示客户', payload: { name: '演示客户' }, contacts: [] } }),
+        });
+
+        await waitFor(() => expect(projectSubmit).toBeEnabled());
+    });
 
     it('shows no contact candidates before a customer is selected', async () => {
         window.history.replaceState({}, '', '/objects/project?mode=create');
@@ -450,7 +491,9 @@ describe('project customer contact choices', () => {
         fireEvent.click(await screen.findByRole('button', { name: '乙客户' }));
 
         expect(within(dialog).getByText('客户已变更，已清除 1 位不属于新客户的联系人。')).toBeInTheDocument();
-        fireEvent.click(within(dialog).getByRole('button', { name: '保存' }));
+        const saveButton = within(dialog).getByRole('button', { name: '保存' });
+        saveButton.click();
+        saveButton.click();
 
         const returnTo = objectListHref('project', new URLSearchParams(window.location.search));
         expect(recordListHrefForObject('project', new URLSearchParams(window.location.search))).toBe(returnTo);
@@ -468,8 +511,9 @@ describe('project customer contact choices', () => {
                     customer_contact_ids: [],
                 },
             },
-            { preserveScroll: true },
+            expect.objectContaining({ preserveScroll: true }),
         );
+        expect(inertia.put).toHaveBeenCalledTimes(1);
     });
 
     it('renders project contacts with name and phone only', async () => {
