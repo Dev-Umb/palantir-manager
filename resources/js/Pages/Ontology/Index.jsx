@@ -33,13 +33,14 @@ export default function Index({ objects = [], currentObject, records, subtotal =
     const [contactModal, setContactModal] = useState(null);
     const selectedRecord = tableRecords.find((record) => record.id === selectedRecordId) || selectedRecordProp;
     const closeHref = objectListHref(currentObject.key, params);
+    const hasFixedColumnOrder = currentObject.key === 'project';
     const storageKey = columnOrderStorageKey(auth.user?.id ?? 'anonymous', currentObject.key);
     const widthStorageKey = columnWidthStorageKey(auth.user?.id ?? 'anonymous', currentObject.key);
-    const [columnOrder, setColumnOrder] = useState(() => readColumnOrder(storageKey));
+    const [columnOrder, setColumnOrder] = useState(() => hasFixedColumnOrder ? [] : readColumnOrder(storageKey));
     const [columnWidths, setColumnWidths] = useState(() => readColumnWidths(widthStorageKey));
     const orderedFields = useMemo(
-        () => fieldsInColumnOrder(currentObject.fields, columnOrder),
-        [columnOrder, currentObject.fields],
+        () => hasFixedColumnOrder ? currentObject.fields : fieldsInColumnOrder(currentObject.fields, columnOrder),
+        [columnOrder, currentObject.fields, hasFixedColumnOrder],
     );
     const createForm = useForm({ payload: defaults(currentObject.fields, params) });
     const createSubmittingRef = useRef(false);
@@ -61,8 +62,8 @@ export default function Index({ objects = [], currentObject, records, subtotal =
     }, [records.data]);
 
     useEffect(() => {
-        setColumnOrder(readColumnOrder(storageKey));
-    }, [storageKey]);
+        setColumnOrder(hasFixedColumnOrder ? [] : readColumnOrder(storageKey));
+    }, [hasFixedColumnOrder, storageKey]);
 
     useEffect(() => {
         setColumnWidths(readColumnWidths(widthStorageKey));
@@ -111,6 +112,8 @@ export default function Index({ objects = [], currentObject, records, subtotal =
     }
 
     function saveColumnOrder(order) {
+        if (hasFixedColumnOrder) return;
+
         const normalized = fieldsInColumnOrder(currentObject.fields, order).map((field) => field.key);
         setColumnOrder(normalized);
         try {
@@ -202,7 +205,8 @@ export default function Index({ objects = [], currentObject, records, subtotal =
                                 relationOptions={relationOptions}
                                 savedColumnWidths={columnWidths}
                                 onRecordChange={updateTableRecord}
-                                onColumnOrderChange={saveColumnOrder}
+                                columnOrderLocked={hasFixedColumnOrder}
+                                onColumnOrderChange={hasFixedColumnOrder ? undefined : saveColumnOrder}
                                 onColumnWidthsChange={saveColumnWidths}
                                 onContactOpen={openContactList}
                                 onContactCreate={openContactCreate}

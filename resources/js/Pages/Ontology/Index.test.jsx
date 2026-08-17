@@ -72,10 +72,11 @@ vi.mock('../../Components/Layout', () => ({
 }));
 
 vi.mock('../../Components/ObjectGrid', () => ({
-    default: ({ object, records, fields, savedColumnWidths, onColumnOrderChange, onColumnWidthsChange, onContactOpen, onContactCreate, canCreateContact, exportUrl }) => (
+    default: ({ object, records, fields, savedColumnWidths, columnOrderLocked, onColumnOrderChange, onColumnWidthsChange, onContactOpen, onContactCreate, canCreateContact, exportUrl }) => (
         <div>
             <div data-testid="grid-order">{fields.map((field) => field.key).join('|')}</div>
             <div data-testid="grid-widths">{JSON.stringify(savedColumnWidths)}</div>
+            <div data-testid="grid-order-locked">{String(columnOrderLocked)}</div>
             <a data-testid="server-export" href={exportUrl}>服务端导出</a>
             <button type="button" onClick={() => onColumnOrderChange?.(['note', 'deleted_field', 'phone', 'note'])}>模拟拖动列</button>
             <button type="button" onClick={() => onColumnWidthsChange?.({ phone: 214, note: 320 })}>模拟调整列宽</button>
@@ -289,6 +290,32 @@ describe('Ontology personal field order', () => {
             columnOrderStorageKey(inertia.userId, 'customer'),
         ))).toEqual(['note', 'phone', 'name', 'position']));
         expect(screen.getByTestId('grid-order')).toHaveTextContent('note|phone|name|position');
+    });
+
+    it('ignores historical personal order and locks the project table to configured field order', async () => {
+        const projectStorageKey = columnOrderStorageKey(inertia.userId, 'project');
+        const historicalOrder = JSON.stringify(['note', 'name', 'phone', 'position']);
+        window.localStorage.setItem(projectStorageKey, historicalOrder);
+        window.history.replaceState({}, '', '/objects/project');
+
+        render(
+            <Index
+                currentObject={{ id: 3, key: 'project', group: '业务与合同', label: '业务项目', fields }}
+                objects={[]}
+                records={{ data: [] }}
+                can={{ create: true, update: true, delete: true }}
+                relationOptions={{}}
+                selectedRecordId={null}
+            />,
+        );
+
+        expect(await screen.findByTestId('grid-order')).toHaveTextContent('name|position|phone|note');
+        expect(screen.getByTestId('grid-order-locked')).toHaveTextContent('true');
+
+        fireEvent.click(screen.getByRole('button', { name: '模拟拖动列' }));
+
+        expect(window.localStorage.getItem(projectStorageKey)).toBe(historicalOrder);
+        expect(screen.getByTestId('grid-order')).toHaveTextContent('name|position|phone|note');
     });
 
     it('restores and persists per-user widths after the user resizes a column', async () => {

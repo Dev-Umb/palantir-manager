@@ -30,6 +30,7 @@ export default function ObjectGrid({
     relationOptions,
     savedColumnWidths = {},
     onRecordChange,
+    columnOrderLocked = false,
     onColumnOrderChange,
     onColumnWidthsChange,
     onContactOpen,
@@ -291,12 +292,13 @@ export default function ObjectGrid({
                         getRowHeight={({ data }) => data?.__subtotal ? 56 : 44}
                         enableCellSpan
                         maintainColumnOrder
+                        suppressMovableColumns={columnOrderLocked}
                         alwaysShowHorizontalScroll
                         onGridReady={(event) => {
                             setTimeout(() => updateVisibleFieldCount(event.api), 0);
                         }}
                         onCellValueChanged={saveCell}
-                        onColumnMoved={saveColumnOrder}
+                        onColumnMoved={columnOrderLocked ? undefined : saveColumnOrder}
                         onColumnResized={saveColumnWidths}
                         onBodyScroll={(event) => updateVisibleFieldCount(event.api)}
                         onGridSizeChanged={(event) => updateVisibleFieldCount(event.api)}
