@@ -20,6 +20,21 @@ dataset('non-admin active roles', [
     ['finance'],
 ]);
 
+it('shows business project columns in the configured default order', function () use ($objectFields): void {
+    $page = visitOnlineAs('admin', '/objects/project')
+        ->waitForText('负责业务员')
+        ->assertNoJavaScriptErrors();
+
+    $headers = $page->script(<<<'JS'
+        () => [...document.querySelectorAll('.ag-header-viewport .grid-header-label')]
+            .map((header) => header.textContent.trim())
+    JS);
+
+    expect($headers)->toBe($objectFields['project'])
+        ->not->toContain('合同数量', '回款状态');
+})->group('online', 'online-ui', 'online-fields')
+    ->skip(fn (): bool => getenv('ONLINE_REGRESSION_ENABLED') !== '1', 'Online regression is opt-in.');
+
 it('opens every active object form and exposes every configured field', function () use ($objectFields): void {
     $page = visitOnlineAs('admin');
 

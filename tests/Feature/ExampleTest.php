@@ -527,20 +527,44 @@ class ExampleTest extends TestCase
                 ])
                 ->has('relationOptions.customer_id.items', 3)
                 ->where('selectedRecordId', null)
-                ->has('currentObject.fields', 30)
-                ->where('currentObject.fields.0.key', 'name')
-                ->where('currentObject.fields.0.label', '项目名称')
-                ->where('currentObject.fields.1.key', 'customer_contact_ids')
-                ->where('currentObject.fields.1.label', '客户联系人')
-                ->where('currentObject.fields.2.key', 'customer_id')
-                ->where('currentObject.fields.2.label', '客户名称')
-                ->where('currentObject.fields.3.key', 'customer_address')
-                ->where('currentObject.fields.3.label', '客户地址')
-                ->where('currentObject.fields.4.key', 'customer_level')
-                ->where('currentObject.fields.4.label', '客户等级')
-                ->where('currentObject.fields.5.key', 'customer_nature')
-                ->where('currentObject.fields.5.label', '客户性质')
-                ->where('currentObject.fields.5.type', 'lookup')
+                ->has('currentObject.fields', 28)
+                ->where('currentObject.fields', fn ($fields): bool => collect($fields)->pluck('key')->all() === [
+                    'business_owner_user_id',
+                    'project_no',
+                    'customer_id',
+                    'name',
+                    'handover_date',
+                    'first_shipment_date',
+                    'last_shipment_date',
+                    'signed_weight',
+                    'occurred_amount',
+                    'paid_amount',
+                    'unpaid_amount',
+                    'last_payment_date',
+                    'payment_progress',
+                    'reconciled_amount',
+                    'invoiced_amount',
+                    'uninvoiced_amount',
+                    'contract_status',
+                    'weight',
+                    'contract_amount',
+                    'customer_contact_ids',
+                    'customer_address',
+                    'customer_level',
+                    'customer_nature',
+                    'collection_count',
+                    'risk',
+                    'informed_business_user_ids',
+                    'overall_status',
+                    'remark',
+                ])
+                ->where('currentObject.fields', fn ($fields): bool => ! collect($fields)->pluck('key')->contains('contract_qty'))
+                ->where('currentObject.fields', fn ($fields): bool => ! collect($fields)->pluck('key')->contains('payment_status'))
+                ->where('currentObject.fields', fn ($fields): bool => collect($fields)->contains(
+                    fn (array $field): bool => $field['key'] === 'customer_nature'
+                        && $field['label'] === '客户性质'
+                        && $field['type'] === 'lookup',
+                ))
                 ->where('currentObject.fields', fn ($fields): bool => collect($fields)->contains(
                     fn (array $field): bool => $field['key'] === 'informed_business_user_ids'
                         && $field['label'] === '知会人员'
@@ -557,6 +581,11 @@ class ExampleTest extends TestCase
                         && $field['type'] === 'number',
                 ))
                 ->missing('relationChain'));
+
+        $contractQuantityField = collect(BusinessObject::where('key', 'contract')->firstOrFail()->fields)
+            ->firstWhere('key', 'contract_qty');
+
+        $this->assertSame('合同数量', $contractQuantityField['label']);
 
         foreach (['drawing', 'work_order'] as $objectKey) {
             $weightField = collect(BusinessObject::where('key', $objectKey)->firstOrFail()->fields)
