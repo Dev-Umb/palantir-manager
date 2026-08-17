@@ -26,8 +26,32 @@ it('shows business project columns in the configured default order', function ()
         ->assertNoJavaScriptErrors();
 
     $headers = $page->script(<<<'JS'
-        () => [...document.querySelectorAll('.ag-header-viewport .grid-header-label')]
-            .map((header) => header.textContent.trim())
+        async () => {
+            const viewport = document.querySelector('.ag-body-horizontal-scroll-viewport');
+            const headers = [];
+            const collectVisibleHeaders = () => {
+                [...document.querySelectorAll('.grid-header-label')]
+                    .map((header) => header.textContent.trim())
+                    .filter((label) => label !== '操作')
+                    .forEach((label) => {
+                        if (!headers.includes(label)) headers.push(label);
+                    });
+            };
+            const maximumScroll = viewport.scrollWidth - viewport.clientWidth;
+            const step = Math.max(100, Math.floor(viewport.clientWidth / 2));
+
+            for (let left = 0; left <= maximumScroll; left += step) {
+                viewport.scrollLeft = Math.min(left, maximumScroll);
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                collectVisibleHeaders();
+            }
+
+            viewport.scrollLeft = maximumScroll;
+            await new Promise((resolve) => setTimeout(resolve, 150));
+            collectVisibleHeaders();
+
+            return headers;
+        }
     JS);
 
     expect($headers)->toBe($objectFields['project'])
