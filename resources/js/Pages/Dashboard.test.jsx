@@ -34,7 +34,7 @@ const cockpit = {
     meta: { scope: '全公司授权范围', as_of: '2026-08-04T10:30:00+08:00' },
     kpis: [
         { key: 'occurred_amount', label: '累计实际发生金额', value: 4200000, format: 'amount', hint: '已发生金额总计', coverage: { valid: 4, total: 5 } },
-        { key: 'collection_rate', label: '回款率', value: 69, format: 'percentage', hint: '已付 / 已发生', coverage: { valid: 3, total: 4 } },
+        { key: 'collection_rate', label: '总回款比例', value: 69, format: 'percentage', hint: '已回款 290.0 / 已发生 420.0 万元', coverage: { valid: 3, total: 4 } },
         { key: 'tender_win_rate', label: '中标率', value: 37.5, format: 'percentage', hint: '已中标 / 已决标', coverage: { valid: 8, total: 9 } },
         { key: 'current_debt', label: '当前欠款', value: 1300000, format: 'amount', hint: '3 个项目待跟进', coverage: { valid: 3, total: 5 } },
     ],
@@ -164,9 +164,37 @@ describe('Company operations cockpit', () => {
     });
 
     it('renders an em dash for unavailable KPI values', () => {
-        render(<Dashboard cockpit={{ meta: {}, kpis: [{ key: 'collection_rate', label: '回款率', value: null, format: 'percentage', hint: '无有效分母', coverage: { valid: 0, total: 2 } }], panels: {} }} />);
+        render(<Dashboard cockpit={{ meta: {}, kpis: [{ key: 'collection_rate', label: '总回款比例', value: null, format: 'percentage', hint: '分母为 0，暂不可计算', coverage: { valid: 0, total: 2 } }], panels: {} }} />);
 
         expect(screen.getByText('—')).toBeInTheDocument();
+        expect(screen.getByText('分母为 0，暂不可计算')).toBeInTheDocument();
+        expect(screen.getByText('覆盖 0/2')).toBeInTheDocument();
         expect(screen.queryByText('0.0')).not.toBeInTheDocument();
+    });
+
+    it('shows total collection ratio with its numerator denominator and coverage', () => {
+        render(
+            <Dashboard
+                cockpit={{
+                    meta: {},
+                    kpis: [{
+                        key: 'collection_rate',
+                        label: '总回款比例',
+                        value: 125,
+                        format: 'percentage',
+                        hint: '已回款 0.1 / 已发生 0.0 万元',
+                        coverage: { valid: 2, total: 3 },
+                    }],
+                    panels: {},
+                }}
+            />,
+        );
+
+        const ratioLabel = screen.getByText('总回款比例');
+        expect(ratioLabel).toBeInTheDocument();
+        expect(ratioLabel.closest('article')).toHaveTextContent('125.0%');
+        expect(screen.getByText('已回款 0.1 / 已发生 0.0 万元')).toBeInTheDocument();
+        expect(screen.getByText('覆盖 2/3')).toBeInTheDocument();
+        expect(screen.queryByText('加权回款率')).not.toBeInTheDocument();
     });
 });

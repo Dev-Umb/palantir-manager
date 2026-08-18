@@ -453,6 +453,7 @@ function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOp
 
 function GridActions({ object, record, can, onDelete, recordListHref }) {
     const canUpdate = can.update && record.can_update !== false;
+    const detailObjectKey = object.key === 'project_business_summary' ? 'project' : object.key;
     function approve() {
         router.post(`/requests/${record.id}/approve`, {}, { preserveScroll: true });
     }
@@ -478,7 +479,12 @@ function GridActions({ object, record, can, onDelete, recordListHref }) {
                 primary={(
                     <Link
                         className="grid-action"
-                        href={objectRecordHref(object.key, record.id, 'detail', recordListHref)}
+                        href={objectRecordHref(
+                            detailObjectKey,
+                            record.id,
+                            'detail',
+                            object.key === 'project_business_summary' ? null : recordListHref,
+                        )}
                         preserveScroll
                         aria-label={`查看 ${record.code} 详情`}
                     >

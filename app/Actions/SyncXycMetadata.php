@@ -45,7 +45,10 @@ class SyncXycMetadata
                 continue;
             }
 
-            foreach (['view' => '查看', 'create' => '新建', 'update' => '编辑', 'delete' => '删除'] as $action => $label) {
+            $actions = $object['read_only'] ?? false
+                ? ['view' => '查看']
+                : ['view' => '查看', 'create' => '新建', 'update' => '编辑', 'delete' => '删除'];
+            foreach ($actions as $action => $label) {
                 $permissions->push([
                     'key' => "object.{$object['key']}.{$action}",
                     'module' => $object['key'],

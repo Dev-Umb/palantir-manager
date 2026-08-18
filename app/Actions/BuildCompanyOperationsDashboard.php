@@ -6,6 +6,7 @@ use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\ProjectNotification;
 use App\Models\User;
+use App\Support\CollectionProgress;
 use App\Support\ObjectRelations;
 use App\Support\ProjectVisibility;
 use Carbon\CarbonImmutable;
@@ -43,6 +44,7 @@ class BuildCompanyOperationsDashboard
     public function __construct(
         private ProjectVisibility $projectVisibility,
         private ObjectRelations $relations,
+        private CollectionProgress $collectionProgress,
     ) {}
 
     /** @return array<string, mixed> */
@@ -75,9 +77,9 @@ class BuildCompanyOperationsDashboard
             'project_progresses' => $projectProgresses,
         ];
 
-        if ($records->get('receivable') instanceof Collection) {
-            $financeKpis = $this->financeKpis($records->get('receivable'));
-            $cockpit['kpis'] = [...$cockpit['kpis'], ...$financeKpis['kpis']];
+        if ($records->get('project') instanceof Collection) {
+            $collectionKpis = $this->collectionKpis($projects);
+            $cockpit['kpis'] = [...$cockpit['kpis'], ...$collectionKpis['kpis']];
         }
 
         if ($records->get('project') instanceof Collection) {
@@ -196,43 +198,33 @@ class BuildCompanyOperationsDashboard
     }
 
     /**
-     * @param  Collection<int, ObjectRecord>  $receivables
+     * @param  Collection<int, ObjectRecord>  $projects
      * @return array{kpis: array<int, array<string, mixed>>}
      */
-    private function financeKpis(Collection $receivables): array
+    private function collectionKpis(Collection $projects): array
     {
-        $weightedPaid = 0.0;
-        $weightedBase = 0.0;
-        $ledgerValid = 0;
-
-        foreach ($receivables as $receivable) {
-            $payload = $receivable->payload;
-            $occurred = $this->nonNegativeNumber($payload['occurred_amount'] ?? null);
-            $contract = $this->nonNegativeNumber($payload['contract_amount'] ?? null);
-            $paid = $this->nonNegativeNumber($payload['paid_amount'] ?? null);
-            $base = $occurred !== null && $occurred > 0 ? $occurred : $contract;
-            if ($base === null || $paid === null) {
-                continue;
-            }
-
-            $ledgerValid++;
-            $weightedBase += $base;
-            $weightedPaid += min($paid, $base);
-        }
-
-        $rate = $weightedBase > 0 ? round($weightedPaid / $weightedBase * 100, 1) : null;
+        $summary = $this->collectionProgress->summarize($projects);
 
         return [
             'kpis' => [
                 [
                     'key' => 'collection_rate',
-                    'label' => '加权回款率',
-                    'value' => $rate,
+                    'label' => '总回款比例',
+                    'value' => $summary['ratio'],
                     'format' => 'percentage',
-                    'hint' => $weightedBase > 0
-                        ? sprintf('%.1f / %.1f 万元', $weightedPaid / 10000, $weightedBase / 10000)
+                    'hint' => $summary['ratio'] !== null
+                        ? sprintf(
+                            '已回款 %.1f / 已发生 %.1f 万元',
+                            $summary['paid_amount'] / 10000,
+                            $summary['occurred_amount'] / 10000,
+                        )
                         : '分母为 0，暂不可计算',
-                    'coverage' => ['valid' => $ledgerValid, 'total' => $receivables->count()],
+                    'coverage' => [
+                        'valid' => $summary['covered_records'],
+                        'total' => $summary['total_records'],
+                    ],
+                    'paid_amount' => $summary['paid_amount'],
+                    'occurred_amount' => $summary['occurred_amount'],
                 ],
             ],
         ];

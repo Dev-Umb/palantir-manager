@@ -55,7 +55,7 @@ class HandleInertiaRequests extends Middleware
         $can = fn (string $permission) => in_array($permission, $permissions, true);
         $roles = $request->user()?->roles->pluck('name')->all() ?? [];
         $objects = BusinessObject::query()
-            ->whereIn('key', BusinessWorkspace::RETAINED_OBJECT_KEYS)
+            ->whereIn('key', BusinessWorkspace::TABLE_OBJECT_KEYS)
             ->withCount(['records as new_task_count' => function ($query) use ($roles): void {
                 $query->whereNotNull('workflow_key')->whereNull('workflow_seen_at');
                 if (! in_array('admin', $roles, true)) {
@@ -68,7 +68,11 @@ class HandleInertiaRequests extends Middleware
             }])
             ->orderBy('sort_order')
             ->get()
-            ->filter(fn (BusinessObject $object) => $can("object.{$object->key}.view"))
+            ->filter(fn (BusinessObject $object) => $can("object.{$object->key}.view")
+                && ($object->key !== 'project_business_summary' || $can('object.project.view')))
+            ->reject(fn (BusinessObject $object) => $object->key === 'requisition'
+                    && in_array('procurement', $roles, true)
+                    && ! in_array('admin', $roles, true))
             ->values();
 
         return [

@@ -844,4 +844,37 @@ describe('ObjectGrid date editing', () => {
         expect(screen.queryByText('旧文本')).toBeNull();
     });
 
+    it('keeps the business summary readonly and opens the real project record', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'project_business_summary', label: '业务概括表' }}
+                records={[{
+                    id: 'project-summary-1',
+                    code: 'XYC-SUMMARY-001',
+                    title: '只读项目',
+                    payload: { name: '只读项目', business_owner_user_id: '41', occurred_amount: null },
+                    display: { business_owner_user_id: '业务员甲' },
+                }]}
+                fields={[
+                    { key: 'occurred_amount', label: '已发生金额', type: 'number', readonly: true },
+                    { key: 'business_owner_user_id', label: '负责业务员', type: 'account', readonly: true },
+                    { key: 'name', label: '项目名称', type: 'readonly', system: 'title' },
+                ]}
+                can={{ create: false, update: false, delete: false }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        expect(await screen.findByText('当前为只读视图')).not.toBeNull();
+        expect(await screen.findByRole('gridcell', { name: '—' })).not.toBeNull();
+        expect((await screen.findByRole('link', { name: '查看 XYC-SUMMARY-001 详情' })).getAttribute('href'))
+            .toBe('/objects/project?record=project-summary-1&mode=detail');
+
+        expect(await screen.findByRole('button', { name: 'XYC-SUMMARY-001 更多操作' })).not.toBeNull();
+        expect(screen.queryByRole('link', { name: '编辑 XYC-SUMMARY-001' })).toBeNull();
+        expect(screen.queryByRole('button', { name: '删除 XYC-SUMMARY-001' })).toBeNull();
+    });
+
 });

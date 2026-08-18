@@ -54,7 +54,7 @@ class ProjectNumberEditingTest extends TestCase
         $this->assertSame(-4.45, $project->payload['reconciled_amount']);
         $this->assertSame(-5.56, $project->payload['invoiced_amount']);
         $this->assertSame(-6.67, $project->payload['uninvoiced_amount']);
-        $this->assertSame(33.34, $project->payload['payment_progress']);
+        $this->assertNull($project->payload['payment_progress']);
     }
 
     public function test_project_non_amount_boundaries_and_other_object_rules_remain_intact(): void
@@ -72,9 +72,14 @@ class ProjectNumberEditingTest extends TestCase
             'payload' => $this->projectPayload($owner, $customer, ['signed_weight' => -0.01]),
         ])->assertUnprocessable()->assertJsonValidationErrors('payload.signed_weight');
 
-        $this->actingAs($admin)->postJson("/objects/{$projectObject->id}", [
-            'payload' => $this->projectPayload($owner, $customer, ['payment_progress' => 100.01]),
-        ])->assertUnprocessable()->assertJsonValidationErrors('payload.payment_progress');
+        $response = $this->actingAs($admin)->postJson("/objects/{$projectObject->id}", [
+            'payload' => $this->projectPayload($owner, $customer, [
+                'occurred_amount' => 100,
+                'paid_amount' => 120,
+                'payment_progress' => 1,
+            ]),
+        ])->assertCreated();
+        $this->assertSame(120.0, (float) ObjectRecord::findOrFail($response->json('record.id'))->payload['payment_progress']);
 
         $tender = BusinessObject::query()->where('key', 'tender')->firstOrFail();
         $this->assertSame(0, collect($tender->fields)->firstWhere('key', 'budget_amount')['min']);

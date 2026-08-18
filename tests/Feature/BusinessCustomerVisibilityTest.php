@@ -99,23 +99,16 @@ class BusinessCustomerVisibilityTest extends TestCase
         $unlinkedContact = $this->contact($business, $unlinkedCustomer, '未关联客户联系人');
         $hiddenContact = $this->contact($other, $hiddenCustomer, '隐藏联系人');
 
-        $this->actingAs($business)->get('/objects/customer_contact')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('records.data', fn ($records): bool => collect($records)->pluck('id')->sort()->values()->all() === collect([
-                    $visibleContact->id,
-                    $unlinkedContact->id,
-                ])->sort()->values()->all()));
-        $contactCsv = $this->actingAs($business)->get('/objects/customer_contact/export.csv')
-            ->assertOk()
-            ->streamedContent();
-        $this->assertStringContainsString('可见联系人', $contactCsv);
-        $this->assertStringContainsString('未关联客户联系人', $contactCsv);
-        $this->assertStringNotContainsString('隐藏联系人', $contactCsv);
+        $this->actingAs($business)->get('/objects/customer_contact')->assertForbidden();
+        $this->actingAs($business)->get('/objects/customer_contact/export.csv')->assertNotFound();
 
         $this->actingAs($business)->getJson("/project-customers/{$visibleCustomer->id}")
             ->assertOk()
-            ->assertJsonPath('customer.id', $visibleCustomer->id);
+            ->assertJsonPath('customer.id', $visibleCustomer->id)
+            ->assertJsonPath('customer.contacts.0.id', $visibleContact->id);
+        $this->actingAs($business)->getJson("/project-customers/{$unlinkedCustomer->id}")
+            ->assertOk()
+            ->assertJsonPath('customer.contacts.0.id', $unlinkedContact->id);
         $this->actingAs($business)->getJson("/project-customers/{$hiddenCustomer->id}")
             ->assertNotFound();
         $this->actingAs($business)->putJson("/project-customers/{$hiddenCustomer->id}", [

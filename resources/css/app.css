@@ -298,6 +298,7 @@ a { color: inherit; text-decoration: none; }
 .board-metrics span { color: var(--muted); }
 .board-metrics strong { display: block; margin-top: 8px; font-size: 22px; }
 .board-metrics small, .flow-node small { margin-left: 3px; color: var(--muted); font-size: 12px; font-weight: 500; }
+.board-metrics .board-metric-detail { display: block; margin: 6px 0 0; line-height: 1.45; }
 .risk-list { margin-top: 14px; }
 .risk-list h3 { margin: 0 0 6px; font-size: 14px; }
 .flow-row, .inventory-path { display: flex; gap: 8px; flex-wrap: wrap; }

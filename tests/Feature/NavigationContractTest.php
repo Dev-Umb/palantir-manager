@@ -14,7 +14,7 @@ class NavigationContractTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_shared_navigation_exposes_the_five_retained_business_tables_only(): void
+    public function test_shared_navigation_shows_customer_and_summary_but_hides_the_contact_table(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $admin = User::create(['name' => 'admin', 'email' => 'nav@example.com', 'password' => Hash::make('password123')]);
@@ -31,12 +31,16 @@ class NavigationContractTest extends TestCase
             ->has('nav.2.children', 3)
             ->has('nav.2.children.0.items', 2)
             ->where('nav.2.children.0.items.0.label', '客户信息')
-            ->where('nav.2.children.0.items.1.label', '客户联系人')
+            ->where('nav.2.children.0.items.1.label', '业务概括表')
             ->has('nav.2.children.1.items', 1)
             ->where('nav.2.children.1.items.0.label', '招投标信息')
             ->has('nav.2.children.2.items', 2)
             ->where('nav.2.children.2.items.0.label', '业务项目')
             ->where('nav.2.children.2.items.1.label', '合同表')
+            ->where('nav.2.children', fn ($groups): bool => ! collect($groups)
+                ->flatMap(fn (array $group): array => $group['items'])
+                ->pluck('label')
+                ->contains('客户联系人'))
             ->has('nav.2.children.0.items.0.new_task_count'));
     }
 }

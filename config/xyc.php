@@ -160,7 +160,7 @@ return [
                 $number('paid_amount', '已回款金额', ['step' => 0.01]),
                 $number('unpaid_amount', '未回款金额', ['step' => 0.01]),
                 $date('last_payment_date', '末次回款日期'),
-                $number('payment_progress', '回款进度', ['min' => 0, 'max' => 100, 'step' => 0.01]),
+                $number('payment_progress', '回款进度', ['readonly' => true, 'step' => 0.01]),
                 $number('reconciled_amount', '对账金额', ['step' => 0.01]),
                 $number('invoiced_amount', '开票金额', ['step' => 0.01]),
                 $number('uninvoiced_amount', '未开票金额', ['step' => 0.01]),
@@ -176,6 +176,18 @@ return [
                 $multiaccount('informed_business_user_ids', '知会人员'),
                 $select('overall_status', '总体状态', $projectStatuses, ['default' => '投标中']),
                 $field('remark', '备注'),
+            ],
+        ],
+        [
+            'key' => 'project_business_summary', 'label' => '业务概括表', 'group' => '主数据', 'code_prefix' => 'XYC', 'title_field' => 'name', 'roles' => ['business', 'finance'], 'write_roles' => [], 'read_only' => true,
+            'fields' => [
+                $field('business_owner_user_id', '负责业务员', 'account', ['readonly' => true]),
+                $field('project_no', '项目编号', 'readonly', ['system' => 'code']),
+                $relation('customer_id', '客户名称', 'customer', ['readonly' => true]),
+                $field('name', '项目名称', 'readonly', ['system' => 'title']),
+                $number('occurred_amount', '已发生金额', ['readonly' => true]),
+                $number('paid_amount', '已回款金额', ['readonly' => true]),
+                $number('unpaid_amount', '未回款金额', ['readonly' => true]),
             ],
         ],
         [

@@ -115,10 +115,10 @@ describe('Ontology workspace layout', () => {
             <Index
                 objects={[
                     { id: 2, key: 'customer', label: '客户信息', group: '主数据' },
-                    { id: 5, key: 'customer_contact', label: '客户联系人', group: '主数据' },
                     { id: 3, key: 'project', label: '项目主档', group: '主数据' },
                     { id: 4, key: 'contract', label: '合同台账', group: '履约' },
                 ]}
+                contactObject={{ id: 5, key: 'customer_contact', label: '客户联系人' }}
                 currentObject={{
                     id: 3,
                     key: 'project',
@@ -138,12 +138,44 @@ describe('Ontology workspace layout', () => {
         expect(screen.queryByRole('heading', { name: '项目资料' })).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: '客户信息' })).toHaveAttribute('href', '/objects/customer');
         expect(screen.getByRole('link', { name: '项目资料' })).toHaveAttribute('href', '/objects/project');
-        expect(screen.getByRole('link', { name: '客户联系人' })).toHaveAttribute('href', '/objects/customer_contact');
+        expect(screen.queryByRole('link', { name: '客户联系人' })).not.toBeInTheDocument();
         expect(screen.queryByRole('link', { name: '合同台账' })).not.toBeInTheDocument();
-        expect(screen.getByText('基础资料 · 3 张表')).toBeInTheDocument();
+        expect(screen.getByText('基础资料 · 2 张表')).toBeInTheDocument();
         expect(screen.getByLabelText('业务模块')).toHaveValue('主数据');
         expect(screen.queryByText('数据列表')).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: '新建' })).toHaveAttribute('href', '/objects/project?mode=create');
+    });
+
+    it('shows the business summary beside customer and project without a create action', () => {
+        window.history.replaceState({}, '', '/objects/project_business_summary');
+
+        render(
+            <Index
+                objects={[
+                    { id: 2, key: 'customer', label: '客户信息', group: '主数据' },
+                    { id: 3, key: 'project', label: '项目主档', group: '主数据' },
+                    { id: 4, key: 'project_business_summary', label: '业务概括表', group: '主数据' },
+                ]}
+                currentObject={{
+                    id: 4,
+                    key: 'project_business_summary',
+                    group: '主数据',
+                    label: '业务概括表',
+                    read_only: true,
+                    fields: [],
+                }}
+                records={{ data: [] }}
+                can={{ create: false, update: false, delete: false }}
+                relationOptions={{}}
+                selectedRecordId={null}
+            />,
+        );
+
+        expect(screen.getByRole('link', { name: '客户信息' })).toHaveAttribute('href', '/objects/customer');
+        expect(screen.getByRole('link', { name: '项目资料' })).toHaveAttribute('href', '/objects/project');
+        expect(screen.getByRole('link', { name: '业务概括表' })).toHaveAttribute('href', '/objects/project_business_summary');
+        expect(screen.getByText('基础资料 · 3 张表')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: '新建' })).not.toBeInTheDocument();
     });
 });
 
@@ -907,7 +939,8 @@ function renderPage(mode, selected = record) {
     return render(
         <Index
             currentObject={{ id: 8, key: 'customer', group: '业务', label: '客户信息', fields }}
-            objects={[{ id: 9, key: 'customer_contact', label: '客户联系人' }]}
+            objects={[{ id: 8, key: 'customer', group: '业务', label: '客户信息' }]}
+            contactObject={{ id: 9, key: 'customer_contact', label: '客户联系人' }}
             records={{ data: [selected] }}
             can={{ create: true, update: true, delete: true }}
             relationOptions={{}}

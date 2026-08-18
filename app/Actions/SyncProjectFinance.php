@@ -5,12 +5,15 @@ namespace App\Actions;
 use App\Models\AuditLog;
 use App\Models\ObjectRecord;
 use App\Models\User;
+use App\Support\CollectionProgress;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
 class SyncProjectFinance
 {
+    public function __construct(private CollectionProgress $collectionProgress) {}
+
     public function lockProjects(array $projectIds): Collection
     {
         $ids = collect($projectIds)
@@ -139,7 +142,18 @@ class SyncProjectFinance
         }
         $payload['unpaid_amount'] = $this->decimal(max($base - $paid, 0));
         $payload['uninvoiced_amount'] = $this->decimal(max($base - $invoiced, 0));
-        $payload['payment_progress'] = $base > 0 ? round(min(100, $paid / $base * 100), 2) : 0;
+        $payload = $this->withCalculatedPaymentProgress($payload);
+
+        return $payload;
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function withCalculatedPaymentProgress(array $payload): array
+    {
+        $payload['payment_progress'] = $this->collectionProgress->percentage(
+            $payload['occurred_amount'] ?? null,
+            $payload['paid_amount'] ?? null,
+        );
 
         return $payload;
     }
@@ -203,7 +217,10 @@ class SyncProjectFinance
             'reconciled_amount' => $this->decimal($this->cents($sourcePayload, 'reconciled_amount')),
             'invoiced_amount' => $this->decimal($invoiced),
             'uninvoiced_amount' => $this->decimal(max($base - $invoiced, 0)),
-            'payment_progress' => $base > 0 ? round(min(100, $paid / $base * 100), 2) : 0,
+            'payment_progress' => $this->collectionProgress->percentage(
+                $sourcePayload['occurred_amount'] ?? null,
+                $sourcePayload['paid_amount'] ?? null,
+            ),
             'payment_status' => $source
                 ? (trim((string) ($sourcePayload['pay_status'] ?? '')) !== ''
                     ? $sourcePayload['pay_status']

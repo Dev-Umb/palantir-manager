@@ -121,3 +121,7 @@ function formatAsOf(value) {
         hour12: false,
     }).format(date).replaceAll('/', '-');
 }
+
+function formatAmount(value) {
+    return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value || 0);
+}

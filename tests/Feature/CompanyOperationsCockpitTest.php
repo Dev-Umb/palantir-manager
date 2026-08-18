@@ -34,6 +34,7 @@ class CompanyOperationsCockpitTest extends TestCase
             'name' => '未知状态项目',
             'overall_status' => '未知状态',
             'occurred_amount' => 4200000,
+            'paid_amount' => 2900000,
             'unpaid_amount' => 1300000,
         ]);
         foreach (['投标中', '已中标', '已拿到加工函', '合同签署', '已完成'] as $status) {
@@ -86,7 +87,8 @@ class CompanyOperationsCockpitTest extends TestCase
                 ->where('cockpit.kpis.0.value', fn (mixed $value): bool => (float) $value === 4200000.0)
                 ->where('cockpit.kpis.1.key', 'collection_rate')
                 ->where('cockpit.kpis.0.hint', '已发生金额总计')
-                ->where('cockpit.kpis.1.value', fn (mixed $value): bool => (float) $value === 58.0)
+                ->where('cockpit.kpis.1.value', fn (mixed $value): bool => (float) $value === 69.05)
+                ->where('cockpit.kpis.1.coverage', ['valid' => 1, 'total' => 6])
                 ->where('cockpit.kpis.2.key', 'tender_win_rate')
                 ->where('cockpit.kpis.2.value', 37.5)
                 ->where('cockpit.kpis.3.key', 'current_debt')
@@ -185,7 +187,8 @@ class CompanyOperationsCockpitTest extends TestCase
                 ->has('cockpit.project_progresses', 1)
                 ->where('cockpit.kpis', fn (Collection $kpis): bool => $kpis->pluck('key')->contains('occurred_amount')
                     && $kpis->pluck('key')->contains('current_debt')
-                    && ! $kpis->pluck('key')->contains('collection_rate')));
+                    && $kpis->pluck('key')->contains('collection_rate')
+                    && (float) $kpis->firstWhere('key', 'collection_rate')['value'] === 20.0));
     }
 
     public function test_project_master_amounts_are_totaled_by_company_and_existing_salesperson_without_deduplication(): void
@@ -244,10 +247,10 @@ class CompanyOperationsCockpitTest extends TestCase
                 ->where('cockpit.panels.project_amounts.as_of', fn (mixed $value): bool => is_string($value) && $value !== ''));
     }
 
-    public function test_zero_finance_base_is_not_reported_as_zero_percent(): void
+    public function test_zero_project_occurred_amount_is_not_reported_as_zero_percent(): void
     {
         $finance = $this->userWithRole('finance');
-        $this->record('receivable', [
+        $this->record('project', [
             'contract_amount' => 0,
             'occurred_amount' => 0,
             'paid_amount' => 0,

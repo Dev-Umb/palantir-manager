@@ -520,11 +520,12 @@ class ExampleTest extends TestCase
                 ->component('Ontology/Index')
                 ->where('objects', fn ($objects): bool => collect($objects)->pluck('key')->all() === [
                     'customer',
-                    'customer_contact',
                     'tender',
                     'project',
+                    'project_business_summary',
                     'contract',
                 ])
+                ->where('contactObject.key', 'customer_contact')
                 ->has('relationOptions.customer_id.items', 3)
                 ->where('selectedRecordId', null)
                 ->has('currentObject.fields', 28)

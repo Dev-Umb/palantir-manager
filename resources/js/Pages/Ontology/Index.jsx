@@ -25,7 +25,7 @@ import { formatObjectNumber } from '../../Components/objectNumberFormatting';
 const ObjectGrid = lazy(() => import('../../Components/ObjectGrid'));
 export const PAGE_SIZE_OPTIONS = Array.from({ length: 10 }, (_, index) => (index + 1) * 10);
 
-export default function Index({ objects = [], currentObject, records, subtotal = null, can, relationOptions, selectedRecordId, selectedRecord: selectedRecordProp = null, businessUsers = [] }) {
+export default function Index({ objects = [], contactObject = null, currentObject, records, subtotal = null, can, relationOptions, selectedRecordId, selectedRecord: selectedRecordProp = null, businessUsers = [] }) {
     const { auth } = usePage().props;
     const params = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
     const mode = params.get('mode');
@@ -53,7 +53,6 @@ export default function Index({ objects = [], currentObject, records, subtotal =
         update: (auth.permissions || []).includes('object.customer_contact.update'),
         delete: (auth.permissions || []).includes('object.customer_contact.delete'),
     };
-    const contactObject = objects.find((object) => object.key === 'customer_contact');
     const exportUrl = exportUrlFor(currentObject.key, params);
     const objectLabel = businessText(currentObject.label);
 

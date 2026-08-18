@@ -9,7 +9,22 @@ use Illuminate\Support\Collection;
 
 class BusinessWorkspace
 {
-    public const RETAINED_OBJECT_KEYS = ['customer', 'customer_contact', 'tender', 'project', 'contract'];
+    public const RETAINED_OBJECT_KEYS = [
+        'customer',
+        'customer_contact',
+        'tender',
+        'project',
+        'project_business_summary',
+        'contract',
+    ];
+
+    public const TABLE_OBJECT_KEYS = [
+        'customer',
+        'tender',
+        'project',
+        'project_business_summary',
+        'contract',
+    ];
 
     public const FINANCE_FIELD_KEYS = [
         'contract_amount',
@@ -37,6 +52,13 @@ class BusinessWorkspace
         $key = $object instanceof BusinessObject ? $object->key : $object;
 
         return in_array($key, self::RETAINED_OBJECT_KEYS, true);
+    }
+
+    public function allowsObjectTableAccess(BusinessObject|string $object): bool
+    {
+        $key = $object instanceof BusinessObject ? $object->key : $object;
+
+        return in_array($key, self::TABLE_OBJECT_KEYS, true);
     }
 
     /** @return array<int, string> */

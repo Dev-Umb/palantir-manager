@@ -31,7 +31,7 @@ class BusinessContractWorkflowTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_customer_contact_project_and_contract_are_accessible_while_business_assignment_scopes_projects(): void
+    public function test_visible_business_tables_preserve_customer_contact_management_metadata_and_scope_projects(): void
     {
         $businessA = $this->userWithRole('business', '业务员甲');
         $businessB = $this->userWithRole('business', '业务员乙');
@@ -46,11 +46,12 @@ class BusinessContractWorkflowTest extends TestCase
                 ->has('objects', 5)
                 ->where('objects', fn ($objects): bool => collect($objects)->pluck('key')->all() === [
                     'customer',
-                    'customer_contact',
                     'tender',
                     'project',
+                    'project_business_summary',
                     'contract',
                 ])
+                ->where('contactObject.key', 'customer_contact')
                 ->has('records.data', 1)
                 ->where('records.data.0.id', $projectA->id)
                 ->where('currentObject.fields', fn ($fields): bool => collect($fields)
@@ -416,12 +417,8 @@ class BusinessContractWorkflowTest extends TestCase
                 ->where('currentObject.key', 'customer')
                 ->where('can.create', true)
                 ->where('can.update', true));
-        $this->actingAs($business)->get('/objects/customer_contact')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('currentObject.key', 'customer_contact')
-                ->where('can.create', true)
-                ->where('can.update', true));
+        $this->actingAs($business)->get('/objects/customer_contact')->assertForbidden();
+        $this->actingAs($business)->get('/objects/customer_contact/export.csv')->assertNotFound();
         $this->assertSame('江苏海岳新能源装备有限公司（测试）', ObjectRecord::findOrFail($customerId)->title);
         $this->assertSame('顾总监', ObjectRecord::findOrFail($contactId)->title);
         $this->assertSame($customerId, ObjectRecord::findOrFail($contactId)->payload['customer_id']);

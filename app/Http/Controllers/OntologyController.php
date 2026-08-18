@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -37,6 +38,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OntologyController extends Controller
 {
+    private const BUSINESS_SUMMARY_KEY = 'project_business_summary';
+
     public function __construct(
         private ObjectRelations $relations,
         private ProjectVisibility $projectVisibility,
@@ -60,7 +63,9 @@ class OntologyController extends Controller
             ->whereIn('key', BusinessWorkspace::RETAINED_OBJECT_KEYS)
             ->orderBy('sort_order')
             ->get();
-        $visible = $objects->filter(fn (BusinessObject $item) => $can("object.{$item->key}.view"))->values();
+        $visible = $objects->filter(fn (BusinessObject $item) => $this->workspace->allowsObjectTableAccess($item)
+            && $can("object.{$item->key}.view")
+            && ($item->key !== self::BUSINESS_SUMMARY_KEY || $can('object.project.view')))->values();
         abort_if($visible->isEmpty(), 403);
 
         $current = $object
@@ -70,7 +75,8 @@ class OntologyController extends Controller
         abort_unless($current, 403);
         $currentFields = $this->workspace->fieldsForUser($current, $request->user());
 
-        $recordsQuery = $this->authorizedRecordsQuery($current, $request)
+        $recordsObject = $this->recordsObject($current);
+        $recordsQuery = $this->authorizedRecordsQuery($recordsObject, $request)
             ->with('businessObject')
             ->orderByDesc('updated_at')
             ->orderByDesc('id');
@@ -78,7 +84,7 @@ class OntologyController extends Controller
         $selected = $request->filled('record')
             ? (clone $recordsQuery)->whereKey((string) $request->query('record'))->first()
             : null;
-        if ($selected && $request->query('mode') === 'detail') {
+        if ($selected && $request->query('mode') === 'detail' && $current->key !== self::BUSINESS_SUMMARY_KEY) {
             $this->workflowTasks->handle($selected, $request->user());
             $selected->refresh();
         }
@@ -98,7 +104,9 @@ class OntologyController extends Controller
         }
         $this->relations->preloadLabels($recordsForLabels, $request->user());
 
-        $relationOptions = $this->relations->optionsFor($current, null, $request->user(), $selected);
+        $relationOptions = $current->key === self::BUSINESS_SUMMARY_KEY
+            ? []
+            : $this->relations->optionsFor($current, null, $request->user(), $selected);
         if ($current->key === 'project') {
             $businessAccounts = $this->workspace->businessAccountOptions()->all();
             $relationOptions['business_owner_user_id'] = [
@@ -128,12 +136,21 @@ class OntologyController extends Controller
 
                 return $data;
             }),
+            'contactObject' => $can('object.customer_contact.view')
+                ? $objects->firstWhere('key', 'customer_contact')?->only(['id', 'key', 'label'])
+                : null,
             'currentObject' => $currentForUser,
-            'records' => $records->through(fn (ObjectRecord $record) => $this->relations->formatRecord($record, $request->user())),
+            'records' => $records->through(fn (ObjectRecord $record) => $this->formatRecordForObject(
+                $current,
+                $record,
+                $request->user(),
+            )),
             'subtotal' => $subtotal,
             'relationOptions' => $relationOptions,
             'selectedRecordId' => $selected?->id,
-            'selectedRecord' => $selected ? $this->relations->formatRecord($selected, $request->user()) : null,
+            'selectedRecord' => $selected
+                ? $this->formatRecordForObject($current, $selected, $request->user())
+                : null,
             'can' => [
                 'create' => $can("object.{$current->key}.create") && $this->canCreate($current, $request->user()),
                 'update' => $can("object.{$current->key}.update") && $this->workspace->writableFieldKeys($current, $request->user()) !== [],
@@ -156,10 +173,13 @@ class OntologyController extends Controller
     public function exportCsv(Request $request, string $object): StreamedResponse
     {
         $current = BusinessObject::where('key', $object)->firstOrFail();
-        abort_unless($this->workspace->allowsDirectObjectAccess($current), 404);
+        abort_unless($this->workspace->allowsObjectTableAccess($current), 404);
         abort_unless($request->user()->canDo("object.{$current->key}.view"), 403);
+        if ($current->key === self::BUSINESS_SUMMARY_KEY) {
+            abort_unless($request->user()->canDo('object.project.view'), 403);
+        }
 
-        $query = $this->authorizedRecordsQuery($current, $request)
+        $query = $this->authorizedRecordsQuery($this->recordsObject($current), $request)
             ->orderByDesc('updated_at')
             ->orderByDesc('id');
         $this->applySearch($query, $current, $this->searchQuery($request));
@@ -197,8 +217,11 @@ class OntologyController extends Controller
                                 'title' => $record->title,
                                 default => in_array($field['type'] ?? null, ['relation', 'creatable_relation', 'multirelation'], true)
                                     ? $this->relations->relationDisplayValue($container, $field)
-                                    : (($field['type'] ?? null) === 'multiaccount'
-                                        ? $this->relations->accountDisplayValue($container[$field['key']] ?? null, true)
+                                    : (in_array($field['type'] ?? null, ['account', 'multiaccount'], true)
+                                        ? $this->relations->accountDisplayValue(
+                                            $container[$field['key']] ?? null,
+                                            ($field['type'] ?? null) === 'multiaccount',
+                                        )
                                         : ($container[$field['key']] ?? null)),
                             };
 
@@ -496,6 +519,37 @@ class OntologyController extends Controller
         return $query;
     }
 
+    private function recordsObject(BusinessObject $object): BusinessObject
+    {
+        if ($object->key !== self::BUSINESS_SUMMARY_KEY) {
+            return $object;
+        }
+
+        return BusinessObject::query()->where('key', 'project')->firstOrFail();
+    }
+
+    /** @return array<string, mixed> */
+    private function formatRecordForObject(
+        BusinessObject $object,
+        ObjectRecord $record,
+        User $user,
+    ): array {
+        $formatted = $this->relations->formatRecord($record, $user);
+        if ($object->key !== self::BUSINESS_SUMMARY_KEY) {
+            return $formatted;
+        }
+
+        $fieldKeys = collect($object->fields ?? [])->pluck('key')->all();
+
+        return [
+            'id' => $formatted['id'],
+            'code' => $formatted['code'],
+            'title' => $formatted['title'],
+            'payload' => Arr::only($formatted['payload'] ?? [], $fieldKeys),
+            'display' => Arr::only($formatted['display'] ?? [], $fieldKeys),
+        ];
+    }
+
     private function applySearch(Builder|Relation $query, BusinessObject $object, string $search): Builder|Relation
     {
         if ($search === '') {
@@ -513,8 +567,10 @@ class OntologyController extends Controller
 
         return $query->where(function (Builder $query) use ($object, $needle, $lowerNeedle, $payloadKeys): void {
             $query->whereLike('code', $needle, caseSensitive: false)
-                ->orWhereLike('title', $needle, caseSensitive: false)
-                ->orWhereRaw('LOWER(CAST(payload AS TEXT)) LIKE ?', [$lowerNeedle]);
+                ->orWhereLike('title', $needle, caseSensitive: false);
+            if ($object->key !== self::BUSINESS_SUMMARY_KEY) {
+                $query->orWhereRaw('LOWER(CAST(payload AS TEXT)) LIKE ?', [$lowerNeedle]);
+            }
             foreach ($payloadKeys as $key) {
                 $query->orWhereLike("payload->{$key}", $needle, caseSensitive: false);
             }
@@ -1126,6 +1182,8 @@ class OntologyController extends Controller
 
     private function prepareNewProjectPayload(array $payload, User $user): array
     {
+        $payload = $this->projectFinance->withCalculatedPaymentProgress($payload);
+
         if (! $this->workspace->isAdmin($user) && $this->workspace->isBusiness($user)) {
             $payload['business_owner_user_id'] = (string) $user->id;
         }
@@ -1152,6 +1210,7 @@ class OntologyController extends Controller
 
     private function prepareProjectPayload(ObjectRecord $project, array $payload, User $user): array
     {
+        $payload = $this->projectFinance->withCalculatedPaymentProgress($payload);
         $oldPayload = $project->payload ?? [];
         if (($oldPayload['business_owner_user_id'] ?? null) !== ($payload['business_owner_user_id'] ?? null)) {
             $this->guardBusinessOwner($payload['business_owner_user_id'] ?? null);
