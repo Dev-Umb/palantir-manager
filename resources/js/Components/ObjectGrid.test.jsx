@@ -26,11 +26,15 @@ describe('ObjectGrid column resizing', () => {
 describe('project number formatting', () => {
     it('shows project numbers with two decimals without changing other objects', () => {
         const field = { key: 'occurred_amount', type: 'number' };
+        const progressField = { key: 'payment_progress', type: 'number' };
 
         expect(formatObjectNumber('project', field, -1234.555)).toBe('-1,234.56');
         expect(formatObjectNumber('project', field, 12)).toBe('12.00');
+        expect(formatObjectNumber('project', progressField, 45.87)).toBe('45.87%');
+        expect(formatObjectNumber('project', progressField, 120)).toBe('120.00%');
         expect(formatObjectNumber('contract', field, 12)).toBe(12);
         expect(formatObjectNumber('project', field, '')).toBe('');
+        expect(formatObjectNumber('project', progressField, null)).toBeNull();
     });
 });
 

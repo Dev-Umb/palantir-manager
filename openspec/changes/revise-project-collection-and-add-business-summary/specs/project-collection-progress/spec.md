@@ -8,6 +8,7 @@ The system MUST calculate project collection progress as paid amount divided by 
 
 - **WHEN** a project has occurred amount 200 and paid amount 50
 - **THEN** the project MUST expose collection progress as 25 percent
+- **AND** the project table MUST render the value with a trailing percent sign, such as `25.00%`
 
 #### Scenario: Collection exceeds occurred amount
 

@@ -10,8 +10,10 @@ export function formatObjectNumber(objectKey, field, value) {
         return value;
     }
 
-    return Number(value).toLocaleString('zh-CN', {
+    const formatted = Number(value).toLocaleString('zh-CN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
+
+    return field.key === 'payment_progress' ? `${formatted}%` : formatted;
 }
