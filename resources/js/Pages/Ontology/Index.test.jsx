@@ -250,6 +250,23 @@ describe('Ontology multi-condition filters', () => {
         expect(within(selector).queryByRole('option', { name: '默认（项目名称）' })).not.toBeInTheDocument();
     });
 
+    it('explains that the contract table is synchronized and exposes no write entrypoint', () => {
+        window.history.replaceState({}, '', '/objects/contract');
+        render(
+            <Index
+                objects={[{ id: 4, key: 'contract', label: '合同表', group: '业务与合同' }]}
+                currentObject={{ id: 4, key: 'contract', label: '合同表', group: '业务与合同', fields: [] }}
+                records={{ data: [] }}
+                can={{ create: false, update: false, delete: false }}
+                relationOptions={{}}
+                selectedRecordId={null}
+            />,
+        );
+
+        expect(screen.getByRole('status')).toHaveTextContent('合同数据由项目主表维护并同步到此处');
+        expect(screen.queryByRole('link', { name: '新建' })).not.toBeInTheDocument();
+    });
+
     it('offers page sizes from 10 to 100 in increments of 10', () => {
         window.history.replaceState({}, '', '/objects/project?per_page=30');
         render(<Index
@@ -425,7 +442,10 @@ describe('customer contact detail list', () => {
 });
 
 describe('project customer contact choices', () => {
-    beforeEach(() => window.localStorage.clear());
+    beforeEach(() => {
+        window.localStorage.clear();
+        vi.clearAllMocks();
+    });
     afterEach(() => {
         cleanup();
         vi.restoreAllMocks();
@@ -592,17 +612,18 @@ describe('project customer contact choices', () => {
         expect(returnTo).toContain('page=2');
         expect(returnTo).not.toContain('mode=edit');
         expect(returnTo).not.toContain('record=project-1');
-        expect(inertia.put).toHaveBeenCalledWith(
+        expect(inertia.post).toHaveBeenCalledWith(
             `/records/project-1?return_to=${encodeURIComponent(returnTo)}`,
             {
                 payload: {
                     customer_id: 'customer-b',
                     customer_contact_ids: [],
                 },
+                _method: 'put',
             },
-            expect.objectContaining({ preserveScroll: true }),
+            expect.objectContaining({ preserveScroll: true, forceFormData: true }),
         );
-        expect(inertia.put).toHaveBeenCalledTimes(1);
+        expect(inertia.post).toHaveBeenCalledTimes(1);
     });
 
     it('renders project contacts with name and phone only', async () => {

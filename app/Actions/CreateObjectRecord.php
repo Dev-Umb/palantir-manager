@@ -30,6 +30,7 @@ class CreateObjectRecord
         string $action = 'object.create',
         ?string $workflowKey = null,
         array $workflowTargetRoles = [],
+        bool $refreshProject = true,
     ): ObjectRecord {
         return DB::transaction(function () use (
             $object,
@@ -38,6 +39,7 @@ class CreateObjectRecord
             $action,
             $workflowKey,
             $workflowTargetRoles,
+            $refreshProject,
         ): ObjectRecord {
             $this->relations->lockReferenceGraph();
             $object = BusinessObject::query()->lockForUpdate()->findOrFail($object->id);
@@ -84,11 +86,11 @@ class CreateObjectRecord
                 'payload' => ['code' => $record->code, 'title' => $record->title],
             ]);
 
-            if ($object->key === 'contract') {
+            if ($object->key === 'contract' && $refreshProject) {
                 $this->contractAmount->handle($payload['project_id'] ?? null);
             }
 
-            if ($object->key === 'contract') {
+            if ($object->key === 'contract' && $refreshProject) {
                 $this->projectNotifications->handleProjects([$payload['project_id'] ?? null]);
             }
 

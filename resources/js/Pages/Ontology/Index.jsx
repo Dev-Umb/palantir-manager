@@ -9,6 +9,11 @@ import ProjectCustomerInlineFields, {
     previewProjectCustomerProfile,
     projectCustomerProfile,
 } from '../../Components/ProjectCustomerInlineFields';
+import ProjectContractEditor, {
+    ProjectContractsDetail,
+    projectContractSubmission,
+    projectContractsForEdit,
+} from '../../Components/ProjectContractEditor';
 import { SchemaForm } from '../../Components/FieldControl';
 import LineItemsEditor, { emptyItem } from '../../Components/LineItemsEditor';
 import {
@@ -42,7 +47,9 @@ export default function Index({ objects = [], contactObject = null, currentObjec
         () => hasFixedColumnOrder ? currentObject.fields : fieldsInColumnOrder(currentObject.fields, columnOrder),
         [columnOrder, currentObject.fields, hasFixedColumnOrder],
     );
-    const createForm = useForm({ payload: defaults(currentObject.fields, params) });
+    const createForm = useForm(currentObject.key === 'project'
+        ? { payload: defaults(currentObject.fields, params), contracts: [], deleted_contract_ids: [] }
+        : { payload: defaults(currentObject.fields, params) });
     const createSubmittingRef = useRef(false);
     const createCheckingCustomerRef = useRef(false);
     const [createCheckingCustomer, setCreateCheckingCustomer] = useState(false);
@@ -101,9 +108,10 @@ export default function Index({ objects = [], contactObject = null, currentObjec
         }
 
         createSubmittingRef.current = true;
-        createForm.transform((data) => withCustomerProfile(data, profile, overwriteConfirmed));
+        createForm.transform((data) => projectSubmissionData(withCustomerProfile(data, profile, overwriteConfirmed)));
         createForm.post(`/objects/${currentObject.id}`, {
             preserveScroll: true,
+            forceFormData: currentObject.key === 'project',
             onFinish: () => {
                 createSubmittingRef.current = false;
             },
@@ -191,6 +199,11 @@ export default function Index({ objects = [], contactObject = null, currentObjec
                                 )}
                             />
                         </div>
+                        {currentObject.key === 'contract' && (
+                            <p className="notice form-notice contract-readonly-notice" role="status">
+                                合同数据由项目主表维护并同步到此处；本表仅供查询、查看附件和导出。
+                            </p>
+                        )}
                         <Suspense fallback={<div className="table-loading">列表加载中...</div>}>
                             <ObjectGrid
                                 key={storageKey}
@@ -228,6 +241,11 @@ export default function Index({ objects = [], contactObject = null, currentObjec
                             submitLabel={`新建${objectLabel}`}
                             relationOptions={relationOptions}
                             canManageCustomers={can.manage_customers}
+                            canManageContracts={can.manage_contracts}
+                            contracts={createForm.data.contracts || []}
+                            setContracts={(contracts) => createForm.setData('contracts', contracts)}
+                            deletedContractIds={createForm.data.deleted_contract_ids || []}
+                            setDeletedContractIds={(ids) => createForm.setData('deleted_contract_ids', ids)}
                         />
                     </form>
                 </Modal>
@@ -256,7 +274,7 @@ export default function Index({ objects = [], contactObject = null, currentObjec
                 />
             )}
             {mode === 'edit' && can.update && selectedRecord && selectedRecord.can_update !== false && (
-                <EditRecordModal key={selectedRecord.id} object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} closeHref={closeHref} canManageCustomers={can.manage_customers} />
+                <EditRecordModal key={selectedRecord.id} object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} closeHref={closeHref} canManageCustomers={can.manage_customers} canManageContracts={can.manage_contracts} />
             )}
             {contactModal && (
                 <CustomerContactModal
@@ -546,8 +564,14 @@ function exportUrlFor(objectKey, params) {
     return `/objects/${objectKey}/export.csv${query ? `?${query}` : ''}`;
 }
 
-function EditRecordModal({ object, record, fields, relationOptions, closeHref, canManageCustomers = false }) {
-    const updateForm = useForm({ payload: payloadForEdit(record.payload, fields) });
+function EditRecordModal({ object, record, fields, relationOptions, closeHref, canManageCustomers = false, canManageContracts = false }) {
+    const updateForm = useForm(object.key === 'project' && canManageContracts
+        ? {
+            payload: payloadForEdit(record.payload, fields),
+            contracts: projectContractsForEdit(record.contracts || []),
+            deleted_contract_ids: [],
+        }
+        : { payload: payloadForEdit(record.payload, fields) });
     const submittingRef = useRef(false);
     const checkingCustomerRef = useRef(false);
     const [checkingCustomer, setCheckingCustomer] = useState(false);
@@ -583,13 +607,21 @@ function EditRecordModal({ object, record, fields, relationOptions, closeHref, c
         }
 
         submittingRef.current = true;
-        updateForm.transform((data) => withCustomerProfile(data, profile, overwriteConfirmed));
-        updateForm.put(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, {
+        updateForm.transform((data) => object.key === 'project'
+            ? { ...projectSubmissionData(withCustomerProfile(data, profile, overwriteConfirmed)), _method: 'put' }
+            : withCustomerProfile(data, profile, overwriteConfirmed));
+        const options = {
             preserveScroll: true,
+            forceFormData: object.key === 'project',
             onFinish: () => {
                 submittingRef.current = false;
             },
-        });
+        };
+        if (object.key === 'project') {
+            updateForm.post(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, options);
+        } else {
+            updateForm.put(`/records/${record.id}?return_to=${encodeURIComponent(closeHref)}`, options);
+        }
     }
 
     return (
@@ -608,6 +640,11 @@ function EditRecordModal({ object, record, fields, relationOptions, closeHref, c
                         relationOptions={relationOptions}
                         recordDisplay={record.display}
                         canManageCustomers={canManageCustomers}
+                        canManageContracts={canManageContracts}
+                        contracts={updateForm.data.contracts || []}
+                        setContracts={(contracts) => updateForm.setData('contracts', contracts)}
+                        deletedContractIds={updateForm.data.deleted_contract_ids || []}
+                        setDeletedContractIds={(ids) => updateForm.setData('deleted_contract_ids', ids)}
                     />
                 </form>
             </Modal>
@@ -635,6 +672,16 @@ function withCustomerProfile(data, profile, overwriteConfirmed) {
             ...data.payload,
             customer_profile: normalizedProjectCustomerProfile(profile, overwriteConfirmed),
         },
+    };
+}
+
+function projectSubmissionData(data) {
+    if (!Array.isArray(data.contracts)) return data;
+
+    return {
+        ...data,
+        contracts: projectContractSubmission(data.contracts),
+        deleted_contract_ids: data.deleted_contract_ids || [],
     };
 }
 
@@ -667,7 +714,7 @@ function Modal({ title, closeHref, children }) {
     );
 }
 
-function RecordForm({ objectKey, record = null, fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {}, canManageCustomers = false }) {
+function RecordForm({ objectKey, record = null, fields, payload, setPayload, processing, errors, submitLabel, relationOptions, recordDisplay = {}, canManageCustomers = false, canManageContracts = false, contracts = [], setContracts = () => {}, deletedContractIds = [], setDeletedContractIds = () => {} }) {
     const itemFields = fields.filter((field) => field.scope === 'item');
     const customerProfileFieldKeys = new Set(['customer_id', 'customer_contact_ids', 'customer_address', 'customer_level', 'customer_nature']);
     const formFields = objectKey === 'customer'
@@ -729,6 +776,15 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
                     contactOptions={scopedOptions.customer_contact_ids || {}}
                 />
             )}
+            {objectKey === 'project' && canManageContracts && (
+                <ProjectContractEditor
+                    contracts={contracts}
+                    onChange={setContracts}
+                    deletedContractIds={deletedContractIds}
+                    onDeletedContractIdsChange={setDeletedContractIds}
+                    errors={errors}
+                />
+            )}
             {itemFields.length > 0 && (
                 <LineItemsEditor
                     fields={itemFields}
@@ -780,6 +836,7 @@ function RecordDetail({ object, record, fields, relationOptions, contactCan, onC
                 <LineItemsDetail fields={itemFields} items={record.payload?.items || []} relationOptions={relationOptions} />
             )}
             {object.key === 'project' && <ProjectContacts contacts={record.contacts || []} />}
+            {object.key === 'project' && can.view_contracts && <ProjectContractsDetail contracts={record.contracts || []} />}
             {object.key === 'project' && can.sync_contract_amount && <ContractAmountSync project={record} />}
             {object.key === 'customer' && <CustomerContacts customer={record} contacts={record.contacts || []} can={contactCan} onDetail={onContactDetail} onCreate={onContactCreate} />}
             {object.key === 'tender' && can.convert && !record.payload?.converted_project_id && (

@@ -636,6 +636,27 @@ input:focus, select:focus, textarea:focus { border-color: var(--steel); box-shad
 .contract-sync-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
 .contract-sync-card div { display: grid; gap: 4px; }
 .contract-sync-card span { color: var(--muted); font-size: 12px; }
+.contract-readonly-notice { margin: 0 0 12px; }
+.project-contract-editor, .project-contract-detail { display: grid; gap: 12px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.project-contract-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.project-contract-editor-head > div { display: grid; gap: 3px; }
+.project-contract-editor-head span { color: var(--muted); font-size: 12px; }
+.project-contract-card { position: relative; min-width: 0; display: grid; gap: 12px; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.project-contract-card legend { padding: 0 7px; color: var(--steel); font-size: 13px; font-weight: 750; }
+.project-contract-card-actions { position: absolute; top: 8px; right: 8px; }
+.project-contract-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.project-contract-fields label, .project-contract-attachment { min-width: 0; display: grid; gap: 6px; }
+.project-contract-attachment { padding-top: 3px; }
+.project-contract-attachment > span { color: var(--muted); font-size: 12px; font-weight: 650; }
+.project-contract-attachment small { color: var(--steel); }
+.project-contract-detail-card { display: grid; gap: 11px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.project-contract-detail-card > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.project-contract-detail-card > div:first-child span { color: var(--muted); font-size: 12px; }
+.project-contract-detail-card dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.project-contract-detail-card dl > div { display: grid; gap: 3px; padding: 8px 10px; border-radius: 7px; background: var(--surface-2); }
+.project-contract-detail-card dt { color: var(--muted); font-size: 11px; }
+.project-contract-detail-card dd { margin: 0; font-weight: 650; }
+.project-contract-detail-card .attachment-list > span { width: 100%; color: var(--muted); font-size: 11px; font-weight: 650; }
 .project-customer-manager { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; }
 .project-customer-manager > div:first-child { display: grid; gap: 4px; }
 .project-customer-manager > div:first-child span { color: var(--muted); font-size: 12px; }
@@ -1540,6 +1561,8 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
     .advanced-filter-actions > div { justify-content: flex-end; }
     .advanced-filter-row { grid-template-columns: 1fr; }
     .contract-sync-card { align-items: stretch; flex-direction: column; }
+    .project-contract-editor-head, .project-contract-detail-card > div:first-child { align-items: stretch; flex-direction: column; }
+    .project-contract-fields, .project-contract-detail-card dl { grid-template-columns: 1fr; }
     .project-customer-manager { align-items: stretch; flex-direction: column; }
     .project-customer-inline { grid-template-columns: 1fr; }
     .project-contact-row { grid-template-columns: 1fr 1fr 38px; }

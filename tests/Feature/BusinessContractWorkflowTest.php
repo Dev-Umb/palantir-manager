@@ -229,19 +229,16 @@ class BusinessContractWorkflowTest extends TestCase
         $project = $this->project($business);
         $contractObject = $this->object('contract');
 
-        $this->actingAs($admin)->post("/objects/{$contractObject->id}", [
-            'payload' => $this->contractPayload($project, '已有加工函', 100000),
-        ])->assertSessionHasErrors('payload.processing_letter_attachments');
+        $this->updateProjectContracts($admin, $project, [[
+            ...$this->contractPayload($project, '已有加工函', 100000),
+        ]])->assertSessionHasErrors('contracts.0.processing_letter_attachments');
 
-        $this->actingAs($admin)->post("/objects/{$contractObject->id}", [
-            'payload' => [
+        $this->updateProjectContracts($admin, $project, [
+            [
                 ...$this->contractPayload($project, '已有加工函', 100000),
                 'processing_letter_attachments' => [UploadedFile::fake()->create('加工函.pdf', 100, 'application/pdf')],
             ],
-        ])->assertRedirect();
-
-        $this->actingAs($admin)->post("/objects/{$contractObject->id}", [
-            'payload' => [
+            [
                 ...$this->contractPayload($project, '已签署', 200000),
                 'contract_attachments' => [UploadedFile::fake()->create('合同.pdf', 100, 'application/pdf')],
             ],
@@ -254,15 +251,11 @@ class BusinessContractWorkflowTest extends TestCase
         $this->assertArrayNotHasKey('related_contract_no', $project->fresh()->payload);
 
         $processingContract = $contracts->firstWhere('payload.status', '已有加工函');
-        $this->actingAs($admin)->put("/records/{$processingContract->id}", [
-            'payload' => [
-                ...$processingContract->payload,
-                'status' => '已签署',
-                'contract_attachments' => [UploadedFile::fake()->create('补签合同.pdf', 100, 'application/pdf')],
-                'processing_letter_attachments' => [],
-                'statement_attachments' => [],
-            ],
-        ])->assertRedirect();
+        $this->updateProjectContracts($admin, $project, [[
+            ...$this->contractPayload($project, '已签署', 100000),
+            'id' => $processingContract->id,
+            'contract_attachments' => [UploadedFile::fake()->create('补签合同.pdf', 100, 'application/pdf')],
+        ]])->assertRedirect();
 
         $this->assertSame('已签署', $project->fresh()->payload['contract_status']);
         $this->assertSame('合同签署', $project->fresh()->payload['overall_status']);
@@ -276,18 +269,16 @@ class BusinessContractWorkflowTest extends TestCase
         $finance = $this->userWithRole('finance', '财务');
         $business = $this->userWithRole('business', '业务员');
         $project = $this->project($business);
-        $contractObject = $this->object('contract');
-
-        $this->actingAs($admin)->post("/objects/{$contractObject->id}", [
-            'payload' => $this->contractPayload($project, '未签署', 100000),
+        $this->updateProjectContracts($admin, $project, [
+            $this->contractPayload($project, '未签署', 100000),
         ])->assertRedirect();
         $this->assertSame(100000.0, (float) $project->fresh()->payload['contract_amount']);
 
         $manual = [...$project->fresh()->payload, 'contract_amount' => 180000];
         $this->actingAs($finance)->put("/records/{$project->id}", ['payload' => $manual])->assertRedirect();
 
-        $this->actingAs($admin)->post("/objects/{$contractObject->id}", [
-            'payload' => $this->contractPayload($project, '未签署', 200000),
+        $this->updateProjectContracts($admin, $project, [
+            $this->contractPayload($project, '未签署', 200000),
         ])->assertRedirect();
         $this->assertSame(180000.0, (float) $project->fresh()->payload['contract_amount']);
 
@@ -548,14 +539,15 @@ class BusinessContractWorkflowTest extends TestCase
         $owner = $this->userWithRole('business', '业务员');
         $project = $this->project($owner);
         $contractObject = $this->object('contract');
-        $this->actingAs($admin)->post("/objects/{$contractObject->id}", ['payload' => [
+        $this->updateProjectContracts($admin, $project, [[
             ...$this->contractPayload($project, '未签署', 100000),
             'statement_attachments' => [UploadedFile::fake()->create('首份对账单.pdf', 20, 'application/pdf')],
         ]])->assertRedirect();
         $contract = $contractObject->records()->where('payload->project_id', $project->id)->firstOrFail();
 
-        $this->actingAs($admin)->put("/records/{$contract->id}", ['payload' => [
-            ...$contract->payload,
+        $this->updateProjectContracts($admin, $project, [[
+            ...$this->contractPayload($project, '未签署', 100000),
+            'id' => $contract->id,
             'statement_attachments' => [
                 UploadedFile::fake()->image('补充一.png'),
                 UploadedFile::fake()->create('补充二.pdf', 20, 'application/pdf'),
@@ -565,12 +557,13 @@ class BusinessContractWorkflowTest extends TestCase
         ]])->assertRedirect();
         $this->assertCount(3, $contract->fresh()->payload['statement_attachments']);
 
-        $this->actingAs($admin)->put("/records/{$contract->id}", ['payload' => [
-            ...$contract->fresh()->payload,
+        $this->updateProjectContracts($admin, $project, [[
+            ...$this->contractPayload($project, '未签署', 100000),
+            'id' => $contract->id,
             'statement_attachments' => [UploadedFile::fake()->create('恶意脚本.exe', 20, 'application/octet-stream')],
             'processing_letter_attachments' => [],
             'contract_attachments' => [],
-        ]])->assertSessionHasErrors('payload.statement_attachments.0');
+        ]])->assertSessionHasErrors('contracts.0.statement_attachments.0');
         $this->assertCount(3, $contract->fresh()->payload['statement_attachments']);
     }
 
@@ -671,7 +664,6 @@ class BusinessContractWorkflowTest extends TestCase
     private function contractPayload(ObjectRecord $project, string $status, float $amount): array
     {
         return [
-            'project_id' => $project->id,
             'status' => $status,
             'ctype' => '销售合同',
             'amount' => $amount,
@@ -681,6 +673,16 @@ class BusinessContractWorkflowTest extends TestCase
             'contract_attachments' => [],
             'statement_attachments' => [],
         ];
+    }
+
+    private function updateProjectContracts(User $user, ObjectRecord $project, array $contracts)
+    {
+        return $this->actingAs($user)->post("/records/{$project->id}", [
+            '_method' => 'put',
+            'payload' => $project->fresh()->payload,
+            'contracts' => $contracts,
+            'deleted_contract_ids' => [],
+        ]);
     }
 
     private function object(string $key): BusinessObject

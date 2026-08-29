@@ -111,9 +111,7 @@ class BusinessWorkspace
         }
 
         if ($object->key === 'contract') {
-            return $this->isAdmin($user)
-                ? $this->editableMetadataKeys($object)
-                : [];
+            return [];
         }
 
         if ($object->key !== 'project') {
@@ -147,6 +145,10 @@ class BusinessWorkspace
 
     public function canDelete(BusinessObject $object, User $user): bool
     {
+        if ($object->key === 'contract') {
+            return false;
+        }
+
         if ($this->isAdmin($user)) {
             return true;
         }

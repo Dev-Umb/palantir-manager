@@ -210,19 +210,20 @@ class ExampleTest extends TestCase
         $admin = $this->userWithRole('admin');
         $this->actingAs($admin);
 
-        $contract = BusinessObject::where('key', 'contract')->firstOrFail();
         $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
-        $customerId = $project->payload['customer_id'];
-
-        $this->post("/objects/{$contract->id}", [
-            'payload' => [
+        $this->post("/records/{$project->id}", [
+            '_method' => 'put',
+            'payload' => $project->payload,
+            'contracts' => [[
                 'ctype' => '补充协议',
                 'amount' => 140000,
-                'customer_id' => $customerId,
-                'project_id' => $project->id,
                 'status' => '未签署',
-            ],
-        ])->assertRedirect();
+                'processing_letter_attachments' => [],
+                'contract_attachments' => [],
+                'statement_attachments' => [],
+            ]],
+            'deleted_contract_ids' => [],
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
         $project->refresh();
         $this->assertSame(5280000.0, (float) $project->payload['contract_amount']);
@@ -232,12 +233,20 @@ class ExampleTest extends TestCase
             ->where('payload->project_id', $project->id)
             ->where('payload->ctype', '补充协议')
             ->firstOrFail();
-        $this->put("/records/{$newContract->id}", [
-            'payload' => [
-                ...$newContract->payload,
+        $this->post("/records/{$project->id}", [
+            '_method' => 'put',
+            'payload' => $project->fresh()->payload,
+            'contracts' => [[
+                'id' => $newContract->id,
+                'ctype' => '补充协议',
                 'amount' => 200000,
-            ],
-        ])->assertRedirect();
+                'status' => '未签署',
+                'processing_letter_attachments' => [],
+                'contract_attachments' => [],
+                'statement_attachments' => [],
+            ]],
+            'deleted_contract_ids' => [],
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame(5280000.0, (float) $project->fresh()->payload['contract_amount']);
 

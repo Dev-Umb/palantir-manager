@@ -8,6 +8,7 @@ use App\Actions\CreateObjectRecord;
 use App\Actions\ReassignTenderBusinessOwner;
 use App\Actions\ResolveInboundMaterials;
 use App\Actions\SyncProjectContractAmount;
+use App\Actions\SyncProjectContracts;
 use App\Actions\SyncProjectCustomerProfile;
 use App\Actions\SyncProjectFinance;
 use App\Actions\SyncProjectNotifications;
@@ -26,6 +27,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -44,6 +46,7 @@ class OntologyController extends Controller
         private ObjectRelations $relations,
         private ProjectVisibility $projectVisibility,
         private SyncProjectContractAmount $contractAmount,
+        private SyncProjectContracts $projectContracts,
         private SyncProjectFinance $projectFinance,
         private SyncProjectNotifications $projectNotifications,
         private ResolveInboundMaterials $inboundMaterials,
@@ -102,7 +105,15 @@ class OntologyController extends Controller
         if ($selected && ! $recordsForLabels->contains('id', $selected->id)) {
             $recordsForLabels = $recordsForLabels->concat([$selected]);
         }
-        $this->relations->preloadLabels($recordsForLabels, $request->user());
+        $projectContractRecords = $this->projectContractRecords(
+            $current,
+            $selected ? collect([$selected]) : collect(),
+            $request->user(),
+        );
+        $this->relations->preloadLabels($recordsForLabels->concat($projectContractRecords), $request->user());
+        $contractsByProject = $projectContractRecords
+            ->map(fn (ObjectRecord $contract): array => $this->relations->formatRecord($contract, $request->user()))
+            ->groupBy(fn (array $contract): string => (string) ($contract['payload']['project_id'] ?? ''));
 
         $relationOptions = $current->key === self::BUSINESS_SUMMARY_KEY
             ? []
@@ -144,12 +155,13 @@ class OntologyController extends Controller
                 $current,
                 $record,
                 $request->user(),
+                $contractsByProject,
             )),
             'subtotal' => $subtotal,
             'relationOptions' => $relationOptions,
             'selectedRecordId' => $selected?->id,
             'selectedRecord' => $selected
-                ? $this->formatRecordForObject($current, $selected, $request->user())
+                ? $this->formatRecordForObject($current, $selected, $request->user(), $contractsByProject)
                 : null,
             'can' => [
                 'create' => $can("object.{$current->key}.create") && $this->canCreate($current, $request->user()),
@@ -159,6 +171,10 @@ class OntologyController extends Controller
                     && ($this->workspace->isAdmin($request->user()) || $this->workspace->isFinance($request->user())),
                 'manage_customers' => $current->key === 'project'
                     && ($this->workspace->isAdmin($request->user()) || $this->workspace->isBusiness($request->user())),
+                'manage_contracts' => $current->key === 'project'
+                    && $can('object.contract.view')
+                    && ($this->workspace->isAdmin($request->user()) || $this->workspace->isBusiness($request->user())),
+                'view_contracts' => $current->key === 'project' && $can('object.contract.view'),
                 'convert' => $current->key === 'tender' && $can('object.tender.update'),
             ],
             'businessUsers' => $current->key === 'tender'
@@ -258,6 +274,7 @@ class OntologyController extends Controller
         abort_unless($this->workspace->allowsDirectObjectAccess($object), 404);
         abort_unless($request->user()->canDo("object.{$object->key}.create") && $this->canCreate($object, $request->user()), 403);
 
+        $contractBatch = $this->projectContractBatch($request, $object);
         $customerProfile = $this->projectCustomerProfileData($request, $object);
         $payload = $this->applySystemPayload(
             $object,
@@ -265,13 +282,17 @@ class OntologyController extends Controller
             $request->user(),
         );
         if ($object->key === 'project') {
+            if ($contractBatch) {
+                $payload['contract_status'] = $contractBatch['contract_status'];
+                $payload['overall_status'] = $this->overallStatusForContracts($payload);
+            }
             $payload = $this->prepareNewProjectPayload($payload, $request->user());
         }
         if ($object->key === 'contract') {
             $this->guardContractEvidence($payload);
         }
         $this->guardTenderStatus($object, $payload);
-        $record = DB::transaction(function () use ($object, $payload, $customerProfile, $request, $writer): ObjectRecord {
+        $record = DB::transaction(function () use ($object, $payload, $customerProfile, $contractBatch, $request, $writer): ObjectRecord {
             $this->relations->lockReferenceGraph();
             if ($object->key === 'project' && $customerProfile) {
                 $customerResult = $this->projectCustomerProfile->handle($customerProfile, $request->user(), $writer);
@@ -284,6 +305,9 @@ class OntologyController extends Controller
             $this->relations->validateItemRelations($object, $payload, $request->user());
 
             $record = $writer->handle($object, $payload, $request->user());
+            if ($object->key === 'project' && $contractBatch) {
+                $this->projectContracts->handle($record, $contractBatch, $request->user());
+            }
 
             return $record;
         });
@@ -315,6 +339,7 @@ class OntologyController extends Controller
             abort_unless($this->projectVisibility->allowsProjectUpdate($request->user(), $record), 403);
         }
 
+        $contractBatch = $this->projectContractBatch($request, $object, $record);
         $customerProfile = $this->projectCustomerProfileData($request, $object);
         $payload = $this->applySystemPayload(
             $object,
@@ -326,7 +351,7 @@ class OntologyController extends Controller
             ),
             $request->user(),
         );
-        DB::transaction(function () use ($record, $object, $payload, $customerProfile, $writer, $request): void {
+        DB::transaction(function () use ($record, $object, $payload, $customerProfile, $contractBatch, $writer, $request): void {
             $this->relations->lockReferenceGraph();
             if (in_array($object->key, ['stock_ledger', 'material'], true)) {
                 BusinessObject::query()->whereKey($object->id)->lockForUpdate()->firstOrFail();
@@ -334,6 +359,10 @@ class OntologyController extends Controller
             $lockedRecord = ObjectRecord::query()->lockForUpdate()->findOrFail($record->id);
             $oldPayload = $lockedRecord->payload ?? [];
             $payload = $this->mergeReadonlyPayload($object, $payload, $oldPayload);
+            if ($object->key === 'project' && $contractBatch) {
+                $payload['contract_status'] = $contractBatch['contract_status'];
+                $payload['overall_status'] = $this->overallStatusForContracts($payload);
+            }
             if ($object->key === 'project' && $customerProfile) {
                 $customerResult = $this->projectCustomerProfile->handle($customerProfile, $request->user(), $writer);
                 $payload['customer_id'] = $customerResult['customer_id'];
@@ -415,7 +444,7 @@ class OntologyController extends Controller
             if ($object->key === 'contract') {
                 $this->projectNotifications->handleProjects([$oldProjectId, $newProjectId]);
             }
-            if ($object->key === 'project') {
+            if ($object->key === 'project' && ! $contractBatch) {
                 $this->projectNotifications->handleProjects([$lockedRecord->id]);
             }
 
@@ -429,6 +458,10 @@ class OntologyController extends Controller
                     'changes' => $this->payloadChanges($oldPayload, $payload),
                 ],
             ]);
+
+            if ($object->key === 'project' && $contractBatch) {
+                $this->projectContracts->handle($lockedRecord, $contractBatch, $request->user());
+            }
         });
 
         $clearedContactCount = (int) $request->attributes->get('cleared_project_contact_count', 0);
@@ -533,8 +566,12 @@ class OntologyController extends Controller
         BusinessObject $object,
         ObjectRecord $record,
         User $user,
+        Collection $contractsByProject,
     ): array {
         $formatted = $this->relations->formatRecord($record, $user);
+        if ($object->key === 'project') {
+            $formatted['contracts'] = $contractsByProject->get($record->id, collect())->values()->all();
+        }
         if ($object->key !== self::BUSINESS_SUMMARY_KEY) {
             return $formatted;
         }
@@ -548,6 +585,54 @@ class OntologyController extends Controller
             'payload' => Arr::only($formatted['payload'] ?? [], $fieldKeys),
             'display' => Arr::only($formatted['display'] ?? [], $fieldKeys),
         ];
+    }
+
+    /** @return Collection<int, ObjectRecord> */
+    private function projectContractRecords(BusinessObject $object, Collection $records, User $user): Collection
+    {
+        if ($object->key !== 'project' || ! $user->canDo('object.contract.view')) {
+            return collect();
+        }
+
+        $projectIds = $records->pluck('id')->filter()->unique()->values();
+        if ($projectIds->isEmpty()) {
+            return collect();
+        }
+
+        return ObjectRecord::query()
+            ->whereRelation('businessObject', 'key', 'contract')
+            ->whereIn('payload->project_id', $projectIds->all())
+            ->with('businessObject')
+            ->orderBy('code')
+            ->get();
+    }
+
+    /**
+     * @return array{
+     *     contracts: array<int, array<string, mixed>>,
+     *     deleted_contract_ids: array<int, string>,
+     *     contract_status: string
+     * }|null
+     */
+    private function projectContractBatch(
+        Request $request,
+        BusinessObject $object,
+        ?ObjectRecord $project = null,
+    ): ?array {
+        if ($object->key !== 'project'
+            || (! $request->exists('contracts')
+                && ! $request->exists('deleted_contract_ids')
+                && ! $request->hasFile('contracts'))) {
+            return null;
+        }
+
+        abort_unless(
+            $request->user()->canDo('object.contract.view')
+                && ($this->workspace->isAdmin($request->user()) || $this->workspace->isBusiness($request->user())),
+            403,
+        );
+
+        return $this->projectContracts->validate($request, $project);
     }
 
     private function applySearch(Builder|Relation $query, BusinessObject $object, string $search): Builder|Relation
@@ -1155,7 +1240,7 @@ class OntologyController extends Controller
 
         return match ($object->key) {
             'project' => $this->workspace->isAdmin($user) || $this->workspace->isBusiness($user),
-            'contract' => $this->workspace->isAdmin($user),
+            'contract' => false,
             'customer' => $this->workspace->isAdmin($user) || $this->workspace->isBusiness($user) || $this->workspace->isTender($user),
             'customer_contact' => $this->workspace->isAdmin($user) || $this->workspace->isBusiness($user),
             'tender' => $this->workspace->isAdmin($user) || $this->workspace->isTender($user),
@@ -1196,10 +1281,10 @@ class OntologyController extends Controller
         $this->guardInformedBusinessUsers($payload['informed_business_user_ids'] ?? []);
 
         $payload['overall_status'] = $payload['overall_status'] ?? '投标中';
+        $payload['contract_status'] = $payload['contract_status'] ?? '未签署';
         $this->guardProjectContractState($payload);
         $this->guardShipmentDates($payload);
         $payload['overall_status_changed_at'] = now()->toISOString();
-        $payload['contract_status'] = '未签署';
         $payload['collection_count'] = 0;
         if (is_numeric($payload['contract_amount'] ?? null)) {
             $payload['contract_amount_source'] = 'manual';
@@ -1267,6 +1352,20 @@ class OntologyController extends Controller
                 'payload.overall_status' => '所有合同签署并上传合同附件后，才可更新为合同签署。',
             ]);
         }
+    }
+
+    private function overallStatusForContracts(array $payload): string
+    {
+        $current = (string) ($payload['overall_status'] ?? '投标中');
+        if ($current === '已完成') {
+            return $current;
+        }
+
+        return match ($payload['contract_status'] ?? '未签署') {
+            '已签署' => '合同签署',
+            '已有加工函', '部分签署' => '已拿到加工函',
+            default => in_array($current, ['已拿到加工函', '合同签署'], true) ? '已中标' : $current,
+        };
     }
 
     private function guardShipmentDates(array $payload): void
