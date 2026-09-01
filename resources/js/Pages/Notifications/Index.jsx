@@ -74,17 +74,7 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                     </div>
                 ) : null}
 
-                {notifications?.links?.length > 3 && (
-                    <nav className="pagination" aria-label="通知分页">
-                        {notifications.links.map((link, index) => link.url ? (
-                            <Link key={`${link.label}-${index}`} className={link.active ? 'active' : ''} href={link.url} preserveScroll>
-                                <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                            </Link>
-                        ) : (
-                            <span key={`${link.label}-${index}`} dangerouslySetInnerHTML={{ __html: link.label }} />
-                        ))}
-                    </nav>
-                )}
+                <NotificationPagination pagination={notifications} ariaLabel="通知分页" />
             </section>
             {tenderItems.length > 0 && (
                 <section className="surface">
@@ -137,20 +127,26 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                             </tbody>
                         </table>
                     </div>
-                    {tenderNotifications?.links?.length > 3 && (
-                        <nav className="pagination" aria-label="招投标通知分页">
-                            {tenderNotifications.links.map((link, index) => link.url ? (
-                                <Link key={`${link.label}-${index}`} className={link.active ? 'active' : ''} href={link.url} preserveScroll>
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Link>
-                            ) : (
-                                <span key={`${link.label}-${index}`} dangerouslySetInnerHTML={{ __html: link.label }} />
-                            ))}
-                        </nav>
-                    )}
+                    <NotificationPagination pagination={tenderNotifications} ariaLabel="招投标通知分页" />
                 </section>
             )}
         </Layout>
+    );
+}
+
+function NotificationPagination({ pagination, ariaLabel }) {
+    if (!pagination?.last_page || pagination.last_page <= 1) return null;
+
+    return (
+        <nav className="object-pagination" aria-label={ariaLabel}>
+            {pagination.prev_page_url ? (
+                <Link className="small-action" href={pagination.prev_page_url} preserveScroll>上一页</Link>
+            ) : <span className="disabled">上一页</span>}
+            <span>第 {pagination.current_page} / {pagination.last_page} 页，共 {pagination.total} 条</span>
+            {pagination.next_page_url ? (
+                <Link className="small-action" href={pagination.next_page_url} preserveScroll>下一页</Link>
+            ) : <span className="disabled">下一页</span>}
+        </nav>
     );
 }
 

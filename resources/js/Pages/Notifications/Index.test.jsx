@@ -73,4 +73,30 @@ describe('notification list layout', () => {
             },
         );
     });
+
+    it('renders compact Chinese pagination instead of untranslated Laravel keys', () => {
+        render(
+            <NotificationsIndex
+                notifications={{
+                    data: [],
+                    current_page: 3,
+                    last_page: 1617,
+                    total: 32328,
+                    prev_page_url: '/notifications?page=2',
+                    next_page_url: '/notifications?page=4',
+                    links: [
+                        { label: 'pagination.previous', url: '/notifications?page=2' },
+                        { label: 'pagination.next', url: '/notifications?page=4' },
+                    ],
+                }}
+                tenderNotifications={{ data: [], last_page: 1 }}
+                unreadCount={0}
+            />,
+        );
+
+        expect(screen.getByRole('link', { name: '上一页' })).toHaveAttribute('href', '/notifications?page=2');
+        expect(screen.getByText('第 3 / 1617 页，共 32328 条')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '下一页' })).toHaveAttribute('href', '/notifications?page=4');
+        expect(screen.queryByText(/pagination\.(previous|next)/)).not.toBeInTheDocument();
+    });
 });
