@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Ai\AiFailureClassifier;
 use App\Ai\AiRunEventPublisher;
 use App\Ai\AiToolEventProjector;
+use App\Ai\FeishuDataAgent;
 use App\Ai\XycDataAgent;
 use App\Models\AiRun;
 use App\Models\AuditLog;
@@ -85,7 +86,9 @@ class RunAiHarness implements ShouldQueue
         };
 
         try {
-            $agent = XycDataAgent::make(user: $run->user)
+            $agent = ($run->origin === 'feishu'
+                ? FeishuDataAgent::make(user: $run->user)
+                : XycDataAgent::make(user: $run->user))
                 ->continue($run->conversation_id, $run->user);
             $stream = $agent->stream(
                 $run->input,
@@ -162,6 +165,7 @@ class RunAiHarness implements ShouldQueue
             ]);
 
             $this->audit($run, 'ai.run.completed');
+            $this->notifyFeishu($run);
         } catch (Throwable $exception) {
             $failure = $failures->classify($exception);
             $attempt = $this->attempts();
@@ -199,6 +203,7 @@ class RunAiHarness implements ShouldQueue
             ]);
             $events->publish($run, 'run.failed', $run->error);
             $this->audit($run, 'ai.run.failed');
+            $this->notifyFeishu($run);
         }
     }
 
@@ -240,6 +245,7 @@ class RunAiHarness implements ShouldQueue
         }
 
         $this->audit($run, 'ai.run.failed');
+        $this->notifyFeishu($run);
     }
 
     private function audit(AiRun $run, string $action): void
@@ -282,5 +288,12 @@ class RunAiHarness implements ShouldQueue
             'reason' => $run->cancel_reason,
         ]);
         $this->audit($run, 'ai.run.cancelled');
+    }
+
+    private function notifyFeishu(AiRun $run): void
+    {
+        if ($run->origin === 'feishu') {
+            SendFeishuAiReply::dispatch($run->id)->afterCommit();
+        }
     }
 }

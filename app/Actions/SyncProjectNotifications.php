@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Integrations\Feishu\FeishuNotificationDispatcher;
 use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 class SyncProjectNotifications
 {
+    public function __construct(private FeishuNotificationDispatcher $feishu) {}
+
     /** @return array{created: int, reactivated: int, resolved: int, triggered: int} */
     public function handle(): array
     {
@@ -159,7 +162,8 @@ class SyncProjectNotifications
                 'recipients' => $lifecycleRecipients,
             ];
         }
-        if (! empty($payload['processing_letter_at']) && ($payload['payment_status'] ?? '未回款') !== '已回款') {
+        if (in_array($status, ['已拿到加工函', '合同签署'], true)
+            && ($payload['payment_status'] ?? '未回款') !== '已回款') {
             $definitions[ProjectNotification::TYPE_PAYMENT] = [
                 'anchor' => $paymentAnchor,
                 'first' => '1_month',
@@ -311,6 +315,7 @@ class SyncProjectNotifications
                 ]);
                 $summary['created']++;
                 $this->auditNotification('notification.created', $notification);
+                $this->feishu->dispatch($notification);
 
                 continue;
             }
@@ -327,6 +332,7 @@ class SyncProjectNotifications
                 $summary['reactivated']++;
             }
             $this->auditNotification($reactivated ? 'notification.reactivated' : 'notification.repeated', $notification);
+            $this->feishu->dispatch($notification);
         }
     }
 

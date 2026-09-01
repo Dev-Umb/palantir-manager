@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'feishu' => [
+        'enabled' => env('FEISHU_ENABLED', false),
+        'base_url' => env('FEISHU_BASE_URL', 'https://open.feishu.cn/open-apis'),
+        'app_id' => env('FEISHU_APP_ID'),
+        'app_secret' => env('FEISHU_APP_SECRET'),
+        'verification_token' => env('FEISHU_VERIFICATION_TOKEN'),
+        'tenant_key' => env('FEISHU_TENANT_KEY'),
+    ],
+
 ];

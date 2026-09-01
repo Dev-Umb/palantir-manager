@@ -6,6 +6,7 @@ use App\Http\Controllers\AiWriteProposalController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FeishuEventController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OntologyController;
 use App\Http\Controllers\ProjectContractAmountController;
@@ -17,6 +18,10 @@ use App\Http\Controllers\RequisitionController;
 use App\Http\Controllers\ShopFloorController;
 use App\Http\Controllers\TenderConversionController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/webhooks/feishu/events', FeishuEventController::class)
+    ->middleware('throttle:feishu-webhook')
+    ->name('webhooks.feishu.events');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');

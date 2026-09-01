@@ -1,0 +1,89 @@
+## Context
+
+项目和招投标同步动作会创建或更新站内 `ProjectNotification`、`TenderNotification`。项目提醒状态由 `project_reminder_states` 维护，当前回款提醒以 `processing_letter_at` 是否存在作为资格条件。AI 助理通过 `AiRun`、队列任务和业务对象查询工具运行。
+
+飞书企业自建应用使用 tenant access token 调用消息 API；事件回调必须快速确认、验证应用身份和 verification token，并以 `event_id` 去重。应用凭据只从运行环境读取。
+
+## Decisions
+
+### 1. 资格改变，周期状态机不重写
+
+回款提醒资格为：
+
+`overall_status in ['已拿到加工函', '合同签署'] && payment_status != '已回款'`
+
+资格起点优先使用已有 `payment_reminder_anchor_at`，其次使用 `processing_letter_at`，均缺失时使用记录的 `updated_at`。首次到期和后续重复继续按现有自然月算法执行。项目处于更早状态时不提醒；变为已回款时解除当前回款提醒。
+
+### 2. 站内提交与外部投递解耦
+
+站内提醒保存成功后创建稳定幂等键的 `notification_deliveries`，并以 after-commit 队列投递。每个来源通知及其 occurrence 只产生一次飞书投递。飞书失败只更新投递记录并重试，不影响站内提醒事务。
+
+### 3. 用户绑定是外部身份与内部权限的唯一桥梁
+
+`feishu_user_bindings` 把 tenant/open_id 唯一映射到 Palantir `user_id`。出站通知只向通知收件人自己的有效绑定发送。入站消息必须来自已绑定用户，并在创建 AI Run 前检查既有 AI 权限；未绑定或无权限时拒绝，不查询业务数据。
+
+### 4. 回调快速确认，业务异步执行
+
+公开回调只处理飞书 URL challenge 或验证后的事件 envelope。验证 `app_id`、verification token 和可选 tenant allowlist，按 `event_id` 首次写入后立即返回成功；重复事件不重复执行。只接受 user 发出的 P2P text，或群聊中包含 mention 元数据的 text 消息；其他消息安全忽略。回调内容和错误日志不得包含凭据。
+
+初版使用 HTTPS + verification token 的未加密事件回调；飞书 encrypted callback 在应用侧保持关闭。若上线要求加密回调，应作为独立安全变更按飞书当前协议实现并验证，不在本次猜测加密格式。
+
+### 5. 飞书 API 客户端集中处理令牌和错误
+
+客户端缓存 tenant access token，并为连接、请求、429 与 5xx 设置有限重试和超时。消息 API 返回成功时保存 message_id；永久错误保存截断且脱敏的错误码/消息。App ID、App Secret、verification token 均只来自环境配置。
+
+### 6. 飞书 AI 通道只提供读取工具
+
+飞书私聊或群聊 @ 机器人消息创建来源为 `feishu` 的 `AiRun`，并关联入站事件和发起人的会话。运行时选择只读 agent，只注册对象列表、记录查询和单条记录读取工具；Web AI 继续使用现有完整 agent。Run 终态后另一个队列任务按来源回复：P2P 使用发起人 `open_id`，群聊使用事件中的原始 `chat_id`。回复不包含隐藏记录，权限和数据范围仍由现有工具执行。
+
+### 7. 回款提醒使用代码内版本化卡片
+
+项目回款提醒使用 `interactive` 消息类型和代码内 JSON 卡片，不依赖飞书后台模板 ID。项目标题放在卡片 header；负责业务员按 `business_owner_user_id` 解析现有 Palantir 用户；回款进度和欠款金额只展示项目 payload 的现有值，缺失时明确显示待补充，不在通知层补算。详情按钮使用命名路由生成绝对 URL，部署时随 `APP_URL` 指向对应 Palantir 环境。招投标及非回款项目提醒保持原文本消息。
+
+### 8. 成功的 AI Markdown 回复使用代码内卡片
+
+飞书来源的 AI Run 成功后，将完整 answer 放入单个 `lark_md` 元素并通过 `interactive` 消息发送，卡片 header 固定为“Palantir · 项目查询”。普通失败提示继续使用现有 text 消息，避免把系统错误包装成业务结果。该改变只影响飞书 AI 回复，不改变 Web AI、提醒卡片、查询权限、会话和审计关联。
+
+### 9. 仅为已接受查询维护 Typing 表态生命周期
+
+入站处理完成消息类型、绑定和权限检查后，通过消息表态接口给原消息添加 `Typing`。返回的 reaction ID 写入入站事件，供最终回复任务删除；删除失败只记录通用、脱敏状态，不允许在回复已经成功后重试并造成重复回复。创建或删除表态都是辅助体验，失败不得阻塞 AI Run、改变回答或扩大消息接收范围。
+
+## Alternatives Considered
+
+### 直接从定时任务调用飞书
+
+拒绝。外部超时会耦合站内提醒事务，且难以独立重试和审计。
+
+### 用飞书 open_id 直接写进用户表
+
+拒绝。租户身份与应用身份有独立生命周期，单独绑定表可唯一约束、停用和审计。
+
+### 让飞书复用完整可写 AI agent
+
+拒绝。飞书当前只要求查询，且没有 Web 确认提案的安全交互；只读 agent 缩小误操作边界。
+
+### 群聊 @ 机器人任务的结果回到私聊
+
+拒绝。用户明确要求群聊任务的结果回到原群，因此机器人使用入站事件的 `chat_id` 发送回答。系统仍按发起人权限查询，但群成员均可看到结果，这是该交互的显式可见范围。
+
+## Risks and Mitigations
+
+- 飞书重试导致重复消息：事件 ID、来源 occurrence 和队列唯一性三层去重。
+- 事务尚未提交就消费：所有投递 job 使用 after-commit。
+- 用户解绑后旧任务仍发送：任务执行时重新读取有效绑定。
+- 飞书消息泄露敏感数据：通知仍只发收件人私聊；AI 查询执行发起人的 Palantir 权限，群聊 @ 任务的结果按明确产品要求对来源群可见。
+- 枚举误映射：以 `config/xyc.php` 的 `已拿到加工函`、`合同签署` 为唯一代码值，并覆盖早期状态和已回款边界测试。
+
+## Migration and Rollback
+
+- 新表和 `ai_runs` 可空/默认列可向后兼容；迁移不回填业务数据。
+- 关闭 `services.feishu.enabled` 即停止新外部投递，站内通知继续工作。
+- 回滚代码前先停止集成队列；新表可暂留以保存审计证据，不需要删除业务数据。
+- 部署不自动绑定用户、不发送测试消息、不修改飞书后台配置。
+
+## Evidence Boundaries
+
+- L1/L2：资格、周期、解除、幂等、绑定权限、回调验证、AI 只读工具、成功与失败投递。
+- 本地全链路：真实 SQLite 写入 + queue/AI/HTTP fake，从项目记录到飞书发送请求，从回调到 AI 回复请求。
+- 外部验证：经执行前确认后，用进程级凭据发送一条显式标注测试的私聊消息并由用户在飞书确认。
+- 部署与线上调度另行授权。

@@ -332,6 +332,47 @@ class BusinessContractWorkflowTest extends TestCase
         $this->assertFalse(ProjectNotification::query()->where('user_id', $informed->id)->exists());
     }
 
+    public function test_payment_reminder_eligibility_uses_project_stage_and_incomplete_payment_without_requiring_a_letter_date(): void
+    {
+        Carbon::setTestNow('2026-09-01 09:00:00');
+        $this->userWithRole('admin', '管理员');
+        $this->userWithRole('finance', '财务');
+        $owner = $this->userWithRole('business', '业务员');
+        $anchor = now()->subMonthNoOverflow()->toISOString();
+        $processing = $this->project($owner, '加工函阶段未回款', [
+            'overall_status' => '已拿到加工函',
+            'overall_status_changed_at' => $anchor,
+            'payment_status' => '未回款',
+        ]);
+        $signed = $this->project($owner, '合同签署阶段部分回款', [
+            'overall_status' => '合同签署',
+            'overall_status_changed_at' => $anchor,
+            'contract_status' => '已签署',
+            'payment_status' => '部分回款',
+        ]);
+        $early = $this->project($owner, '早期阶段未回款', [
+            'overall_status' => '已中标',
+            'overall_status_changed_at' => $anchor,
+            'payment_status' => '未回款',
+        ]);
+        $paid = $this->project($owner, '加工函阶段已回款', [
+            'overall_status' => '已拿到加工函',
+            'overall_status_changed_at' => $anchor,
+            'payment_status' => '已回款',
+        ]);
+
+        $result = app(SyncProjectNotifications::class)->handleProjects([
+            $processing->id, $signed->id, $early->id, $paid->id,
+        ]);
+
+        $this->assertSame(3, $result['triggered']);
+        $this->assertSame(3, ProjectNotification::where('project_id', $processing->id)->where('type', ProjectNotification::TYPE_PAYMENT)->count());
+        $this->assertSame(3, ProjectNotification::where('project_id', $signed->id)->where('type', ProjectNotification::TYPE_PAYMENT)->count());
+        $this->assertFalse(ProjectNotification::whereIn('project_id', [$early->id, $paid->id])->where('type', ProjectNotification::TYPE_PAYMENT)->exists());
+        $this->assertSame(1, $processing->fresh()->payload['collection_count']);
+        $this->assertSame(1, $signed->fresh()->payload['collection_count']);
+    }
+
     public function test_project_filters_support_top_level_and_or_logic(): void
     {
         $admin = $this->userWithRole('admin', '管理员');

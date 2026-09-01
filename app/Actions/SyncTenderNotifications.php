@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Integrations\Feishu\FeishuNotificationDispatcher;
 use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\Role;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 class SyncTenderNotifications
 {
+    public function __construct(private FeishuNotificationDispatcher $feishu) {}
+
     private const DEADLINES = [
         'register' => 'register_deadline',
         'purchase' => 'purchase_deadline',
@@ -104,6 +107,7 @@ class SyncTenderNotifications
                     ]);
                     $summary['created']++;
                     $this->audit('tender_notification.created', $notification);
+                    $this->feishu->dispatch($notification);
 
                     continue;
                 }
@@ -119,6 +123,7 @@ class SyncTenderNotifications
                     ]);
                     $summary['reactivated']++;
                     $this->audit('tender_notification.reactivated', $notification);
+                    $this->feishu->dispatch($notification);
                 }
             }
 
