@@ -26,15 +26,30 @@ The system MUST place a project into the existing payment-reminder cycle when it
 - **THEN** the current payment reminder MUST be resolved
 - **AND** no new payment-reminder occurrence MUST be sent
 
-### Requirement: Existing reminder behavior remains intact
+### Requirement: Incomplete payments repeat every fifteen days after the first due date
 
-The system MUST preserve the current natural-month cadence, recipient resolution, occurrence counting, idempotency and non-payment reminder rules.
+The system MUST trigger the first payment reminder one natural month after the current reminder anchor and MUST repeat every 15 days after a due occurrence while payment remains incomplete. Recipient resolution, occurrence counting, idempotency, anchor reset behavior and non-payment reminder rules MUST remain unchanged.
+
+#### Scenario: First payment reminder preserves the natural-month delay
+
+- **WHEN** an eligible project reaches one natural month after its current payment reminder anchor
+- **THEN** the existing recipients MUST receive the first occurrence
+
+#### Scenario: An eligible reminder is not yet fifteen days old
+
+- **WHEN** an eligible project remains incomplete but fewer than 15 days have elapsed since the last due occurrence
+- **THEN** the system MUST NOT create another occurrence
 
 #### Scenario: An eligible reminder repeats
 
-- **WHEN** an eligible project remains incomplete through the next natural-month due date
+- **WHEN** an eligible project remains incomplete for 15 days after the last due occurrence
 - **THEN** the existing recipients MUST receive one new occurrence
 - **AND** repeated synchronization in the same cycle MUST NOT duplicate it
+
+#### Scenario: A financial update resets the reminder anchor
+
+- **WHEN** an authorized financial update resets the payment reminder anchor
+- **THEN** the next payment reminder MUST be due one natural month after the new anchor
 
 #### Scenario: Other project reminder types synchronize
 

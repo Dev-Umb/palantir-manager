@@ -6,6 +6,7 @@ use App\Actions\SyncProjectNotifications;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\ProjectNotification;
+use App\Models\ProjectReminderState;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -371,6 +372,47 @@ class BusinessContractWorkflowTest extends TestCase
         $this->assertFalse(ProjectNotification::whereIn('project_id', [$early->id, $paid->id])->where('type', ProjectNotification::TYPE_PAYMENT)->exists());
         $this->assertSame(1, $processing->fresh()->payload['collection_count']);
         $this->assertSame(1, $signed->fresh()->payload['collection_count']);
+    }
+
+    public function test_incomplete_payment_repeats_every_fifteen_days_after_the_first_natural_month(): void
+    {
+        Carbon::setTestNow('2026-02-28 09:00:00');
+        $this->userWithRole('admin', '管理员');
+        $this->userWithRole('finance', '财务');
+        $owner = $this->userWithRole('business', '业务员');
+        $project = $this->project($owner, '十五天重复回款提醒项目', [
+            'overall_status' => '合同签署',
+            'contract_status' => '已签署',
+            'payment_reminder_anchor_at' => '2026-01-31T09:00:00Z',
+            'payment_status' => '部分回款',
+        ]);
+        $sync = app(SyncProjectNotifications::class);
+
+        $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
+        $this->assertSame(1, $project->fresh()->payload['collection_count']);
+        $this->assertSame(1, ProjectNotification::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $owner->id)
+            ->value('occurrences'));
+
+        $nextDueAt = ProjectReminderState::query()
+            ->where('project_id', $project->id)
+            ->where('type', ProjectNotification::TYPE_PAYMENT)
+            ->firstOrFail()
+            ->next_due_at;
+        $this->assertSame(15.0, now()->diffInDays($nextDueAt));
+
+        Carbon::setTestNow($nextDueAt->copy()->subSecond());
+        $this->assertSame(0, $sync->handleProjects([$project->id])['triggered'], 'Reminder triggered before the 15-day due time.');
+
+        Carbon::setTestNow($nextDueAt);
+        $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
+        $this->assertSame(2, $project->fresh()->payload['collection_count']);
+        $this->assertSame(2, ProjectNotification::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $owner->id)
+            ->value('occurrences'));
+        $this->assertSame(0, $sync->handleProjects([$project->id])['triggered'], 'Reminder duplicated in the same 15-day cycle.');
     }
 
     public function test_project_filters_support_top_level_and_or_logic(): void

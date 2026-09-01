@@ -72,3 +72,9 @@
 - [x] 11.2 Ignore malformed group events without a `chat_id` before creating an AI Run or reaction.
 - [x] 11.3 Cover group destination, P2P preservation and malformed group boundaries with focused PHPUnit tests.
 - [x] 11.4 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate.
+
+## 12. Fifteen-day incomplete-payment repeats
+
+- [x] 12.1 Preserve the first natural-month due date and change only subsequent incomplete-payment occurrences to a 15-day cadence.
+- [x] 12.2 Cover the 14-day boundary, 15-day occurrence, same-cycle idempotency, first natural-month delay and unchanged non-payment reminder cadence.
+- [x] 12.3 Run Pint, focused PHPUnit, strict OpenSpec validation and the applicable quality gate.

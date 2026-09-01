@@ -167,7 +167,7 @@ class SyncProjectNotifications
             $definitions[ProjectNotification::TYPE_PAYMENT] = [
                 'anchor' => $paymentAnchor,
                 'first' => '1_month',
-                'repeat' => '1_month',
+                'repeat' => '15_days',
                 'recipients' => $paymentRecipients,
             ];
         }

@@ -12,7 +12,7 @@
 
 `overall_status in ['已拿到加工函', '合同签署'] && payment_status != '已回款'`
 
-资格起点优先使用已有 `payment_reminder_anchor_at`，其次使用 `processing_letter_at`，均缺失时使用记录的 `updated_at`。首次到期和后续重复继续按现有自然月算法执行。项目处于更早状态时不提醒；变为已回款时解除当前回款提醒。
+资格起点优先使用已有 `payment_reminder_anchor_at`，其次使用 `processing_letter_at`，均缺失时使用记录的 `updated_at`。首次到期继续按锚点后 1 个自然月计算；首次触发后，项目仍未完成回款时每 15 天重复提醒。项目处于更早状态时不提醒；变为已回款时解除当前回款提醒。财务更新导致锚点重置后，下一次仍从新锚点满 1 个自然月开始。
 
 ### 2. 站内提交与外部投递解耦
 
