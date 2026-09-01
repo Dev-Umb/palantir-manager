@@ -138,15 +138,23 @@ class ProjectVisibility
         );
     }
 
-    /** @return array<int, string> */
-    public function visibleProjectIds(User $user): array
+    /**
+     * @param  array<int, string>|null  $projectIds
+     * @return array<int, string>
+     */
+    public function visibleProjectIds(User $user, ?array $projectIds = null): array
     {
         $project = BusinessObject::where('key', 'project')->first();
         if (! $project) {
             return [];
         }
 
-        return $this->scope($project->records(), $user)
+        $query = $this->scope($project->records(), $user);
+        if ($projectIds !== null) {
+            $query->whereIn('id', $projectIds);
+        }
+
+        return $query
             ->pluck('id')
             ->all();
     }

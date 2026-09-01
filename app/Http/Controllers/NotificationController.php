@@ -20,39 +20,13 @@ class NotificationController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
-        $visibleProjectIds = array_flip($this->projectVisibility->visibleProjectIds($user));
         $notifications = ProjectNotification::query()
             ->where('user_id', $user->id)
             ->with('project')
             ->orderBy('status')
             ->latest('triggered_at')
             ->paginate(20)
-            ->withQueryString()
-            ->through(function (ProjectNotification $notification) use ($visibleProjectIds): array {
-                $project = $notification->project;
-                $payload = $project?->payload ?? [];
-                $canViewProject = $project && isset($visibleProjectIds[$project->id]);
-
-                return [
-                    'id' => $notification->id,
-                    'type' => $notification->type,
-                    'type_label' => $this->typeLabel($notification->type),
-                    'message' => $this->message($notification),
-                    'status' => $notification->status,
-                    'read_at' => $notification->read_at?->toISOString(),
-                    'resolved_at' => $notification->resolved_at?->toISOString(),
-                    'triggered_at' => $notification->triggered_at?->toISOString(),
-                    'occurrences' => $notification->occurrences,
-                    'project' => $project ? [
-                        'id' => $project->id,
-                        'code' => $project->code,
-                        'name' => $payload['name'] ?? $project->title ?? $project->code,
-                        'project_no' => $payload['project_no'] ?? $project->code,
-                    ] : null,
-                    'can_view_project' => (bool) $canViewProject,
-                    'project_url' => $canViewProject ? "/objects/project?record={$project->id}&mode=detail" : null,
-                ];
-            });
+            ->withQueryString();
         $canViewTender = $user->canDo('object.tender.view');
         $tenderNotifications = TenderNotification::query()
             ->where('user_id', $user->id)
@@ -60,45 +34,79 @@ class NotificationController extends Controller
             ->orderBy('status')
             ->latest('triggered_at')
             ->paginate(20, ['*'], 'tender_page')
-            ->withQueryString()
-            ->through(function (TenderNotification $notification) use ($canViewTender, $user): array {
-                $tender = $notification->tender;
-                $payload = $tender?->payload ?? [];
-                $project = $notification->project;
-                $canViewProject = $project && $this->projectVisibility->allowsProject($user, $project);
+            ->withQueryString();
+        $pageProjectIds = collect($notifications->items())
+            ->pluck('project_id')
+            ->merge(collect($tenderNotifications->items())->pluck('project_id'))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $visibleProjectIds = array_flip($this->projectVisibility->visibleProjectIds($user, $pageProjectIds));
 
-                return [
-                    'id' => $notification->id,
-                    'type' => $notification->type,
-                    'type_label' => $this->tenderTypeLabel($notification),
-                    'message' => $this->tenderMessage($notification),
-                    'status' => $notification->status,
-                    'read_at' => $notification->read_at?->toISOString(),
-                    'resolved_at' => $notification->resolved_at?->toISOString(),
-                    'triggered_at' => $notification->triggered_at?->toISOString(),
-                    'deadline_at' => $notification->deadline_at
-                        ?->shiftTimezone(config('xyc.tender_timezone'))
-                        ->toISOString(),
-                    'occurrences' => $notification->occurrences,
-                    'tender' => $tender ? [
-                        'id' => $tender->id,
-                        'code' => $tender->code,
-                        'name' => $payload['name'] ?? $tender->title ?? $tender->code,
-                    ] : null,
-                    'tender_url' => $canViewTender && $tender
-                        ? "/objects/tender?record={$tender->id}&mode=detail"
-                        : null,
-                    'project' => $project ? [
-                        'id' => $project->id,
-                        'code' => $project->code,
-                        'name' => $project->payload['name'] ?? $project->title ?? $project->code,
-                    ] : null,
-                    'project_url' => $canViewProject
-                        ? "/objects/project?record={$project->id}&mode=detail"
-                        : null,
-                    'read_url' => route('tender-notifications.read', $notification, false),
-                ];
-            });
+        $notifications->through(function (ProjectNotification $notification) use ($visibleProjectIds): array {
+            $project = $notification->project;
+            $payload = $project?->payload ?? [];
+            $canViewProject = $project && isset($visibleProjectIds[$project->id]);
+
+            return [
+                'id' => $notification->id,
+                'type' => $notification->type,
+                'type_label' => $this->typeLabel($notification->type),
+                'message' => $this->message($notification),
+                'status' => $notification->status,
+                'read_at' => $notification->read_at?->toISOString(),
+                'resolved_at' => $notification->resolved_at?->toISOString(),
+                'triggered_at' => $notification->triggered_at?->toISOString(),
+                'occurrences' => $notification->occurrences,
+                'project' => $project ? [
+                    'id' => $project->id,
+                    'code' => $project->code,
+                    'name' => $payload['name'] ?? $project->title ?? $project->code,
+                    'project_no' => $payload['project_no'] ?? $project->code,
+                ] : null,
+                'can_view_project' => (bool) $canViewProject,
+                'project_url' => $canViewProject ? "/objects/project?record={$project->id}&mode=detail" : null,
+            ];
+        });
+        $tenderNotifications->through(function (TenderNotification $notification) use ($canViewTender, $visibleProjectIds): array {
+            $tender = $notification->tender;
+            $payload = $tender?->payload ?? [];
+            $project = $notification->project;
+            $canViewProject = $project && isset($visibleProjectIds[$project->id]);
+
+            return [
+                'id' => $notification->id,
+                'type' => $notification->type,
+                'type_label' => $this->tenderTypeLabel($notification),
+                'message' => $this->tenderMessage($notification),
+                'status' => $notification->status,
+                'read_at' => $notification->read_at?->toISOString(),
+                'resolved_at' => $notification->resolved_at?->toISOString(),
+                'triggered_at' => $notification->triggered_at?->toISOString(),
+                'deadline_at' => $notification->deadline_at
+                    ?->shiftTimezone(config('xyc.tender_timezone'))
+                    ->toISOString(),
+                'occurrences' => $notification->occurrences,
+                'tender' => $tender ? [
+                    'id' => $tender->id,
+                    'code' => $tender->code,
+                    'name' => $payload['name'] ?? $tender->title ?? $tender->code,
+                ] : null,
+                'tender_url' => $canViewTender && $tender
+                    ? "/objects/tender?record={$tender->id}&mode=detail"
+                    : null,
+                'project' => $project ? [
+                    'id' => $project->id,
+                    'code' => $project->code,
+                    'name' => $project->payload['name'] ?? $project->title ?? $project->code,
+                ] : null,
+                'project_url' => $canViewProject
+                    ? "/objects/project?record={$project->id}&mode=detail"
+                    : null,
+                'read_url' => route('tender-notifications.read', $notification, false),
+            ];
+        });
 
         return Inertia::render('Notifications/Index', [
             'notifications' => $notifications,

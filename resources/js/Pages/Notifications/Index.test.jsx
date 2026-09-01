@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { router } from '@inertiajs/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import NotificationsIndex from './Index';
 
@@ -15,7 +16,10 @@ vi.mock('../../Components/Layout', () => ({
     default: ({ children, title, eyebrow }) => <main data-title={title} data-eyebrow={eyebrow}>{children}</main>,
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+});
 
 describe('notification list layout', () => {
     it('uses the unified page header contract', () => {
@@ -55,6 +59,18 @@ describe('notification list layout', () => {
         expect(screen.getByRole('link', { name: /查看招投标/ })).toHaveAttribute(
             'href',
             '/objects/tender?record=tender-1&mode=detail',
+        );
+
+        fireEvent.click(screen.getAllByRole('button', { name: /标为已读/ })[0]);
+
+        expect(router.patch).toHaveBeenCalledWith(
+            '/tender-notifications/7/read',
+            {},
+            {
+                only: ['notifications', 'tenderNotifications', 'unreadCount', 'notificationUnreadCount'],
+                preserveScroll: true,
+                preserveState: true,
+            },
         );
     });
 });

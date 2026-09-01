@@ -9,6 +9,7 @@ use App\Models\ProjectNotification;
 use App\Models\ProjectReminderState;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\ProjectVisibility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -69,6 +70,23 @@ class BusinessContractWorkflowTest extends TestCase
             ->assertForbidden();
 
         $this->assertDatabaseCount('object_records', 4);
+    }
+
+    public function test_visible_project_ids_can_be_limited_to_the_current_notification_page(): void
+    {
+        $business = $this->userWithRole('business', '业务员');
+        $currentPageProject = $this->project($business, '当前页项目');
+        $otherPageProject = $this->project($business, '其他页项目');
+        $visibility = app(ProjectVisibility::class);
+
+        $this->assertEqualsCanonicalizing(
+            [$currentPageProject->id, $otherPageProject->id],
+            $visibility->visibleProjectIds($business),
+        );
+        $this->assertSame(
+            [$currentPageProject->id],
+            $visibility->visibleProjectIds($business, [$currentPageProject->id]),
+        );
     }
 
     public function test_project_owner_and_admin_manage_valid_informed_business_users(): void

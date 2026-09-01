@@ -5,6 +5,11 @@ import Layout from '../../Components/Layout';
 export default function NotificationsIndex({ notifications, tenderNotifications, unreadCount }) {
     const items = notifications?.data || [];
     const tenderItems = tenderNotifications?.data || [];
+    const readOptions = {
+        only: ['notifications', 'tenderNotifications', 'unreadCount', 'notificationUnreadCount'],
+        preserveScroll: true,
+        preserveState: true,
+    };
 
     return (
         <Layout title="通知中心" eyebrow="通知中心">
@@ -17,7 +22,7 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                         <span>当前有 {unreadCount} 条未读风险提醒，已处理风险仍保留历史记录。</span>
                     </div>
                     {unreadCount > 0 && (
-                        <button className="ghost-button" type="button" onClick={() => router.patch('/notifications/read-all')}>
+                        <button className="ghost-button" type="button" onClick={() => router.patch('/notifications/read-all', {}, readOptions)}>
                             <CheckCheck size={16} /> 全部已读
                         </button>
                     )}
@@ -46,7 +51,7 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                                         <td>{formatDate(notification.triggered_at)}</td>
                                         <td>
                                             {!notification.read_at && (
-                                                <button className="ghost-button" type="button" onClick={() => router.patch(`/notifications/${notification.id}/read`)}>
+                                                <button className="ghost-button" type="button" onClick={() => router.patch(`/notifications/${notification.id}/read`, {}, readOptions)}>
                                                     <Check size={15} /> 标为已读
                                                 </button>
                                             )}
@@ -112,7 +117,7 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                                         <td>{formatTenderDate(notification.deadline_at || notification.triggered_at)}</td>
                                         <td>
                                             {!notification.read_at && (
-                                                <button className="ghost-button" type="button" onClick={() => router.patch(notification.read_url)}>
+                                                <button className="ghost-button" type="button" onClick={() => router.patch(notification.read_url, {}, readOptions)}>
                                                     <Check size={15} /> 标为已读
                                                 </button>
                                             )}
