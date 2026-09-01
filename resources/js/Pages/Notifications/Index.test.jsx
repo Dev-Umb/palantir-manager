@@ -29,6 +29,7 @@ describe('notification list layout', () => {
 
         expect(container.querySelector('main')).toHaveAttribute('data-title', '通知中心');
         expect(container.querySelector('main')).toHaveAttribute('data-eyebrow', '通知中心');
+        expect(screen.getByText('当前有 0 条未读风险提醒，已读通知会自动归档。')).toBeInTheDocument();
     });
 
     it('renders tender deadlines with the precise time and tender entry point', () => {

@@ -22,6 +22,7 @@ class NotificationController extends Controller
         $user = $request->user();
         $notifications = ProjectNotification::query()
             ->where('user_id', $user->id)
+            ->whereNull('read_at')
             ->with('project')
             ->orderBy('status')
             ->latest('triggered_at')
@@ -30,6 +31,7 @@ class NotificationController extends Controller
         $canViewTender = $user->canDo('object.tender.view');
         $tenderNotifications = TenderNotification::query()
             ->where('user_id', $user->id)
+            ->whereNull('read_at')
             ->with(['tender', 'project'])
             ->orderBy('status')
             ->latest('triggered_at')

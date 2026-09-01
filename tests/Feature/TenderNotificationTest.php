@@ -6,7 +6,9 @@ use App\Actions\CreateObjectRecord;
 use App\Actions\SyncTenderNotifications;
 use App\Actions\SyncXycMetadata;
 use App\Models\BusinessObject;
+use App\Models\NotificationDelivery;
 use App\Models\ObjectRecord;
+use App\Models\ProjectNotification;
 use App\Models\Role;
 use App\Models\TenderNotification;
 use App\Models\User;
@@ -134,7 +136,75 @@ class TenderNotificationTest extends TestCase
         $this->patch("/tender-notifications/{$notification->id}/read")
             ->assertRedirect();
         $this->assertNotNull($notification->fresh()->read_at);
-        $this->get('/notifications')->assertOk();
+        $this->get('/notifications')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('unreadCount', 0)
+                ->has('tenderNotifications.data', 0));
+        $this->assertModelExists($notification);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'tender_notification.read',
+            'subject_id' => (string) $notification->id,
+        ]);
+    }
+
+    public function test_mark_all_read_archives_project_and_tender_notifications_without_deleting_them(): void
+    {
+        $recipient = $this->userWithRole('tender');
+        $this->createTender($recipient, '2026-08-03T12:30');
+        Carbon::setTestNow(Carbon::parse('2026-08-03 08:00', config('xyc.tender_timezone')));
+        app(SyncTenderNotifications::class)->handle();
+        $tenderNotification = TenderNotification::query()->where('user_id', $recipient->id)->firstOrFail();
+        $project = BusinessObject::query()->where('key', 'project')->firstOrFail()->records()->create([
+            'code' => 'PROJECT-ARCHIVE-001',
+            'title' => '归档测试项目',
+            'payload' => ['name' => '归档测试项目'],
+            'created_by' => $recipient->id,
+        ]);
+        $projectNotification = ProjectNotification::create([
+            'project_id' => $project->id,
+            'type' => ProjectNotification::TYPE_BID,
+            'user_id' => $recipient->id,
+            'status' => ProjectNotification::STATUS_ACTIVE,
+            'triggered_at' => now(),
+            'occurrences' => 1,
+        ]);
+        $delivery = NotificationDelivery::factory()->create([
+            'source_type' => 'project_notification',
+            'source_id' => (string) $projectNotification->id,
+            'user_id' => $recipient->id,
+            'occurrence' => 1,
+            'status' => NotificationDelivery::STATUS_SENT,
+            'attempts' => 1,
+            'external_message_id' => 'om_archived_notification',
+            'sent_at' => now(),
+        ]);
+
+        $this->actingAs($recipient)
+            ->get('/notifications')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('unreadCount', 2)
+                ->has('notifications.data', 1)
+                ->has('tenderNotifications.data', 1));
+        $this->patch('/notifications/read-all')->assertRedirect();
+
+        $this->get('/notifications')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('unreadCount', 0)
+                ->has('notifications.data', 0)
+                ->has('tenderNotifications.data', 0));
+        $this->assertModelExists($projectNotification->fresh());
+        $this->assertModelExists($tenderNotification->fresh());
+        $this->assertNotNull($projectNotification->fresh()->read_at);
+        $this->assertNotNull($tenderNotification->fresh()->read_at);
+        $this->assertSame(NotificationDelivery::STATUS_SENT, $delivery->fresh()->status);
+        $this->assertSame('om_archived_notification', $delivery->fresh()->external_message_id);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'notification.read_all',
+            'payload->count' => 2,
+        ]);
     }
 
     public function test_business_backup_and_reset_include_tender_notifications(): void

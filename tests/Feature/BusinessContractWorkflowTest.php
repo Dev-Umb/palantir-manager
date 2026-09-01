@@ -396,6 +396,51 @@ class BusinessContractWorkflowTest extends TestCase
         $this->assertDatabaseEmpty('notification_deliveries');
     }
 
+    public function test_read_project_notification_is_archived_and_a_new_occurrence_becomes_visible_again(): void
+    {
+        Carbon::setTestNow('2026-09-01 09:00:00');
+        $this->userWithRole('admin', '管理员');
+        $business = $this->userWithRole('business', '业务员');
+        $project = $this->project($business, '归档后再次提醒项目', [
+            'overall_status' => '投标中',
+            'overall_status_changed_at' => now()->subDays(15)->toISOString(),
+        ]);
+        $sync = app(SyncProjectNotifications::class);
+        $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
+        $notification = ProjectNotification::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $business->id)
+            ->firstOrFail();
+
+        $this->actingAs($business)
+            ->get('/notifications')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('unreadCount', 1)
+                ->has('notifications.data', 1));
+        $this->patch("/notifications/{$notification->id}/read")->assertRedirect();
+        $this->get('/notifications')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('unreadCount', 0)
+                ->has('notifications.data', 0));
+        $this->assertModelExists($notification->fresh());
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'notification.read',
+            'subject_id' => (string) $notification->id,
+        ]);
+
+        Carbon::setTestNow(now()->addDays(15));
+        $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
+        $this->assertNull($notification->fresh()->read_at);
+        $this->get('/notifications')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('unreadCount', 1)
+                ->has('notifications.data', 1)
+                ->where('notifications.data.0.occurrences', 2));
+    }
+
     public function test_payment_reminder_requires_an_eligible_stage_positive_debt_and_a_month_old_valid_last_payment_date(): void
     {
         Carbon::setTestNow('2026-09-01 09:00:00');

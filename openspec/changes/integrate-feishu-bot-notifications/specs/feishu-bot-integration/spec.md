@@ -22,6 +22,27 @@ The system MUST keep station notifications as the source of truth and MUST async
 - **THEN** the delivery MUST be recorded as skipped or not queued
 - **AND** the station notification MUST remain unchanged
 
+### Requirement: Read station notifications are archived from the notification center
+
+The system MUST hide read project and tender notifications from the notification center while retaining their persisted records and audit evidence.
+
+#### Scenario: A user marks one notification as read
+
+- **WHEN** the recipient marks a project or tender notification as read
+- **THEN** the notification MUST no longer appear in that recipient's notification-center list
+- **AND** the notification record and read audit evidence MUST remain persisted
+
+#### Scenario: A user marks all notifications as read
+
+- **WHEN** the recipient marks all project and tender notifications as read
+- **THEN** none of those read notifications MUST remain visible in the notification center
+- **AND** the records MUST NOT be deleted or change their Feishu delivery state
+
+#### Scenario: The same risk produces a new occurrence
+
+- **WHEN** existing reminder synchronization reactivates an archived notification for a new occurrence and clears its read state
+- **THEN** the notification MUST become visible again without changing reminder eligibility or cadence
+
 ### Requirement: Payment reminders use an actionable project card
 
 The system MUST render Feishu project payment reminders as interactive cards while keeping the station notification and delivery lifecycle unchanged.

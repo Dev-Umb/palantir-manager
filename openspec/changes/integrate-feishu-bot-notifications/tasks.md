@@ -85,3 +85,9 @@
 - [x] 13.2 Cover both approved stages, early-stage exclusion, missing/invalid/not-due dates, zero debt, natural-month reset, 15-day repeats and idempotency.
 - [x] 13.3 Prove that an existing due project-status notification creates a Feishu delivery for its business-owner recipient without changing notification-center rules.
 - [x] 13.4 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate before deployment.
+
+## 14. Archive read station notifications
+
+- [x] 14.1 Hide read project and tender notifications from notification-center pagination while preserving persisted records, audit evidence and delivery state.
+- [x] 14.2 Update notification-center copy and cover single-read, read-all, unread-visible and reactivated-visible boundaries.
+- [x] 14.3 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate before deployment.

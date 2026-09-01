@@ -19,7 +19,7 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                     <div>
                         <p>风险提醒</p>
                         <h2>通知记录</h2>
-                        <span>当前有 {unreadCount} 条未读风险提醒，已处理风险仍保留历史记录。</span>
+                        <span>当前有 {unreadCount} 条未读风险提醒，已读通知会自动归档。</span>
                     </div>
                     {unreadCount > 0 && (
                         <button className="ghost-button" type="button" onClick={() => router.patch('/notifications/read-all', {}, readOptions)}>
