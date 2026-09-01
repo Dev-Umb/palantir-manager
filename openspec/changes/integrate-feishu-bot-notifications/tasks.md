@@ -78,3 +78,10 @@
 - [x] 12.1 Preserve the first natural-month due date and change only subsequent incomplete-payment occurrences to a 15-day cadence.
 - [x] 12.2 Cover the 14-day boundary, 15-day occurrence, same-cycle idempotency, first natural-month delay and unchanged non-payment reminder cadence.
 - [x] 12.3 Run Pint, focused PHPUnit, strict OpenSpec validation and the applicable quality gate.
+
+## 13. Last-payment-date eligibility and notification-center parity
+
+- [x] 13.1 Require an approved project stage, positive numeric unpaid amount and valid `last_payment_date`; remove all date fallbacks.
+- [x] 13.2 Cover both approved stages, early-stage exclusion, missing/invalid/not-due dates, zero debt, natural-month reset, 15-day repeats and idempotency.
+- [x] 13.3 Prove that an existing due project-status notification creates a Feishu delivery for its business-owner recipient without changing notification-center rules.
+- [x] 13.4 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate before deployment.

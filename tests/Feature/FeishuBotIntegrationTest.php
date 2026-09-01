@@ -87,6 +87,7 @@ class FeishuBotIntegrationTest extends TestCase
             'overall_status' => '合同签署',
             'overall_status_changed_at' => now()->subMonthNoOverflow()->toISOString(),
             'contract_status' => '已签署',
+            'last_payment_date' => now()->subMonthNoOverflow()->toDateString(),
             'payment_status' => '部分回款',
             'paid_amount' => 25000,
             'unpaid_amount' => 75000,
@@ -200,6 +201,37 @@ class FeishuBotIntegrationTest extends TestCase
         Http::assertSent(fn ($request): bool => str_contains($request->url(), '/im/v1/messages')
             && $request['msg_type'] === 'text'
             && str_contains((string) $request['content'], '项目投标跟进提醒'));
+    }
+
+    public function test_due_project_status_notification_creates_a_feishu_delivery_for_the_business_owner(): void
+    {
+        Carbon::setTestNow('2026-09-01 09:00:00');
+        $owner = $this->userWithRole('business');
+        FeishuUserBinding::factory()->for($owner)->create([
+            'tenant_key' => 'test-tenant',
+            'open_id' => 'ou_status_owner',
+        ]);
+        $project = $this->project($owner, [
+            'overall_status' => '投标中',
+            'overall_status_changed_at' => now()->subDays(15)->toISOString(),
+        ]);
+
+        $result = app(SyncProjectNotifications::class)->handleProjects([$project->id]);
+
+        $this->assertSame(1, $result['triggered']);
+        $notification = ProjectNotification::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $owner->id)
+            ->where('type', ProjectNotification::TYPE_BID)
+            ->sole();
+        $delivery = NotificationDelivery::query()
+            ->where('source_type', 'project_notification')
+            ->where('source_id', (string) $notification->id)
+            ->where('user_id', $owner->id)
+            ->sole();
+
+        $this->assertSame(NotificationDelivery::STATUS_PENDING, $delivery->status);
+        Queue::assertPushed(DeliverFeishuNotification::class);
     }
 
     public function test_verified_private_message_flows_to_read_only_ai_run_and_feishu_reply(): void

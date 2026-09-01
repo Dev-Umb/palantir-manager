@@ -207,6 +207,7 @@ class FullChainDemoSeeder extends Seeder
                 'contract_status' => '未签署',
                 'processing_letter_at' => isset($definition['processing_at']) ? $definition['processing_at']->toISOString() : '',
                 'payment_reminder_anchor_at' => isset($definition['payment_at']) ? $definition['payment_at']->toISOString() : '',
+                'last_payment_date' => isset($definition['payment_at']) ? $definition['payment_at']->toDateString() : '',
                 'first_shipment_date' => in_array($key, ['partial', 'signed_partial_payment', 'paid', 'completed'], true) ? '2024-04-10' : '',
                 'last_shipment_date' => in_array($key, ['paid', 'completed'], true) ? '2026-05-20' : '',
                 'handover_date' => $definition['status_at']->format('Y-m-d'),
