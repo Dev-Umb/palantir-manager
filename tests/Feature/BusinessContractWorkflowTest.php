@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -332,6 +333,49 @@ class BusinessContractWorkflowTest extends TestCase
         $this->assertTrue(ProjectNotification::query()->where('user_id', $admin->id)->exists());
         $this->assertTrue(ProjectNotification::query()->where('user_id', $finance->id)->where('type', ProjectNotification::TYPE_PAYMENT)->exists());
         $this->assertFalse(ProjectNotification::query()->where('user_id', $informed->id)->exists());
+    }
+
+    public function test_microsecond_status_anchor_does_not_reset_a_second_precision_reminder_state(): void
+    {
+        Carbon::setTestNow('2026-09-01 09:00:00');
+        $this->userWithRole('admin', '管理员');
+        $business = $this->userWithRole('business', '业务员');
+        $project = $this->project($business, '微秒锚点项目', [
+            'overall_status' => '投标中',
+            'overall_status_changed_at' => '2026-08-17T09:00:00.438925Z',
+        ]);
+        $sync = app(SyncProjectNotifications::class);
+
+        $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
+        DB::table('project_reminder_states')
+            ->where('project_id', $project->id)
+            ->where('type', ProjectNotification::TYPE_BID)
+            ->update(['anchor_at' => '2026-08-17 09:00:00']);
+
+        $second = $sync->handleProjects([$project->id]);
+        $occurrences = ProjectNotification::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $business->id)
+            ->value('occurrences');
+        $this->assertSame(0, $second['triggered']);
+        $this->assertSame(1, $occurrences);
+    }
+
+    public function test_opening_notification_center_does_not_run_reminder_synchronization(): void
+    {
+        Carbon::setTestNow('2026-09-01 09:00:00');
+        $admin = $this->userWithRole('admin', '管理员');
+        $business = $this->userWithRole('business', '业务员');
+        $this->project($business, '通知页只读项目', [
+            'overall_status' => '投标中',
+            'overall_status_changed_at' => now()->subDays(15)->toISOString(),
+        ]);
+
+        $this->actingAs($admin)->get('/notifications')->assertOk();
+
+        $this->assertDatabaseEmpty('project_reminder_states');
+        $this->assertDatabaseEmpty('project_notifications');
+        $this->assertDatabaseEmpty('notification_deliveries');
     }
 
     public function test_payment_reminder_requires_an_eligible_stage_positive_debt_and_a_month_old_valid_last_payment_date(): void

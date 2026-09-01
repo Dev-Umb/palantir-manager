@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\SyncProjectNotifications;
-use App\Actions\SyncTenderNotifications;
 use App\Models\AuditLog;
 use App\Models\ProjectNotification;
 use App\Models\TenderNotification;
@@ -16,16 +14,11 @@ use Inertia\Response;
 class NotificationController extends Controller
 {
     public function __construct(
-        private SyncProjectNotifications $sync,
-        private SyncTenderNotifications $tenderSync,
         private ProjectVisibility $projectVisibility,
     ) {}
 
     public function index(Request $request): Response
     {
-        $this->sync->handle();
-        $this->tenderSync->handle();
-
         $user = $request->user();
         $visibleProjectIds = array_flip($this->projectVisibility->visibleProjectIds($user));
         $notifications = ProjectNotification::query()

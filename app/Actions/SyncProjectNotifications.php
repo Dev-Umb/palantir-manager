@@ -351,7 +351,8 @@ class SyncProjectNotifications
 
     private function date(mixed $value, Carbon $fallback): Carbon
     {
-        return is_string($value) && $value !== '' ? Carbon::parse($value) : $fallback->copy();
+        return (is_string($value) && $value !== '' ? Carbon::parse($value) : $fallback->copy())
+            ->startOfSecond();
     }
 
     private function dateOrNull(mixed $value): ?Carbon
@@ -361,7 +362,7 @@ class SyncProjectNotifications
         }
 
         try {
-            return Carbon::parse($value);
+            return Carbon::parse($value)->startOfSecond();
         } catch (\Throwable) {
             return null;
         }
