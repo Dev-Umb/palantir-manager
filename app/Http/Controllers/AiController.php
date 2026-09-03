@@ -36,7 +36,7 @@ class AiController extends Controller
 
         $provider = config('ai.default', 'ark');
         if (! Ai::hasFakeGatewayFor(XycDataAgent::class) && blank(config("ai.providers.{$provider}.key"))) {
-            return response()->json(['message' => 'AI 服务尚未配置 ARK_API_KEY。'], 422);
+            return response()->json(['message' => 'AI 服务尚未配置。'], 422);
         }
 
         if (! empty($data['conversation_id'])) {

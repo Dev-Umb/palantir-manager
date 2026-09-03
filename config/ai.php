@@ -53,6 +53,20 @@ return [
     */
 
     'providers' => [
+        'aimon' => [
+            'driver' => 'openai',
+            'key' => env('AIMON_API_KEY'),
+            'url' => env('AIMON_BASE_URL', 'https://aimon.umb.ink/v1'),
+            'store' => false,
+            'models' => [
+                'text' => [
+                    'default' => env('AIMON_MODEL', 'gpt-5.6-sol'),
+                    'cheapest' => env('AIMON_MODEL', 'gpt-5.6-sol'),
+                    'smartest' => env('AIMON_MODEL', 'gpt-5.6-sol'),
+                ],
+            ],
+        ],
+
         'ark' => [
             'driver' => 'ark-openai',
             'key' => env('ARK_API_KEY'),
