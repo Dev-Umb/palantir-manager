@@ -176,7 +176,7 @@ class FeishuClient
     {
         $response = $request($this->tenantAccessToken());
 
-        if ($response->successful() || (int) ($response->json('code') ?? -1) !== 99991663) {
+        if ($response->successful() || ! in_array((int) ($response->json('code') ?? -1), [99991663, 99991668], true)) {
             return $response;
         }
 

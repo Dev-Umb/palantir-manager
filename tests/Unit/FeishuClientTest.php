@@ -6,6 +6,7 @@ use App\Integrations\Feishu\FeishuClient;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -22,11 +23,12 @@ class FeishuClientTest extends TestCase
         Http::preventStrayRequests();
     }
 
-    public function test_it_refreshes_an_invalid_tenant_token_and_retries_once(): void
+    #[DataProvider('invalidTenantTokenCodes')]
+    public function test_it_refreshes_an_invalid_tenant_token_and_retries_once(int $errorCode): void
     {
         Http::fakeSequence()
             ->push(['code' => 0, 'tenant_access_token' => 'expired-token'])
-            ->push(['code' => 99991663, 'msg' => 'Invalid access token'], 400)
+            ->push(['code' => $errorCode, 'msg' => 'Invalid access token'], 400)
             ->push(['code' => 0, 'tenant_access_token' => 'fresh-token'])
             ->push(['code' => 0, 'data' => ['message_id' => 'om_123']]);
 
@@ -38,6 +40,15 @@ class FeishuClientTest extends TestCase
         $requests = Http::recorded()->pluck(0)->values();
         $this->assertSame('Bearer expired-token', $requests[1]->header('Authorization')[0]);
         $this->assertSame('Bearer fresh-token', $requests[3]->header('Authorization')[0]);
+    }
+
+    /** @return array<string, array{int}> */
+    public static function invalidTenantTokenCodes(): array
+    {
+        return [
+            'expired tenant token' => [99991663],
+            'invalid tenant token' => [99991668],
+        ];
     }
 
     public function test_it_does_not_retry_an_unrelated_feishu_error(): void
