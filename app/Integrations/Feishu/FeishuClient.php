@@ -3,6 +3,7 @@
 namespace App\Integrations\Feishu;
 
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -13,11 +14,11 @@ class FeishuClient
     public function downloadMessageResource(string $messageId, string $fileKey): array
     {
         $maxBytes = (int) config('services.feishu.attachment_max_bytes', 20 * 1024 * 1024);
-        $response = $this->request()->withToken($this->tenantAccessToken())
+        $response = $this->withTenantAccessToken(fn (string $token): Response => $this->request()->withToken($token)
             ->withOptions(['stream' => true])
             ->get('/im/v1/messages/'.rawurlencode($messageId).'/resources/'.rawurlencode($fileKey), [
                 'type' => 'file',
-            ]);
+            ]));
         if (! $response->successful()) {
             throw new RuntimeException("feishu_download_resource_failed:http={$response->status()}");
         }
@@ -74,10 +75,10 @@ class FeishuClient
     /** @return array{reaction_id: string} */
     public function addReaction(string $messageId, string $emojiType = 'Typing'): array
     {
-        $response = $this->request()->withToken($this->tenantAccessToken())
+        $response = $this->withTenantAccessToken(fn (string $token): Response => $this->request()->withToken($token)
             ->post('/im/v1/messages/'.rawurlencode($messageId).'/reactions', [
                 'reaction_type' => ['emoji_type' => $emojiType],
-            ]);
+            ]));
         $payload = $response->json();
         if (! $response->successful() || (int) ($payload['code'] ?? -1) !== 0) {
             throw new RuntimeException($this->errorMessage('add_reaction', $response->status(), $payload));
@@ -93,8 +94,8 @@ class FeishuClient
 
     public function deleteReaction(string $messageId, string $reactionId): void
     {
-        $response = $this->request()->withToken($this->tenantAccessToken())
-            ->delete('/im/v1/messages/'.rawurlencode($messageId).'/reactions/'.rawurlencode($reactionId));
+        $response = $this->withTenantAccessToken(fn (string $token): Response => $this->request()->withToken($token)
+            ->delete('/im/v1/messages/'.rawurlencode($messageId).'/reactions/'.rawurlencode($reactionId)));
         $payload = $response->json();
         if (! $response->successful() || (int) ($payload['code'] ?? -1) !== 0) {
             throw new RuntimeException($this->errorMessage('delete_reaction', $response->status(), $payload));
@@ -111,12 +112,12 @@ class FeishuClient
         string $messageType,
         array $content,
     ): array {
-        $response = $this->request()->withToken($this->tenantAccessToken())
+        $response = $this->withTenantAccessToken(fn (string $token): Response => $this->request()->withToken($token)
             ->post('/im/v1/messages?receive_id_type='.rawurlencode($receiveIdType), [
                 'receive_id' => $receiveId,
                 'msg_type' => $messageType,
                 'content' => json_encode($content, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-            ]);
+            ]));
         $payload = $response->json();
         if (! $response->successful() || (int) ($payload['code'] ?? -1) !== 0) {
             throw new RuntimeException($this->errorMessage('send_message', $response->status(), $payload));
@@ -128,8 +129,8 @@ class FeishuClient
     /** @return array<string, string> */
     public function openIdsByEmails(array $emails): array
     {
-        $response = $this->request()->withToken($this->tenantAccessToken())
-            ->post('/contact/v3/users/batch_get_id?user_id_type=open_id', ['emails' => array_values($emails)]);
+        $response = $this->withTenantAccessToken(fn (string $token): Response => $this->request()->withToken($token)
+            ->post('/contact/v3/users/batch_get_id?user_id_type=open_id', ['emails' => array_values($emails)]));
         $payload = $response->json();
         if (! $response->successful() || (int) ($payload['code'] ?? -1) !== 0) {
             throw new RuntimeException($this->errorMessage('resolve_user', $response->status(), $payload));
@@ -149,7 +150,7 @@ class FeishuClient
             throw new RuntimeException('feishu_not_configured');
         }
 
-        return Cache::remember('feishu:tenant-token:'.sha1($appId), now()->addMinutes(90), function () use ($appId, $appSecret): string {
+        return Cache::remember($this->tenantAccessTokenCacheKey(), now()->addMinutes(90), function () use ($appId, $appSecret): string {
             $response = $this->request()->post('/auth/v3/tenant_access_token/internal', [
                 'app_id' => $appId,
                 'app_secret' => $appSecret,
@@ -166,6 +167,27 @@ class FeishuClient
 
             return $token;
         });
+    }
+
+    /**
+     * @param  callable(string): Response  $request
+     */
+    private function withTenantAccessToken(callable $request): Response
+    {
+        $response = $request($this->tenantAccessToken());
+
+        if ($response->successful() || (int) ($response->json('code') ?? -1) !== 99991663) {
+            return $response;
+        }
+
+        Cache::forget($this->tenantAccessTokenCacheKey());
+
+        return $request($this->tenantAccessToken());
+    }
+
+    private function tenantAccessTokenCacheKey(): string
+    {
+        return 'feishu:tenant-token:'.sha1((string) config('services.feishu.app_id'));
     }
 
     private function request(): PendingRequest
