@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Actions\CreateFeishuAiRun;
+use App\Integrations\Feishu\FeishuClient;
+use App\Integrations\Feishu\FeishuContractAttachmentService;
 use App\Integrations\Feishu\FeishuProcessingReaction;
 use App\Models\FeishuInboundEvent;
 use App\Models\FeishuUserBinding;
@@ -46,21 +48,11 @@ class ProcessFeishuInboundEvent implements ShouldBeUnique, ShouldQueue
             || ($chatType === 'group'
                 && $mentionKeys->isNotEmpty()
                 && filled(data_get($event, 'message.chat_id')));
-        $isSupportedText = $isSupportedChat
-            && data_get($event, 'message.message_type') === 'text'
+        $messageType = (string) data_get($event, 'message.message_type');
+        $isSupportedMessage = $isSupportedChat
+            && in_array($messageType, ['text', 'file'], true)
             && data_get($event, 'sender.sender_type', 'user') === 'user';
-        if (! $isSupportedText) {
-            $inbound->update(['status' => 'ignored', 'processed_at' => now()]);
-
-            return;
-        }
-
-        $content = json_decode((string) data_get($event, 'message.content', '{}'), true);
-        $message = Str::of((string) ($content['text'] ?? ''))
-            ->when($chatType === 'group', fn ($text) => $text->replace($mentionKeys->all(), ' '))
-            ->squish()
-            ->toString();
-        if ($message === '') {
+        if (! $isSupportedMessage) {
             $inbound->update(['status' => 'ignored', 'processed_at' => now()]);
 
             return;
@@ -76,8 +68,64 @@ class ProcessFeishuInboundEvent implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        $content = json_decode((string) data_get($event, 'message.content', '{}'), true);
+        if (! is_array($content)) {
+            $inbound->update(['status' => 'ignored', 'processed_at' => now()]);
+
+            return;
+        }
+
+        if ($messageType === 'file') {
+            if (! $binding->user->canDo('object.project.update')) {
+                $inbound->update(['status' => 'rejected', 'error' => 'permission_denied', 'processed_at' => now()]);
+
+                return;
+            }
+            $reaction->add($inbound);
+            $card = app(FeishuContractAttachmentService::class)->stage($inbound, $binding, $content);
+            $reply = $this->sendCard($inbound, app(FeishuClient::class), $card);
+            $inbound->update(['status' => 'completed', 'reply_message_id' => $reply['message_id'], 'processed_at' => now()]);
+            $reaction->remove($inbound->fresh());
+
+            return;
+        }
+
+        $message = Str::of((string) ($content['text'] ?? ''))
+            ->when($chatType === 'group', fn ($text) => $text->replace($mentionKeys->all(), ' '))
+            ->squish()
+            ->toString();
+        if ($message === '') {
+            $inbound->update(['status' => 'ignored', 'processed_at' => now()]);
+
+            return;
+        }
+
         $reaction->add($inbound);
+        $attachments = app(FeishuContractAttachmentService::class);
+        if ($attachments->isBindingCommand($message)) {
+            $card = $attachments->bind($inbound, $binding, $message);
+            $reply = $this->sendCard($inbound, app(FeishuClient::class), $card);
+            $inbound->update(['status' => 'completed', 'reply_message_id' => $reply['message_id'], 'processed_at' => now()]);
+            $reaction->remove($inbound->fresh());
+
+            return;
+        }
+
         $runs->handle($inbound, $binding, $message);
+    }
+
+    /**
+     * @param  array<string, mixed>  $card
+     * @return array{message_id: string}
+     */
+    private function sendCard(FeishuInboundEvent $event, FeishuClient $client, array $card): array
+    {
+        $chatType = (string) data_get($event->payload, 'event.message.chat_type');
+        if ($chatType === 'group') {
+            return $client->sendCardToChat((string) data_get($event->payload, 'event.message.chat_id'), $card);
+        }
+
+        return $client->sendCard((string) $event->sender_open_id, $card);
     }
 
     public function failed(?Throwable $exception): void

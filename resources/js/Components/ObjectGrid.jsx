@@ -593,7 +593,21 @@ function renderValue(object, field, record, value, relationOptions, row = null) 
     if (field.type === 'files') {
         const attachments = Array.isArray(record?.display?.[field.key]) ? record.display[field.key] : [];
         return attachments.length
-            ? <span title={`${attachments.length} 个附件`}>{attachments.length} 个附件</span>
+            ? (
+                <span className="attachment-links" title={`${attachments.length} 个附件`}>
+                    {attachments.map((url, index) => (
+                        <a
+                            className="relation-chip"
+                            href={url}
+                            key={url}
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            下载{index + 1}
+                        </a>
+                    ))}
+                </span>
+            )
             : <span className="empty-value">—</span>;
     }
     if (field.type === 'account') {

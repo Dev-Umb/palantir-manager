@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
+use App\Models\StoredAttachment;
 use App\Models\User;
 use App\Support\ObjectRelations;
 use Illuminate\Http\Request;
@@ -248,6 +249,68 @@ class SyncProjectContracts
 
             throw $exception;
         }
+    }
+
+    public function appendStoredAttachment(
+        ObjectRecord $project,
+        ObjectRecord $contract,
+        string $field,
+        StoredAttachment $attachment,
+        User $user,
+    ): void {
+        if (! in_array($field, ['processing_letter_attachments', 'contract_attachments'], true)) {
+            throw ValidationException::withMessages(['attachment_type' => '附件类型无效。']);
+        }
+
+        DB::transaction(function () use ($project, $contract, $field, $attachment, $user): void {
+            $project = ObjectRecord::query()
+                ->whereKey($project->id)
+                ->whereRelation('businessObject', 'key', 'project')
+                ->lockForUpdate()
+                ->firstOrFail();
+            $contract = ObjectRecord::query()
+                ->whereKey($contract->id)
+                ->whereRelation('businessObject', 'key', 'contract')
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless((string) ($contract->payload['project_id'] ?? '') === $project->id, 422);
+
+            $oldPayload = $contract->payload ?? [];
+            $paths = collect($oldPayload[$field] ?? [])
+                ->filter(fn (mixed $path): bool => is_string($path) && $path !== '')
+                ->values();
+            if ($paths->contains($attachment->logical_path)) {
+                return;
+            }
+            if ($paths->count() >= 20) {
+                throw ValidationException::withMessages([$field => '每类附件最多保留 20 个文件。']);
+            }
+
+            $payload = $oldPayload;
+            $payload[$field] = $paths->push($attachment->logical_path)->all();
+            $currentStatus = (string) ($payload['status'] ?? '未签署');
+            $payload['status'] = $field === 'contract_attachments'
+                ? '已签署'
+                : ($currentStatus === '未签署' ? '已有加工函' : $currentStatus);
+            $contract->update(['payload' => $payload]);
+            $attachment->update(['status' => StoredAttachment::STATUS_ATTACHED]);
+
+            AuditLog::create([
+                'user_id' => $user->id,
+                'action' => 'object.update.project_contract.feishu_attachment',
+                'subject_type' => 'contract',
+                'subject_id' => $contract->id,
+                'payload' => [
+                    'code' => $contract->code,
+                    'attachment_id' => $attachment->id,
+                    'attachment_field' => $field,
+                    'changes' => $this->payloadChanges($oldPayload, $payload),
+                ],
+            ]);
+
+            $this->contractAmount->handle($project->id);
+            $this->projectNotifications->handleProjects([$project->id]);
+        });
     }
 
     /** @return array<string, mixed> */

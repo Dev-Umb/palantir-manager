@@ -100,3 +100,13 @@
 - [x] 15.4 Cover structured card rendering, authorized/denied/empty exports, payload bounds, CLI failure, tool availability and preserved private/group destinations.
 - [x] 15.5 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate.
 - [x] 15.6 Deploy with a rollback point, install/configure the production CLI, restart workers, and verify existing bot queries plus one new document and spreadsheet export without modifying business records.
+
+## 16. Feishu contract evidence upload and contract-table download
+
+- [x] 16.1 Add durable staged-upload and stored-attachment metadata with a configurable private attachment disk and legacy-local fallback.
+- [x] 16.2 Accept supported Feishu file events, download the exact message resource, validate/hash/store it, and return binding guidance without starting an AI Run.
+- [x] 16.3 Parse the explicit binding instruction and append only through the authorized project-contract workflow after exact unique project/contract matching; return a no-write confirmation card for every mismatch.
+- [x] 16.4 Render individual contract and processing-letter download links in the contract table while preserving download authorization.
+- [x] 16.5 Cover valid P2P and group flows, duplicate event/retry, MIME/size/storage failures, ambiguous/mismatched identifiers, permission denial, append preservation and manual download authorization.
+- [x] 16.6 Run focused backend/UI tests, Pint, strict OpenSpec validation, production build and full quality gate before deployment.
+- [ ] 16.7 After local evidence passes, create/configure a dedicated private versioned encrypted TOS bucket, deploy with rollback, migrate/restart workers, and run one explicitly scoped production smoke test.

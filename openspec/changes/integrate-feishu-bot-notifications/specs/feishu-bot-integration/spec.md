@@ -185,3 +185,53 @@ The system MUST load the App ID, App Secret and verification token from runtime 
 - **WHEN** the client records or logs an error
 - **THEN** only sanitized status, API code and bounded message text MAY be retained
 - **AND** authorization tokens and application secrets MUST NOT appear
+
+### Requirement: Authorized Feishu users can append contract evidence safely
+
+The system MUST durably stage an accepted Feishu file before business binding and MUST append it to a contract only when the sender is bound, authorized, and supplies an exact unique project number, exact unique contract number, and explicit attachment type.
+
+#### Scenario: A valid file is staged
+
+- **WHEN** a bound user with contract update permission sends a PDF, JPEG or PNG file in a supported Feishu conversation
+- **THEN** the bot MUST download that exact message resource with bounded size and timeout
+- **AND** MUST persist its original name, MIME type, byte size, SHA-256 digest, storage location, sender and source message evidence before replying
+- **AND** MUST ask for an explicit `项目编号 + 合同编号 + 合同附件/加工函附件` binding instruction
+
+#### Scenario: Exact identifiers uniquely match
+
+- **WHEN** the sender binds a pending file using an exact project number and exact contract number that each resolve uniquely and consistently
+- **THEN** the existing authorized project-contract workflow MUST append the file to the selected attachment field
+- **AND** existing attachments MUST remain unchanged and downloadable
+- **AND** the upload record MUST link to the project, contract, actor and audit log
+
+#### Scenario: Matching is ambiguous or inconsistent
+
+- **WHEN** either identifier is missing, duplicate, not found, or the contract does not belong to the exact project
+- **THEN** no business record MUST be changed
+- **AND** the bot MUST return a confirmation card that states the blocking reason and requests corrected exact identifiers without guessing
+
+#### Scenario: A group file is not directed to the bot
+
+- **WHEN** a file message arrives from a group without an explicit bot mention or supported pending-upload context
+- **THEN** it MUST NOT be downloaded, staged or attached
+
+#### Scenario: Storage or verification fails
+
+- **WHEN** resource download, allowlist validation, durable write, size verification or digest verification fails
+- **THEN** no contract payload MUST be changed
+- **AND** the inbound/upload audit state MUST retain a sanitized failure suitable for retry
+
+### Requirement: Contract evidence is manually downloadable from the contract table
+
+The system MUST render every contract and processing-letter attachment in the contract object table as an individual authenticated download action.
+
+#### Scenario: An authorized visible contract has multiple attachments
+
+- **WHEN** a user who can view the contract and its project opens the contract table
+- **THEN** each contract attachment and processing-letter attachment MUST have a distinct download link
+- **AND** the download response MUST use attachment disposition, private no-store caching and a safe original filename
+
+#### Scenario: A contract is outside the user's visibility
+
+- **WHEN** the user cannot view the contract object or its related project
+- **THEN** direct attachment download MUST remain forbidden even if the URL is known

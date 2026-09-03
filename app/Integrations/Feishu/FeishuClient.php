@@ -9,6 +9,38 @@ use RuntimeException;
 
 class FeishuClient
 {
+    /** @return array{contents: string, mime_type: string} */
+    public function downloadMessageResource(string $messageId, string $fileKey): array
+    {
+        $maxBytes = (int) config('services.feishu.attachment_max_bytes', 20 * 1024 * 1024);
+        $response = $this->request()->withToken($this->tenantAccessToken())
+            ->withOptions(['stream' => true])
+            ->get('/im/v1/messages/'.rawurlencode($messageId).'/resources/'.rawurlencode($fileKey), [
+                'type' => 'file',
+            ]);
+        if (! $response->successful()) {
+            throw new RuntimeException("feishu_download_resource_failed:http={$response->status()}");
+        }
+
+        $declaredSize = (int) ($response->header('Content-Length') ?: 0);
+        if ($declaredSize > $maxBytes) {
+            throw new RuntimeException('feishu_attachment_size_invalid');
+        }
+        $body = $response->toPsrResponse()->getBody();
+        $contents = '';
+        while (! $body->eof()) {
+            $contents .= $body->read(8192);
+            if (strlen($contents) > $maxBytes) {
+                throw new RuntimeException('feishu_attachment_size_invalid');
+            }
+        }
+
+        return [
+            'contents' => $contents,
+            'mime_type' => (string) ($response->header('Content-Type') ?: 'application/octet-stream'),
+        ];
+    }
+
     /** @return array{message_id: string} */
     public function sendText(string $openId, string $text): array
     {

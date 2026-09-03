@@ -60,6 +60,19 @@ return [
             'report' => false,
         ],
 
+        'contract_tos' => [
+            'driver' => 's3',
+            'key' => env('TOS_ACCESS_KEY_ID'),
+            'secret' => env('TOS_SECRET_ACCESS_KEY'),
+            'region' => env('TOS_REGION', 'cn-beijing'),
+            'bucket' => env('TOS_BUCKET'),
+            'endpoint' => env('TOS_ENDPOINT', 'https://tos-s3-cn-beijing.volces.com'),
+            'use_path_style_endpoint' => false,
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => true,
+        ],
+
     ],
 
     /*

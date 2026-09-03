@@ -42,6 +42,8 @@ return [
         'app_secret' => env('FEISHU_APP_SECRET'),
         'verification_token' => env('FEISHU_VERIFICATION_TOKEN'),
         'tenant_key' => env('FEISHU_TENANT_KEY'),
+        'attachment_disk' => env('FEISHU_ATTACHMENT_DISK', 'local'),
+        'attachment_max_bytes' => env('FEISHU_ATTACHMENT_MAX_BYTES', 20 * 1024 * 1024),
         'cli' => [
             'enabled' => env('FEISHU_CLI_ENABLED', false),
             'binary' => env('FEISHU_CLI_BINARY', 'lark-cli'),

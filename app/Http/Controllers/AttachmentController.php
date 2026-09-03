@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\ObjectRecord;
+use App\Models\StoredAttachment;
 use App\Support\ProjectVisibility;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttachmentController extends Controller
 {
@@ -18,7 +19,7 @@ class AttachmentController extends Controller
 
     public function __construct(private ProjectVisibility $projectVisibility) {}
 
-    public function __invoke(Request $request, ObjectRecord $record, string $field, ?int $index = null): BinaryFileResponse
+    public function __invoke(Request $request, ObjectRecord $record, string $field, ?int $index = null): StreamedResponse
     {
         $record->loadMissing('businessObject');
         $object = $record->businessObject;
@@ -38,13 +39,22 @@ class AttachmentController extends Controller
             $value = $value[$index];
         }
         $path = $this->privatePath($value);
-        $disk = Storage::disk('local');
-        abort_unless($path && $disk->exists($path), 404);
+        abort_unless($path, 404);
+        $stored = StoredAttachment::query()->where('logical_path', $path)->first();
+        $disk = Storage::disk($stored?->disk ?: 'local');
+        $objectKey = $stored?->object_key ?: $path;
+        abort_unless($disk->exists($objectKey), 404);
 
-        $mimeType = $disk->mimeType($path);
+        $mimeType = $stored?->mime_type ?: $disk->mimeType($objectKey);
         abort_unless(is_string($mimeType) && in_array($mimeType, self::ALLOWED_MIME_TYPES, true), 404);
+        $downloadName = $stored?->original_name ?: basename($path);
 
-        return response()->download($disk->path($path), basename($path), [
+        return response()->streamDownload(function () use ($disk, $objectKey): void {
+            $stream = $disk->readStream($objectKey);
+            abort_unless(is_resource($stream), 404);
+            fpassthru($stream);
+            fclose($stream);
+        }, $downloadName, [
             'Content-Type' => $mimeType,
             'Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff',

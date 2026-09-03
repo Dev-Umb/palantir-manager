@@ -11,6 +11,7 @@ use App\Ai\AiToolEventProjector;
 use App\Ai\FeishuDataAgent;
 use App\Ai\Tools\PrepareObjectRecordUpdateTool;
 use App\Integrations\Feishu\FeishuClient;
+use App\Integrations\Feishu\FeishuContractAttachmentService;
 use App\Integrations\Feishu\FeishuMessageRenderer;
 use App\Integrations\Feishu\FeishuNotificationDispatcher;
 use App\Integrations\Feishu\FeishuProcessingReaction;
@@ -20,12 +21,14 @@ use App\Jobs\RunAiHarness;
 use App\Jobs\SendFeishuAiReply;
 use App\Models\AiRun;
 use App\Models\BusinessObject;
+use App\Models\FeishuFileUpload;
 use App\Models\FeishuInboundEvent;
 use App\Models\FeishuUserBinding;
 use App\Models\NotificationDelivery;
 use App\Models\ObjectRecord;
 use App\Models\ProjectNotification;
 use App\Models\Role;
+use App\Models\StoredAttachment;
 use App\Models\TenderNotification;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,6 +37,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Laravel\Ai\Responses\Data\Meta;
@@ -63,6 +67,7 @@ class FeishuBotIntegrationTest extends TestCase
         URL::forceScheme('https');
         Cache::clear();
         Queue::fake();
+        Storage::fake('local');
     }
 
     protected function tearDown(): void
@@ -737,6 +742,284 @@ class FeishuBotIntegrationTest extends TestCase
         $this->assertSame(1, $delivery->attempts);
     }
 
+    public function test_feishu_file_is_durably_staged_then_exactly_bound_and_appended_to_contract(): void
+    {
+        config()->set('services.feishu.attachment_disk', 'contract_tos');
+        Storage::fake('contract_tos');
+        $owner = $this->userWithRole('business');
+        FeishuUserBinding::factory()->for($owner)->create([
+            'tenant_key' => 'test-tenant',
+            'open_id' => 'ou_contract_owner',
+        ]);
+        $project = $this->project($owner, [
+            'project_no' => 'XYC-20260903-001',
+            'overall_status' => '已中标',
+            'contract_status' => '未签署',
+        ]);
+        $contract = BusinessObject::where('key', 'contract')->firstOrFail()->records()->create([
+            'code' => 'HT-20260903-001',
+            'title' => 'HT-20260903-001',
+            'created_by' => $owner->id,
+            'payload' => [
+                'contract_no' => 'HT-20260903-001',
+                'project_id' => $project->id,
+                'project_no' => 'XYC-20260903-001',
+                'status' => '未签署',
+                'amount' => 100000,
+                'contract_attachments' => ['attachments/legacy.pdf'],
+                'processing_letter_attachments' => [],
+                'statement_attachments' => [],
+            ],
+        ]);
+        Storage::disk('local')->put('attachments/legacy.pdf', "%PDF-1.4\nlegacy");
+        Http::fake([
+            'https://open.feishu.test/open-apis/auth/v3/tenant_access_token/internal' => Http::response([
+                'code' => 0, 'tenant_access_token' => 'fake-token', 'expire' => 7200,
+            ]),
+            'https://open.feishu.test/open-apis/im/v1/messages/*/resources/*' => Http::response(
+                "%PDF-1.4\ncontract-evidence",
+                200,
+                ['Content-Type' => 'application/pdf'],
+            ),
+            'https://open.feishu.test/open-apis/im/v1/messages/*/reactions*' => Http::response([
+                'code' => 0, 'data' => ['reaction_id' => 'reaction_attachment'],
+            ]),
+            'https://open.feishu.test/open-apis/im/v1/messages*' => Http::response([
+                'code' => 0, 'data' => ['message_id' => 'om_attachment_reply'],
+            ]),
+        ]);
+
+        $filePayload = $this->filePayload('event-contract-file', 'ou_contract_owner', '合同原件.pdf');
+        $this->postJson('/webhooks/feishu/events', $filePayload)->assertOk();
+        $fileEvent = FeishuInboundEvent::sole();
+        (new ProcessFeishuInboundEvent($fileEvent->id))->handle(
+            app(CreateFeishuAiRun::class),
+            app(FeishuProcessingReaction::class),
+        );
+
+        $upload = FeishuFileUpload::with('storedAttachment')->sole();
+        $this->assertSame(FeishuFileUpload::STATUS_PENDING, $upload->status);
+        $this->assertSame('合同原件.pdf', $upload->storedAttachment->original_name);
+        $this->assertSame(hash('sha256', "%PDF-1.4\ncontract-evidence"), $upload->storedAttachment->sha256);
+        $this->assertSame('contract_tos', $upload->storedAttachment->disk);
+        Storage::disk('contract_tos')->assertExists($upload->storedAttachment->object_key);
+        $this->assertDatabaseCount('ai_runs', 0);
+
+        $bindPayload = $this->messagePayload(
+            'event-contract-bind',
+            'ou_contract_owner',
+            '绑定附件 项目编号：XYC-20260903-001 合同编号：HT-20260903-001 类型：合同附件',
+        );
+        $this->postJson('/webhooks/feishu/events', $bindPayload)->assertOk();
+        $bindEvent = FeishuInboundEvent::where('event_id', 'event-contract-bind')->sole();
+        (new ProcessFeishuInboundEvent($bindEvent->id))->handle(
+            app(CreateFeishuAiRun::class),
+            app(FeishuProcessingReaction::class),
+        );
+
+        $paths = $contract->fresh()->payload['contract_attachments'];
+        $this->assertSame('attachments/legacy.pdf', $paths[0]);
+        $this->assertSame($upload->storedAttachment->logical_path, $paths[1]);
+        $this->assertSame('已签署', $contract->fresh()->payload['status']);
+        $this->assertSame('合同签署', $project->fresh()->payload['overall_status']);
+        $this->assertSame(FeishuFileUpload::STATUS_ATTACHED, $upload->fresh()->status);
+        $this->assertSame(StoredAttachment::STATUS_ATTACHED, $upload->storedAttachment->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'object.update.project_contract.feishu_attachment',
+            'subject_id' => $contract->id,
+            'user_id' => $owner->id,
+        ]);
+        $this->assertDatabaseCount('ai_runs', 0);
+        Http::assertSent(fn ($request): bool => $request->method() === 'GET'
+            && str_contains($request->url(), "/im/v1/messages/{$fileEvent->message_id}/resources/file_contract_test")
+            && $request->data()['type'] === 'file');
+    }
+
+    public function test_binding_command_selects_the_exact_staged_file_when_the_conversation_has_multiple_uploads(): void
+    {
+        $owner = $this->userWithRole('business');
+        $binding = FeishuUserBinding::factory()->for($owner)->create([
+            'tenant_key' => 'test-tenant',
+            'open_id' => 'ou_multiple_uploads',
+        ]);
+        $project = $this->project($owner, ['project_no' => 'XYC-MULTIPLE']);
+        $contract = BusinessObject::where('key', 'contract')->firstOrFail()->records()->create([
+            'code' => 'HT-MULTIPLE',
+            'title' => 'HT-MULTIPLE',
+            'created_by' => $owner->id,
+            'payload' => [
+                'contract_no' => 'HT-MULTIPLE',
+                'project_id' => $project->id,
+                'project_no' => 'XYC-MULTIPLE',
+                'status' => '未签署',
+                'amount' => 1,
+                'contract_attachments' => [],
+            ],
+        ]);
+        $uploads = collect(['第一份.pdf', '第二份.pdf'])->map(function (string $name, int $index) use ($binding): FeishuFileUpload {
+            $sourceEvent = FeishuInboundEvent::factory()->create([
+                'tenant_key' => 'test-tenant',
+                'sender_open_id' => 'ou_multiple_uploads',
+                'binding_id' => $binding->id,
+                'status' => 'completed',
+                'payload' => ['event' => ['message' => ['chat_id' => 'oc_multiple_uploads']]],
+            ]);
+            $attachment = StoredAttachment::factory()->create([
+                'logical_path' => "attachments/multiple-{$index}.pdf",
+                'object_key' => "attachments/multiple-{$index}.pdf",
+                'original_name' => $name,
+            ]);
+
+            return FeishuFileUpload::create([
+                'inbound_event_id' => $sourceEvent->id,
+                'binding_id' => $binding->id,
+                'stored_attachment_id' => $attachment->id,
+                'conversation_key' => 'chat:oc_multiple_uploads',
+                'file_key' => "file_multiple_{$index}",
+                'status' => FeishuFileUpload::STATUS_PENDING,
+            ]);
+        });
+        $commandEvent = FeishuInboundEvent::factory()->create([
+            'tenant_key' => 'test-tenant',
+            'sender_open_id' => 'ou_multiple_uploads',
+            'binding_id' => $binding->id,
+            'status' => 'processing',
+            'payload' => ['event' => ['message' => ['chat_id' => 'oc_multiple_uploads']]],
+        ]);
+
+        $card = app(FeishuContractAttachmentService::class)->bind(
+            $commandEvent,
+            $binding,
+            "绑定附件 暂存编号：{$uploads[1]->id} 项目编号：XYC-MULTIPLE 合同编号：HT-MULTIPLE 类型：合同附件",
+        );
+
+        $this->assertSame('附件已追加到合同', data_get($card, 'header.title.content'));
+        $this->assertSame(FeishuFileUpload::STATUS_PENDING, $uploads[0]->fresh()->status);
+        $this->assertSame(FeishuFileUpload::STATUS_ATTACHED, $uploads[1]->fresh()->status);
+        $this->assertSame([$uploads[1]->storedAttachment->logical_path], $contract->fresh()->payload['contract_attachments']);
+    }
+
+    public function test_binding_with_mismatched_exact_identifiers_does_not_change_contract(): void
+    {
+        $owner = $this->userWithRole('business');
+        $binding = FeishuUserBinding::factory()->for($owner)->create([
+            'tenant_key' => 'test-tenant',
+            'open_id' => 'ou_mismatch_owner',
+        ]);
+        $project = $this->project($owner, ['project_no' => 'XYC-ONE']);
+        $other = $this->project($owner, ['project_no' => 'XYC-TWO']);
+        $contract = BusinessObject::where('key', 'contract')->firstOrFail()->records()->create([
+            'code' => 'HT-TWO',
+            'title' => 'HT-TWO',
+            'created_by' => $owner->id,
+            'payload' => [
+                'contract_no' => 'HT-TWO',
+                'project_id' => $other->id,
+                'project_no' => 'XYC-TWO',
+                'status' => '未签署',
+                'amount' => 1,
+                'contract_attachments' => [],
+            ],
+        ]);
+        $stored = StoredAttachment::create([
+            'logical_path' => 'attachments/pending.pdf',
+            'disk' => 'local',
+            'object_key' => 'attachments/pending.pdf',
+            'original_name' => '待绑定.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => 12,
+            'sha256' => hash('sha256', 'pending-file'),
+            'status' => StoredAttachment::STATUS_STAGED,
+        ]);
+        $event = FeishuInboundEvent::factory()->create([
+            'tenant_key' => 'test-tenant',
+            'sender_open_id' => 'ou_mismatch_owner',
+            'binding_id' => $binding->id,
+            'status' => 'completed',
+            'payload' => ['event' => ['message' => ['chat_type' => 'p2p']]],
+        ]);
+        FeishuFileUpload::create([
+            'inbound_event_id' => $event->id,
+            'binding_id' => $binding->id,
+            'stored_attachment_id' => $stored->id,
+            'conversation_key' => 'user:ou_mismatch_owner',
+            'file_key' => 'file_pending',
+            'status' => FeishuFileUpload::STATUS_PENDING,
+        ]);
+        $command = $this->messagePayload(
+            'event-mismatch-bind',
+            'ou_mismatch_owner',
+            '绑定附件 项目编号：XYC-ONE 合同编号：HT-TWO 类型：加工函附件',
+        );
+        $this->postJson('/webhooks/feishu/events', $command)->assertOk();
+        Http::fake([
+            'https://open.feishu.test/open-apis/auth/v3/tenant_access_token/internal' => Http::response([
+                'code' => 0, 'tenant_access_token' => 'fake-token', 'expire' => 7200,
+            ]),
+            'https://open.feishu.test/open-apis/im/v1/messages/*/reactions*' => Http::response([
+                'code' => 0, 'data' => ['reaction_id' => 'reaction_mismatch'],
+            ]),
+            'https://open.feishu.test/open-apis/im/v1/messages*' => Http::response([
+                'code' => 0, 'data' => ['message_id' => 'om_mismatch'],
+            ]),
+        ]);
+        $bindEvent = FeishuInboundEvent::where('event_id', 'event-mismatch-bind')->sole();
+
+        (new ProcessFeishuInboundEvent($bindEvent->id))->handle(
+            app(CreateFeishuAiRun::class),
+            app(FeishuProcessingReaction::class),
+        );
+
+        $this->assertSame([], $contract->fresh()->payload['contract_attachments']);
+        $this->assertSame(FeishuFileUpload::STATUS_PENDING, FeishuFileUpload::sole()->status);
+        $request = collect(Http::recorded())->first(
+            fn (array $exchange): bool => $exchange[0]->method() === 'POST'
+                && ($exchange[0]['msg_type'] ?? null) === 'interactive',
+        )[0];
+        $card = json_decode($request['content'], true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('附件尚未写入', data_get($card, 'header.title.content'));
+        $this->assertStringContainsString('合同不属于该项目', data_get($card, 'elements.0.content'));
+    }
+
+    public function test_disallowed_feishu_file_is_not_staged_or_sent_to_the_ai(): void
+    {
+        $owner = $this->userWithRole('business');
+        FeishuUserBinding::factory()->for($owner)->create([
+            'tenant_key' => 'test-tenant',
+            'open_id' => 'ou_invalid_file_owner',
+        ]);
+        $payload = $this->filePayload('event-invalid-file', 'ou_invalid_file_owner', '恶意程序.exe');
+        $this->postJson('/webhooks/feishu/events', $payload)->assertOk();
+        $event = FeishuInboundEvent::sole();
+        Http::fake([
+            'https://open.feishu.test/open-apis/auth/v3/tenant_access_token/internal' => Http::response([
+                'code' => 0, 'tenant_access_token' => 'fake-token', 'expire' => 7200,
+            ]),
+            'https://open.feishu.test/open-apis/im/v1/messages/*/resources/*' => Http::response(
+                "MZ\0\0executable",
+                200,
+                ['Content-Type' => 'application/octet-stream'],
+            ),
+            'https://open.feishu.test/open-apis/im/v1/messages/*/reactions*' => Http::response([
+                'code' => 0, 'data' => ['reaction_id' => 'reaction_invalid_file'],
+            ]),
+        ]);
+        $job = new ProcessFeishuInboundEvent($event->id);
+
+        try {
+            $job->handle(app(CreateFeishuAiRun::class), app(FeishuProcessingReaction::class));
+            $this->fail('Expected the attachment MIME allowlist to reject the file.');
+        } catch (\RuntimeException $exception) {
+            $job->failed($exception);
+        }
+
+        $this->assertSame('failed', $event->fresh()->status);
+        $this->assertDatabaseCount('stored_attachments', 0);
+        $this->assertDatabaseCount('feishu_file_uploads', 0);
+        $this->assertDatabaseCount('ai_runs', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles('attachments'));
+    }
+
     /** @return array<string, mixed> */
     private function messagePayload(string $eventId, string $openId, string $text): array
     {
@@ -759,6 +1042,19 @@ class FeishuBotIntegrationTest extends TestCase
                 ],
             ],
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function filePayload(string $eventId, string $openId, string $fileName): array
+    {
+        $payload = $this->messagePayload($eventId, $openId, '');
+        $payload['event']['message']['message_type'] = 'file';
+        $payload['event']['message']['content'] = json_encode([
+            'file_key' => 'file_contract_test',
+            'file_name' => $fileName,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+
+        return $payload;
     }
 
     private function project(User $owner, array $overrides): ObjectRecord
