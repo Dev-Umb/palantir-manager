@@ -7,6 +7,7 @@ use App\Models\ProjectNotification;
 use App\Models\TenderNotification;
 use App\Models\User;
 use Illuminate\Support\Number;
+use Illuminate\Support\Str;
 
 class FeishuMessageRenderer
 {
@@ -24,13 +25,116 @@ class FeishuMessageRenderer
                     'content' => 'Palantir · 项目查询',
                 ],
             ],
-            'elements' => [[
-                'tag' => 'div',
-                'text' => [
-                    'tag' => 'lark_md',
-                    'content' => $content === '' ? '查询完成，但没有可展示的结果。' : $content,
-                ],
-            ]],
+            'elements' => $this->aiReplyElements(
+                $content === '' ? '查询完成，但没有可展示的结果。' : $content,
+            ),
+        ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function aiReplyElements(string $content): array
+    {
+        $lines = preg_split('/\R/u', $content) ?: [];
+        $elements = [];
+        $paragraph = [];
+
+        $flushParagraph = function () use (&$elements, &$paragraph): void {
+            $text = trim(implode("\n", $paragraph));
+            if ($text !== '') {
+                $elements[] = $this->textElement($text);
+            }
+            $paragraph = [];
+        };
+
+        for ($index = 0; $index < count($lines); $index++) {
+            $line = trim($lines[$index]);
+            if ($line === '') {
+                $flushParagraph();
+
+                continue;
+            }
+
+            if (preg_match('/^#{1,6}\s+(.+)$/u', $line, $heading) === 1) {
+                $flushParagraph();
+                $elements[] = $this->textElement('**'.trim($heading[1]).'**');
+
+                continue;
+            }
+
+            if ($this->startsMarkdownTable($lines, $index)) {
+                $flushParagraph();
+                [$tableElements, $index] = $this->parseMarkdownTable($lines, $index);
+                array_push($elements, ...$tableElements);
+
+                continue;
+            }
+
+            $paragraph[] = $line;
+        }
+
+        $flushParagraph();
+
+        return $elements === [] ? [$this->textElement('查询完成，但没有可展示的结果。')] : $elements;
+    }
+
+    private function startsMarkdownTable(array $lines, int $index): bool
+    {
+        if (! isset($lines[$index + 1]) || ! Str::contains($lines[$index], '|')) {
+            return false;
+        }
+
+        $separator = trim($lines[$index + 1]);
+
+        return preg_match('/^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/u', $separator) === 1;
+    }
+
+    /** @return array{0: array<int, array<string, mixed>>, 1: int} */
+    private function parseMarkdownTable(array $lines, int $start): array
+    {
+        $headers = $this->tableCells($lines[$start]);
+        $rows = [];
+        $index = $start + 2;
+        while (isset($lines[$index]) && Str::contains($lines[$index], '|') && trim($lines[$index]) !== '') {
+            $rows[] = $this->tableCells($lines[$index]);
+            $index++;
+        }
+
+        $elements = [];
+        foreach ($rows as $rowIndex => $row) {
+            $fields = [];
+            foreach ($headers as $column => $header) {
+                $value = trim((string) ($row[$column] ?? '—'));
+                $fields[] = [
+                    'is_short' => $column !== 0,
+                    'text' => [
+                        'tag' => 'lark_md',
+                        'content' => '**'.trim($header)."**\n".($value !== '' ? $value : '—'),
+                    ],
+                ];
+            }
+            $elements[] = ['tag' => 'div', 'fields' => $fields];
+            if ($rowIndex < count($rows) - 1) {
+                $elements[] = ['tag' => 'hr'];
+            }
+        }
+
+        return [$elements, $index - 1];
+    }
+
+    /** @return string[] */
+    private function tableCells(string $line): array
+    {
+        return collect(explode('|', trim($line, " \t|")))
+            ->map(fn (string $cell): string => trim($cell))
+            ->all();
+    }
+
+    /** @return array{tag: string, text: array{tag: string, content: string}} */
+    private function textElement(string $content): array
+    {
+        return [
+            'tag' => 'div',
+            'text' => ['tag' => 'lark_md', 'content' => $content],
         ];
     }
 

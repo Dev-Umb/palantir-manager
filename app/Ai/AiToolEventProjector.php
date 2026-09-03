@@ -105,6 +105,8 @@ class AiToolEventProjector
             'list_visible_objects' => '正在读取可用数据范围',
             'get_object_record' => '正在读取记录详情',
             'query_object_records' => '正在查询'.$this->objectLabel($call->arguments['object'] ?? null),
+            'export_feishu_document' => '正在生成飞书云文档',
+            'export_feishu_spreadsheet' => '正在生成飞书电子表格',
             'present_user_choice' => '正在准备快捷选项',
             'present_user_form' => '正在准备补充资料卡片',
             'prepare_object_record_create' => '正在校验待写入资料',
@@ -134,6 +136,12 @@ class AiToolEventProjector
         }
         if ($tool === 'prepare_object_record_update') {
             return '修改草稿已准备，等待用户确认';
+        }
+        if ($tool === 'export_feishu_document') {
+            return '飞书云文档已生成';
+        }
+        if ($tool === 'export_feishu_spreadsheet') {
+            return '飞书电子表格已生成';
         }
 
         $label = $payload['object']['label'] ?? ($tool === 'list_visible_objects' ? '数据范围' : '记录');

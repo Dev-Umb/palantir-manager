@@ -272,7 +272,7 @@ class FeishuBotIntegrationTest extends TestCase
         $this->assertSame($binding->fresh()->conversation_id, $run->conversation_id);
         $toolNames = collect(FeishuDataAgent::make(user: $user)->tools())
             ->map(fn ($tool): string => $tool::class)->all();
-        $this->assertCount(3, $toolNames);
+        $this->assertCount(5, $toolNames);
         $this->assertNotContains(PrepareObjectRecordUpdateTool::class, $toolNames);
         Http::assertSent(fn ($request): bool => $request->method() === 'POST'
             && str_ends_with($request->url(), "/im/v1/messages/{$event->message_id}/reactions")
@@ -282,7 +282,7 @@ class FeishuBotIntegrationTest extends TestCase
             yield new TextDelta(
                 id: (string) Str::uuid7(),
                 messageId: (string) Str::uuid7(),
-                delta: "## 查询结果\n\n当前可见项目欠款合计 **75,000 元**，项目处于合同签署阶段。",
+                delta: "## 查询结果\n\n当前可见项目欠款合计 **75,000 元**。\n\n## 项目对照\n\n| 项目 | 业务员 | 欠款 |\n|---|---|---|\n| 祁离4标 | 渠宗元 | **75,000 元** |\n| 祁离高速 | 张晓云 | 20,000 元 |\n\n## 关注点\n\n- 优先跟进祁离4标",
                 timestamp: time(),
             );
         }, new Meta(provider: 'fake', model: 'fake-model'));
@@ -327,8 +327,15 @@ class FeishuBotIntegrationTest extends TestCase
         $this->assertSame('interactive', $replyRequest['msg_type']);
         $this->assertSame('Palantir · 项目查询', data_get($replyCard, 'header.title.content'));
         $this->assertSame('lark_md', data_get($replyCard, 'elements.0.text.tag'));
-        $this->assertStringContainsString('## 查询结果', (string) data_get($replyCard, 'elements.0.text.content'));
-        $this->assertStringContainsString('**75,000 元**', (string) data_get($replyCard, 'elements.0.text.content'));
+        $rendered = json_encode($replyCard['elements'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        $this->assertStringNotContainsString('##', $rendered);
+        $this->assertStringNotContainsString('|---|', $rendered);
+        $this->assertStringContainsString('**查询结果**', $rendered);
+        $this->assertStringContainsString('**项目**\\n祁离4标', $rendered);
+        $this->assertStringContainsString('**业务员**\\n渠宗元', $rendered);
+        $this->assertStringContainsString('**75,000 元**', $rendered);
+        $this->assertStringContainsString('祁离高速', $rendered);
+        $this->assertStringContainsString('优先跟进祁离4标', $rendered);
         Http::assertSent(fn ($request): bool => $request->method() === 'DELETE'
             && str_ends_with($request->url(), "/im/v1/messages/{$event->message_id}/reactions/reaction_typing_1"));
     }

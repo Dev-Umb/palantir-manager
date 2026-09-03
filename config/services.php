@@ -42,6 +42,15 @@ return [
         'app_secret' => env('FEISHU_APP_SECRET'),
         'verification_token' => env('FEISHU_VERIFICATION_TOKEN'),
         'tenant_key' => env('FEISHU_TENANT_KEY'),
+        'cli' => [
+            'enabled' => env('FEISHU_CLI_ENABLED', false),
+            'binary' => env('FEISHU_CLI_BINARY', 'lark-cli'),
+            'profile' => env('FEISHU_CLI_PROFILE', 'palantir'),
+            'timeout' => env('FEISHU_CLI_TIMEOUT', 45),
+            'max_rows' => env('FEISHU_CLI_MAX_ROWS', 200),
+            'max_columns' => env('FEISHU_CLI_MAX_COLUMNS', 20),
+            'max_payload_bytes' => env('FEISHU_CLI_MAX_PAYLOAD_BYTES', 200000),
+        ],
     ],
 
 ];

@@ -91,3 +91,12 @@
 - [x] 14.1 Hide read project and tender notifications from notification-center pagination while preserving persisted records, audit evidence and delivery state.
 - [x] 14.2 Update notification-center copy and cover single-read, read-all, unread-visible and reactivated-visible boundaries.
 - [x] 14.3 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate before deployment.
+
+## 15. Native AI result cards and Feishu file exports
+
+- [x] 15.1 Replace whole-answer `lark_md` rendering with semantic card elements for headings, paragraphs, lists and tables while retaining all answer text.
+- [x] 15.2 Add bounded `lark-cli` execution, configuration and error sanitization without shell interpolation or OpenClaw binding.
+- [x] 15.3 Add document and spreadsheet export tools that rerun queries through `XycDataAccess` using the initiating Palantir user.
+- [x] 15.4 Cover structured card rendering, authorized/denied/empty exports, payload bounds, CLI failure, tool availability and preserved private/group destinations.
+- [x] 15.5 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate.
+- [ ] 15.6 Deploy with a rollback point, install/configure the production CLI, restart workers, and verify existing bot queries plus one new document and spreadsheet export without modifying business records.

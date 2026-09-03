@@ -98,9 +98,48 @@ The system MUST accept P2P text messages and group text messages that explicitly
 #### Scenario: A successful AI query returns Markdown
 
 - **WHEN** a Feishu-origin AI Run completes with a Markdown answer
-- **THEN** the private reply MUST be sent as an interactive card containing a `lark_md` element
+- **THEN** the source-conversation reply MUST be sent as an interactive card whose headings, paragraphs, lists and tables are represented by supported native card elements
+- **AND** unsupported Markdown heading and table delimiter syntax MUST NOT remain visible to the user
 - **AND** the card MUST retain the complete answer instead of replacing it with a summary
 - **AND** failed AI Runs MUST retain the existing plain-text failure reply
+
+### Requirement: Bound users can export authorized query results to new Feishu files
+
+The system MUST allow a bound and authorized Feishu user to explicitly export a Palantir query result to a newly created Feishu cloud document or spreadsheet without granting access to arbitrary existing files.
+
+#### Scenario: A user requests a cloud document export
+
+- **WHEN** a bound user explicitly asks to export a supported Palantir query as a Feishu document
+- **THEN** the tool MUST rerun the query using that Palantir user's existing visibility and object permissions
+- **AND** MUST create one new bot-owned cloud document containing the result
+- **AND** MUST grant only the initiating bound Feishu user view access to the new document
+- **AND** MUST return its title, type, exported row count and clickable URL to the source conversation
+
+#### Scenario: A user requests a spreadsheet export
+
+- **WHEN** a bound user explicitly asks to export a supported Palantir query as a Feishu spreadsheet
+- **THEN** the tool MUST derive headers and values from the authorized server-side result
+- **AND** MUST create one new bot-owned spreadsheet with bounded rows, columns and payload size
+- **AND** MUST grant only the initiating bound Feishu user view access to the new spreadsheet
+- **AND** MUST return its title, type, exported row count and clickable URL to the source conversation
+
+#### Scenario: The requested data is forbidden or absent
+
+- **WHEN** the object is not visible, a field is invalid or the authorized query returns no rows
+- **THEN** the tool MUST NOT create a file
+- **AND** MUST return a clear non-success result without fabricating data
+
+#### Scenario: A prompt attempts to operate an existing Feishu file
+
+- **WHEN** a prompt asks the export tool to read, edit, move, overwrite or delete an existing file
+- **THEN** the tool MUST reject or remain unavailable for that operation
+- **AND** MUST NOT invoke a destructive CLI command
+
+#### Scenario: CLI support is disabled or unavailable
+
+- **WHEN** the production CLI feature flag is disabled, the executable is missing or the CLI returns an error
+- **THEN** existing Palantir queries, reminders and replies MUST continue to operate
+- **AND** the export request MUST return a sanitized actionable failure without exposing credentials
 
 #### Scenario: An authorized query starts processing
 
