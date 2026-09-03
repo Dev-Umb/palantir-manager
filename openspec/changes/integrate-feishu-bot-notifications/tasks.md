@@ -99,4 +99,4 @@
 - [x] 15.3 Add document and spreadsheet export tools that rerun queries through `XycDataAccess` using the initiating Palantir user.
 - [x] 15.4 Cover structured card rendering, authorized/denied/empty exports, payload bounds, CLI failure, tool availability and preserved private/group destinations.
 - [x] 15.5 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate.
-- [ ] 15.6 Deploy with a rollback point, install/configure the production CLI, restart workers, and verify existing bot queries plus one new document and spreadsheet export without modifying business records.
+- [x] 15.6 Deploy with a rollback point, install/configure the production CLI, restart workers, and verify existing bot queries plus one new document and spreadsheet export without modifying business records.
