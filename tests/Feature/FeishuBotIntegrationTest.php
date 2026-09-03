@@ -172,6 +172,104 @@ class FeishuBotIntegrationTest extends TestCase
         $this->assertStringContainsString('待补充', (string) data_get($card, 'elements.1.fields.4.text.content'));
     }
 
+    public function test_pending_reminders_for_one_recipient_are_sent_as_one_summary_card(): void
+    {
+        $owner = $this->userWithRole('business');
+        FeishuUserBinding::factory()->for($owner)->create([
+            'tenant_key' => 'test-tenant',
+            'open_id' => 'ou_digest_owner',
+        ]);
+        $paymentProject = $this->project($owner, [
+            'overall_status' => '合同签署',
+            'payment_progress' => 40,
+            'unpaid_amount' => 60000,
+        ]);
+        $paymentProject->update(['title' => '回款项目甲']);
+        $bidProject = $this->project($owner, ['overall_status' => '投标中']);
+        $bidProject->update(['title' => '投标项目乙']);
+        $payment = ProjectNotification::create([
+            'project_id' => $paymentProject->id,
+            'type' => ProjectNotification::TYPE_PAYMENT,
+            'user_id' => $owner->id,
+            'status' => ProjectNotification::STATUS_ACTIVE,
+            'triggered_at' => now(),
+            'occurrences' => 2,
+        ]);
+        $bid = ProjectNotification::create([
+            'project_id' => $bidProject->id,
+            'type' => ProjectNotification::TYPE_BID,
+            'user_id' => $owner->id,
+            'status' => ProjectNotification::STATUS_ACTIVE,
+            'triggered_at' => now(),
+            'occurrences' => 1,
+        ]);
+        $deliveries = collect([$payment, $bid])->map(fn (ProjectNotification $notification): NotificationDelivery => NotificationDelivery::factory()->for($owner)->create([
+            'source_type' => 'project_notification',
+            'source_id' => (string) $notification->id,
+            'occurrence' => $notification->occurrences,
+        ]));
+        Http::fake([
+            'https://open.feishu.test/open-apis/auth/v3/tenant_access_token/internal' => Http::response([
+                'code' => 0, 'tenant_access_token' => 'fake-token', 'expire' => 7200,
+            ]),
+            'https://open.feishu.test/open-apis/im/v1/messages*' => Http::response([
+                'code' => 0, 'data' => ['message_id' => 'om_digest'],
+            ]),
+        ]);
+
+        (new DeliverFeishuNotification($deliveries->first()->id))->handle(
+            app(FeishuClient::class),
+            app(FeishuMessageRenderer::class),
+        );
+        (new DeliverFeishuNotification($deliveries->last()->id))->handle(
+            app(FeishuClient::class),
+            app(FeishuMessageRenderer::class),
+        );
+
+        $messageRequests = collect(Http::recorded())->filter(
+            fn (array $exchange): bool => str_contains($exchange[0]->url(), '/im/v1/messages'),
+        );
+        $this->assertCount(1, $messageRequests);
+        $request = $messageRequests->first()[0];
+        $card = json_decode((string) $request['content'], true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('interactive', $request['msg_type']);
+        $this->assertSame('Palantir · 待办提醒汇总（2 项）', data_get($card, 'header.title.content'));
+        $this->assertStringContainsString('回款项目甲', data_get($card, 'elements.0.text.content'));
+        $this->assertStringContainsString('投标项目乙', data_get($card, 'elements.0.text.content'));
+        $this->assertStringContainsString('60,000', data_get($card, 'elements.0.text.content'));
+        $this->assertSame('https://palantir.example.test/notifications', data_get($card, 'elements.1.actions.0.url'));
+        foreach ($deliveries as $delivery) {
+            $this->assertSame(NotificationDelivery::STATUS_SENT, $delivery->fresh()->status);
+            $this->assertSame('om_digest', $delivery->fresh()->external_message_id);
+            $this->assertSame(1, $delivery->fresh()->attempts);
+        }
+    }
+
+    public function test_summary_card_bounds_visible_rows_and_reports_the_remaining_count(): void
+    {
+        $owner = $this->userWithRole('business');
+        $project = $this->project($owner, ['overall_status' => '投标中']);
+        $notification = ProjectNotification::create([
+            'project_id' => $project->id,
+            'type' => ProjectNotification::TYPE_BID,
+            'user_id' => $owner->id,
+            'status' => ProjectNotification::STATUS_ACTIVE,
+            'triggered_at' => now(),
+            'occurrences' => 1,
+        ]);
+        $deliveries = NotificationDelivery::factory()->count(21)->for($owner)->create([
+            'source_type' => 'project_notification',
+            'source_id' => (string) $notification->id,
+        ]);
+
+        $card = app(FeishuMessageRenderer::class)->renderBatchCard($deliveries);
+
+        $this->assertSame('Palantir · 待办提醒汇总（21 项）', data_get($card, 'header.title.content'));
+        $this->assertStringContainsString('还有 **1** 项未展开', data_get($card, 'elements.0.text.content'));
+        $this->assertStringContainsString('**20.', data_get($card, 'elements.0.text.content'));
+        $this->assertStringNotContainsString('**21.', data_get($card, 'elements.0.text.content'));
+    }
+
     public function test_non_payment_project_reminder_keeps_the_text_message_contract(): void
     {
         $owner = $this->userWithRole('business');

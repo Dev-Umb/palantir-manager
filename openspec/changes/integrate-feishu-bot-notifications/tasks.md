@@ -109,4 +109,11 @@
 - [x] 16.4 Render individual contract and processing-letter download links in the contract table while preserving download authorization.
 - [x] 16.5 Cover valid P2P and group flows, duplicate event/retry, MIME/size/storage failures, ambiguous/mismatched identifiers, permission denial, append preservation and manual download authorization.
 - [x] 16.6 Run focused backend/UI tests, Pint, strict OpenSpec validation, production build and full quality gate before deployment.
-- [ ] 16.7 After local evidence passes, create/configure a dedicated private versioned encrypted TOS bucket, deploy with rollback, migrate/restart workers, and run one explicitly scoped production smoke test.
+- [x] 16.7 After local evidence passes, create/configure a dedicated private versioned encrypted TOS bucket, deploy with rollback, migrate/restart workers, and run one explicitly scoped production smoke test.
+
+## 17. Consolidated Feishu reminder delivery
+
+- [x] 17.1 Consolidate all pending deliveries for one recipient into one bounded list card while preserving station records and occurrence idempotency.
+- [x] 17.2 Serialize per-recipient sends so concurrent queue jobs cannot duplicate a consolidated delivery.
+- [x] 17.3 Cover mixed reminder batching, one outbound message, shared delivery evidence, single-reminder preservation and overflow summary.
+- [ ] 17.4 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate, then hot-update production with rollback and online verification.

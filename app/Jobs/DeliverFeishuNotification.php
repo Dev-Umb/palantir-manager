@@ -9,6 +9,7 @@ use App\Models\NotificationDelivery;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 class DeliverFeishuNotification implements ShouldBeUnique, ShouldQueue
@@ -37,28 +38,49 @@ class DeliverFeishuNotification implements ShouldBeUnique, ShouldQueue
     public function handle(FeishuClient $client, FeishuMessageRenderer $renderer): void
     {
         $delivery = NotificationDelivery::findOrFail($this->deliveryId);
-        if ($delivery->status === NotificationDelivery::STATUS_SENT) {
+        if ($delivery->status !== NotificationDelivery::STATUS_PENDING) {
             return;
         }
 
-        $binding = FeishuUserBinding::active()->where('user_id', $delivery->user_id)->first();
-        if (! $binding) {
-            $delivery->update(['status' => NotificationDelivery::STATUS_SKIPPED, 'last_error' => 'recipient_not_bound']);
+        Cache::lock("feishu:notification-delivery:user:{$delivery->user_id}", 30)
+            ->block(10, function () use ($client, $delivery, $renderer): void {
+                $deliveries = NotificationDelivery::query()
+                    ->where('user_id', $delivery->user_id)
+                    ->where('channel', 'feishu')
+                    ->where('status', NotificationDelivery::STATUS_PENDING)
+                    ->orderBy('id')
+                    ->get();
+                if ($deliveries->isEmpty()) {
+                    return;
+                }
 
-            return;
-        }
+                $binding = FeishuUserBinding::active()->where('user_id', $delivery->user_id)->first();
+                if (! $binding) {
+                    NotificationDelivery::query()->whereKey($deliveries->modelKeys())->update([
+                        'status' => NotificationDelivery::STATUS_SKIPPED,
+                        'last_error' => 'recipient_not_bound',
+                    ]);
 
-        $delivery->increment('attempts');
-        $card = $renderer->renderCard($delivery);
-        $result = $card
-            ? $client->sendCard($binding->open_id, $card)
-            : $client->sendText($binding->open_id, $renderer->render($delivery));
-        $delivery->update([
-            'status' => NotificationDelivery::STATUS_SENT,
-            'external_message_id' => $result['message_id'],
-            'last_error' => null,
-            'sent_at' => now(),
-        ]);
+                    return;
+                }
+
+                NotificationDelivery::query()->whereKey($deliveries->modelKeys())->increment('attempts');
+                if ($deliveries->count() > 1) {
+                    $result = $client->sendCard($binding->open_id, $renderer->renderBatchCard($deliveries));
+                } else {
+                    $single = $deliveries->sole();
+                    $card = $renderer->renderCard($single);
+                    $result = $card
+                        ? $client->sendCard($binding->open_id, $card)
+                        : $client->sendText($binding->open_id, $renderer->render($single));
+                }
+                NotificationDelivery::query()->whereKey($deliveries->modelKeys())->update([
+                    'status' => NotificationDelivery::STATUS_SENT,
+                    'external_message_id' => $result['message_id'],
+                    'last_error' => null,
+                    'sent_at' => now(),
+                ]);
+            });
     }
 
     public function failed(?Throwable $exception): void

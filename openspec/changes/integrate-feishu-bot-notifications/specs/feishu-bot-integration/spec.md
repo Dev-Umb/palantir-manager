@@ -43,6 +43,23 @@ The system MUST hide read project and tender notifications from the notification
 - **WHEN** existing reminder synchronization reactivates an archived notification for a new occurrence and clears its read state
 - **THEN** the notification MUST become visible again without changing reminder eligibility or cadence
 
+### Requirement: Concurrent reminders are consolidated per recipient
+
+The system MUST consolidate pending Feishu reminder deliveries for the same recipient into one bounded interactive list card without changing reminder eligibility, occurrence idempotency or station notification records.
+
+#### Scenario: Several reminders become due together
+
+- **WHEN** multiple Feishu notification deliveries for one recipient are pending when delivery begins
+- **THEN** the system MUST send one interactive summary card instead of one message per reminder
+- **AND** every included delivery MUST record the same outbound Feishu message ID and terminal sent state
+- **AND** the card MUST identify each reminder and link project items to Palantir
+
+#### Scenario: The pending list exceeds the card display bound
+
+- **WHEN** more reminders are pending than can be safely rendered in one card
+- **THEN** the card MUST show a bounded leading list and the number of additional reminders
+- **AND** all consolidated deliveries MUST be represented by that single outbound message and remain available in the notification center
+
 ### Requirement: Payment reminders use an actionable project card
 
 The system MUST render Feishu project payment reminders as interactive cards while keeping the station notification and delivery lifecycle unchanged.

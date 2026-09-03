@@ -6,11 +6,14 @@ use App\Models\NotificationDelivery;
 use App\Models\ProjectNotification;
 use App\Models\TenderNotification;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 
 class FeishuMessageRenderer
 {
+    private const BATCH_VISIBLE_LIMIT = 20;
+
     /** @return array<string, mixed> */
     public function renderAiReplyCard(string $markdown): array
     {
@@ -207,6 +210,91 @@ class FeishuMessageRenderer
                 ],
             ],
         ];
+    }
+
+    /**
+     * @param  Collection<int, NotificationDelivery>  $deliveries
+     * @return array<string, mixed>
+     */
+    public function renderBatchCard(Collection $deliveries): array
+    {
+        $total = $deliveries->count();
+        $visible = $deliveries->take(self::BATCH_VISIBLE_LIMIT)
+            ->values()
+            ->map(fn (NotificationDelivery $delivery, int $index): string => $this->batchLine($delivery, $index + 1))
+            ->implode("\n\n");
+        $remaining = $total - min($total, self::BATCH_VISIBLE_LIMIT);
+        if ($remaining > 0) {
+            $visible .= "\n\n还有 **{$remaining}** 项未展开，请进入通知中心查看。";
+        }
+
+        return [
+            'config' => ['wide_screen_mode' => true],
+            'header' => [
+                'template' => 'orange',
+                'title' => [
+                    'tag' => 'plain_text',
+                    'content' => "Palantir · 待办提醒汇总（{$total} 项）",
+                ],
+            ],
+            'elements' => [
+                [
+                    'tag' => 'div',
+                    'text' => ['tag' => 'lark_md', 'content' => $visible],
+                ],
+                [
+                    'tag' => 'action',
+                    'actions' => [[
+                        'tag' => 'button',
+                        'type' => 'primary',
+                        'text' => ['tag' => 'plain_text', 'content' => '查看通知中心'],
+                        'url' => route('notifications.index'),
+                    ]],
+                ],
+            ],
+        ];
+    }
+
+    private function batchLine(NotificationDelivery $delivery, int $index): string
+    {
+        if ($delivery->source_type === 'project_notification') {
+            $notification = ProjectNotification::with('project')->findOrFail($delivery->source_id);
+            $project = $notification->project;
+            $payload = $project?->payload ?? [];
+            $labels = [
+                ProjectNotification::TYPE_BID => '投标跟进',
+                ProjectNotification::TYPE_PROCESSING_LETTER => '加工函跟进',
+                ProjectNotification::TYPE_SIGNATURE => '合同签署',
+                ProjectNotification::TYPE_PAYMENT => '项目回款',
+            ];
+            $title = $this->escapeMarkdown($project?->title ?? (string) $notification->project_id);
+            $detailUrl = route('objects.index', [
+                'object' => 'project',
+                'record' => $project?->id ?? $notification->project_id,
+                'mode' => 'detail',
+            ]);
+            $line = "**{$index}. [{$title}]({$detailUrl}) · ".($labels[$notification->type] ?? '项目提醒')."**\n";
+            $line .= '状态：'.$this->escapeMarkdown((string) data_get($payload, 'overall_status', '待补充'));
+            if ($notification->type === ProjectNotification::TYPE_PAYMENT) {
+                $businessOwnerId = filter_var(data_get($payload, 'business_owner_user_id'), FILTER_VALIDATE_INT);
+                $businessOwner = $businessOwnerId ? User::query()->whereKey($businessOwnerId)->value('name') : null;
+                $progress = data_get($payload, 'payment_progress');
+                $outstanding = data_get($payload, 'unpaid_amount', data_get($payload, 'arrears'));
+                $line .= '｜业务员：'.$this->escapeMarkdown($businessOwner ?: '待补充');
+                $line .= '｜回款进度：'.(is_numeric($progress) ? Number::percentage((float) $progress, maxPrecision: 2, locale: 'zh_CN') : '待补充');
+                $line .= '｜欠款：'.(is_numeric($outstanding) ? Number::currency((float) $outstanding, in: 'CNY', locale: 'zh_CN') : '待补充');
+            }
+
+            return $line.'｜提醒次数：'.$delivery->occurrence;
+        }
+
+        $notification = TenderNotification::with('tender')->findOrFail($delivery->source_id);
+        $title = $this->escapeMarkdown($notification->tender?->title ?? (string) $notification->tender_id);
+
+        return "**{$index}. {$title} · 招投标提醒**\n节点："
+            .$this->escapeMarkdown($notification->deadline_type)
+            .'｜阶段：'.$this->escapeMarkdown($notification->stage)
+            .'｜截止：'.($notification->deadline_at?->format('Y-m-d H:i') ?? '待补充');
     }
 
     public function render(NotificationDelivery $delivery): string
