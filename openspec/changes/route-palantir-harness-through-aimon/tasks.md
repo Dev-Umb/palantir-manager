@@ -13,5 +13,5 @@
 
 - [x] 3.1 Issue a dedicated Palantir production key after action-time confirmation.
 - [x] 3.2 Verify authenticated model discovery, plain Responses completion, and function-call continuation.
-- [ ] 3.3 Deploy with an environment backup, switch the provider, rebuild config cache, and restart workers.
-- [ ] 3.4 Verify the web and Feishu flows, Aimon trace attribution, and application health; roll back to Ark on failure.
+- [x] 3.3 Deploy with an environment backup, switch the provider, rebuild config cache, and restart workers.
+- [x] 3.4 Verify the web and Feishu agent flows, Aimon trace attribution, and application health; roll back to Ark on failure.
