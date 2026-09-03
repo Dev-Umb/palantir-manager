@@ -116,4 +116,4 @@
 - [x] 17.1 Consolidate all pending deliveries for one recipient into one bounded list card while preserving station records and occurrence idempotency.
 - [x] 17.2 Serialize per-recipient sends so concurrent queue jobs cannot duplicate a consolidated delivery.
 - [x] 17.3 Cover mixed reminder batching, one outbound message, shared delivery evidence, single-reminder preservation and overflow summary.
-- [ ] 17.4 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate, then hot-update production with rollback and online verification.
+- [x] 17.4 Run Pint, focused PHPUnit, strict OpenSpec validation and the full quality gate, then hot-update production with rollback and online verification.
