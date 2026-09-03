@@ -145,7 +145,7 @@ class FeishuCliClient
         $flat = Arr::dot($payload);
         $url = collect($flat)->first(fn (mixed $value, string $key): bool => is_string($value) && Str::contains($key, ['url', 'link']) && Str::startsWith($value, 'https://')
         );
-        $token = collect($flat)->first(fn (mixed $value, string $key): bool => is_string($value) && Str::contains($key, ['token', 'document_id', 'spreadsheet_token'])
+        $token = collect($flat)->first(fn (mixed $value, string $key): bool => is_string($value) && $value !== '' && Str::endsWith($key, ['document_id', 'spreadsheet_token'])
         );
         $title = collect($flat)->first(fn (mixed $value, string $key): bool => is_string($value) && Str::endsWith($key, 'title')
         );

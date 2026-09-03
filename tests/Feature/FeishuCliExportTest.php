@@ -53,6 +53,7 @@ class FeishuCliExportTest extends TestCase
                 'ok' => true,
                 'data' => [$isDocument ? 'document' : 'spreadsheet' => [
                     'title' => '项目欠款清单',
+                    'folder_token' => '',
                     $isDocument ? 'document_id' : 'spreadsheet_token' => $isDocument ? 'docx_test_1' : 'sht_test_1',
                     'url' => $isDocument
                         ? 'https://example.feishu.cn/docx/docx_test_1'
