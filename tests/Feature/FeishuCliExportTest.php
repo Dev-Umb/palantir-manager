@@ -96,13 +96,15 @@ class FeishuCliExportTest extends TestCase
         });
         Process::assertRan(function (PendingProcess $process): bool {
             $command = $process->command;
-            $headers = $command[array_search('--headers', $command, true) + 1] ?? '';
-            $values = $command[array_search('--values', $command, true) + 1] ?? '';
+            $sheets = json_decode((string) ($command[array_search('--sheets', $command, true) + 1] ?? ''), true);
 
             return in_array('sheets', $command, true)
-                && str_contains($headers, '名称')
-                && str_contains($headers, '欠款')
-                && str_contains($values, '祁离4标');
+                && data_get($sheets, 'sheets.0.name') === '数据'
+                && data_get($sheets, 'sheets.0.header') === true
+                && in_array('名称', data_get($sheets, 'sheets.0.columns', []), true)
+                && in_array('欠款', data_get($sheets, 'sheets.0.columns', []), true)
+                && data_get($sheets, 'sheets.0.dtypes.欠款') === 'float64'
+                && collect(data_get($sheets, 'sheets.0.data', []))->flatten()->contains('祁离4标');
         });
         Process::assertRanTimes(function (PendingProcess $process): bool {
             $command = $process->command;

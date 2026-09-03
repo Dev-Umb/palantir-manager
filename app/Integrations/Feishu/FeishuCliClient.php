@@ -31,10 +31,18 @@ class FeishuCliClient
      */
     public function createSpreadsheet(string $title, array $headers, array $rows, string $recipientOpenId): array
     {
+        $sheets = [
+            'sheets' => [[
+                'name' => '数据',
+                'header' => true,
+                'columns' => $headers,
+                'data' => $rows,
+                'dtypes' => $this->sheetDtypes($headers, $rows),
+            ]],
+        ];
         $payload = $this->run([
             'sheets', '+workbook-create', '--as', 'bot', '--title', $title,
-            '--headers', json_encode($headers, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-            '--values', json_encode($rows, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+            '--sheets', json_encode($sheets, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
             '--json',
         ]);
 
@@ -42,6 +50,25 @@ class FeishuCliClient
         $this->grantViewPermission($file, $recipientOpenId);
 
         return $file;
+    }
+
+    /**
+     * @param  string[]  $headers
+     * @param  array<int, array<int, scalar|null>>  $rows
+     * @return array<string, string>
+     */
+    private function sheetDtypes(array $headers, array $rows): array
+    {
+        return collect($headers)->mapWithKeys(function (string $header, int $column) use ($rows): array {
+            $values = collect($rows)->pluck($column)->filter(fn (mixed $value): bool => $value !== null);
+            $type = $values->isNotEmpty() && $values->every(fn (mixed $value): bool => is_bool($value))
+                ? 'boolean'
+                : ($values->isNotEmpty() && $values->every(fn (mixed $value): bool => is_int($value) || is_float($value))
+                    ? 'float64'
+                    : 'object');
+
+            return [$header => $type];
+        })->all();
     }
 
     /** @param array{title: string, type: string, url: string, token: string|null} $file */
