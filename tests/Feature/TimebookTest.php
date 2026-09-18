@@ -6,6 +6,7 @@ use App\Actions\SyncXycMetadata;
 use App\Ai\AiHistoryAuthorization;
 use App\Ai\AiToolEventProjector;
 use App\Ai\Tools\QueryTimebookTool;
+use App\Ai\XycDataAccess;
 use App\Ai\XycDataAgent;
 use App\Models\AiRun;
 use App\Models\BusinessObject;
@@ -261,5 +262,39 @@ class TimebookTest extends TestCase
         $this->get('/objects/project')->assertForbidden();
         $this->post('/logout');
         $this->post('/login', ['email' => $user->email, 'password' => 'password'])->assertRedirect('/timebook');
+    }
+
+    public function test_dedicated_operator_is_restricted_even_with_an_extra_admin_role(): void
+    {
+        config(['ai.harness_v2' => true]);
+        app(SyncXycMetadata::class)->handle();
+        $user = $this->user();
+        $user->roles()->first()->update(['name' => 'timebook_operator']);
+        $user->roles()->attach(Role::where('name', 'admin')->sole());
+        $user = $user->fresh();
+        $this->assertFalse($user->canDo('dashboard.view'));
+        $this->assertFalse($user->canDo('object.project.view'));
+        $this->actingAs($user)->get('/timebook')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('auth.password_only', true)->where('notificationUnreadCount', 0)
+            ->where('nav', fn ($nav) => collect($nav)->pluck('key')->all() === ['timebook', 'ai']));
+        $this->get('/ai')->assertOk();
+        $this->get('/settings')->assertOk();
+        foreach (['/', '/notifications', '/objects/project', '/objects/customer', '/admin/rbac', '/procurement-hub', '/ai/contracts', '/relation-options', '/purchase-request'] as $path) {
+            $this->getJson($path)->assertForbidden();
+        }
+        $this->putJson('/settings/email', [])->assertForbidden();
+        $this->put('/settings/password', ['current_password' => 'password', 'password' => 'Changed-Test-9876!', 'password_confirmation' => 'Changed-Test-9876!'])->assertRedirect('/settings');
+        $this->assertTrue($user->fresh()->is_password_changed);
+        $access = app(XycDataAccess::class);
+        $this->assertSame([], $access->visibleObjects($user));
+        foreach (BusinessObject::pluck('key') as $key) {
+            $this->assertFalse($access->queryRecords($user, ['object' => $key])['ok']);
+        }
+        $this->assertTrue(json_decode((new QueryTimebookTool($user))->handle(new Request([])), true)['ok']);
+        $this->post('/logout')->assertRedirect('/login');
+        $ordinary = User::factory()->create();
+        $ordinary->roles()->attach(Role::where('name', 'admin')->sole());
+        $this->actingAs($ordinary)->get('/')->assertOk();
+        $this->get('/notifications')->assertOk();
     }
 }

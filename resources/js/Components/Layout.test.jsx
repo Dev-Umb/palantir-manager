@@ -4,13 +4,15 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Layout from './Layout';
 
+const profile = vi.hoisted(() => ({ password_only: false, settings_url: '/settings' }));
+
 vi.mock('@inertiajs/react', () => ({
     Link: ({ href, children, ...props }) => <a href={href} {...props}>{children}</a>,
     router: { post: vi.fn() },
     usePage: () => ({
         url: '/objects/drawing',
         props: {
-            auth: { user: { name: '技术员' }, roles: [{ id: 1, label: '技术' }] },
+            auth: { ...profile, user: { name: '技术员', is_password_changed: true }, roles: [{ id: 1, label: '技术' }] },
             flash: {},
             nav: [{
                 key: 'ontology',
@@ -49,7 +51,13 @@ vi.mock('@inertiajs/react', () => ({
 }));
 
 describe('Layout workflow task navigation', () => {
-    afterEach(cleanup);
+    afterEach(() => { cleanup(); profile.password_only = false; });
+
+    it('keeps own password access for dedicated operators after the initial password change', () => {
+        profile.password_only = true;
+        render(<Layout title="工日簿"><div>内容</div></Layout>);
+        expect(screen.getByRole('link', { name: '修改密码' }).getAttribute('href')).toBe('/settings#password');
+    });
 
     it('shows flat business modules without expanding their table items', () => {
         render(<Layout title="工作台"><div>内容</div></Layout>);

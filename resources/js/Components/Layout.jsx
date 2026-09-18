@@ -20,7 +20,7 @@ const iconFor = {
 export default function Layout({ title, eyebrow, children, aside, immersive = false, hideHeader = false }) {
     const page = usePage();
     const { auth, nav, flash, notificationUnreadCount = 0 } = page.props;
-    const passwordChangeRequired = auth.user?.is_password_changed === false;
+    const passwordChangeRequired = auth.user?.is_password_changed === false || auth.password_only;
     const visibleNav = (nav || []).filter((item) => item.visible);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const preferredMobileKeys = ['dashboard', 'notifications', 'ontology'];
@@ -151,7 +151,7 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
             <main className={`workspace ${immersive ? 'workspace-immersive' : ''}`} style={immersive && passwordChangeRequired ? { gridTemplateRows: `${!hideHeader ? 'auto ' : ''}auto minmax(0, 1fr)` } : undefined}>
                 {passwordChangeRequired && (
                     <div className="password-reminder" role="status">
-                        <span>为保障账号安全，请修改密码。修改完成前将持续提醒。</span>
+                        <span>{auth.user?.is_password_changed === false ? '为保障账号安全，请修改密码。修改完成前将持续提醒。' : '工日簿专用账号'}</span>
                         <Link href={`${auth.settings_url}#password`}>修改密码</Link>
                     </div>
                 )}

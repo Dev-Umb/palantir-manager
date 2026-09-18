@@ -1,5 +1,8 @@
 # Design
 
+## Dedicated operator follow-up
+User requested one dedicated management account and approved retaining own password changes. Use an explicit timebook_operator role as a restrictive access profile; do not infer this restriction for other timebook users. Filter effective permissions centrally and restrict authenticated web routes before rendering. Reuse existing password page and RBAC grants, without schema or dependency changes. Business navigation has only timebook and AI; password link remains outside business navigation. Credentials are generated only at provisioning, never committed. This follows the user's approved two-entry scope and does not change existing accounts.
+
 ## Scope
 必须改变：工日簿原生模块、专用表、RBAC、AI 只读查询。必须保持：交接包记工口径及其他模块的路由、数据和权限。允许隐藏：原设密和独立登录。必须可见：录入、查询、汇总、XLSX、冲突和审计。禁止推断：工资、审批、多账本、自动合并姓名、AI 写入。
 

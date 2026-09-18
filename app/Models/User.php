@@ -53,6 +53,8 @@ class User extends Authenticatable
 
         return $this->permissionKeyCache = $roles
             ->flatMap(fn (Role $role) => $role->permissions->pluck('key'))
+            ->filter(fn (string $key) => ! $roles->contains('name', 'timebook_operator')
+                || in_array($key, ['timebook.view', 'timebook.create', 'timebook.update', 'timebook.delete', 'timebook.export', 'timebook.audit', 'timebook.ai.query', 'ai.harness.view'], true))
             ->unique()
             ->values()
             ->all();
@@ -61,5 +63,10 @@ class User extends Authenticatable
     public function canDo(string $permission): bool
     {
         return in_array($permission, $this->permissionKeys(), true);
+    }
+
+    public function isTimebookOperator(): bool
+    {
+        return $this->roles->contains('name', 'timebook_operator');
     }
 }

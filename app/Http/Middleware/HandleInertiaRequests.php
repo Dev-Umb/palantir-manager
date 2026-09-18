@@ -20,6 +20,12 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         $permissions = $user ? $user->permissionKeys() : [];
+        $passwordOnly = $user?->isTimebookOperator() ?? false;
+        if ($passwordOnly) {
+            abort_unless($request->routeIs('timebook.*', 'ai.index', 'ai.messages', 'ai.conversations.show',
+                'ai.runs.store', 'ai.runs.show', 'ai.runs.events', 'ai.runs.cancel',
+                'settings.index', 'settings.password', 'logout'), 403);
+        }
 
         if ($request->is('procurement-hub', 'procurement-hub/*')) {
             $canRead = HubAccess::canRead($user);
@@ -41,13 +47,14 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
+                'password_only' => $passwordOnly,
                 'user' => $user ? $user->only('id', 'name', 'email', 'is_password_changed') : null,
                 'roles' => $user ? $user->roles->sortBy('label')->map->only(['id', 'name', 'label'])->values() : [],
                 'permissions' => $permissions,
                 'settings_url' => $user ? route('settings.index') : null,
             ],
             'nav' => $user ? $this->navigation($request, $permissions) : [],
-            'notificationUnreadCount' => fn () => $user
+            'notificationUnreadCount' => fn () => $user && ! $passwordOnly
                 ? $this->unreadNotificationCount($user->id)
                 : 0,
             'flash' => ['status' => fn () => $request->session()->get('status')],
@@ -74,6 +81,12 @@ class HandleInertiaRequests extends Middleware
     {
         $can = fn (string $permission) => in_array($permission, $permissions, true);
         $roles = $request->user()?->roles->pluck('name')->all() ?? [];
+        if (in_array('timebook_operator', $roles, true)) {
+            return [
+                ['key' => 'timebook', 'label' => '工日簿', 'href' => route('timebook.index'), 'visible' => $can('timebook.view'), 'mobile_priority' => 25],
+                ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
+            ];
+        }
         $objects = BusinessObject::query()
             ->whereIn('key', BusinessWorkspace::TABLE_OBJECT_KEYS)
             ->withCount(['records as new_task_count' => function ($query) use ($roles): void {

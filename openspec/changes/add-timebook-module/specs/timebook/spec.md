@@ -1,5 +1,14 @@
 ## ADDED Requirements
 
+### Requirement: Dedicated operator isolation
+The explicit timebook_operator role MUST limit effective permissions to the seven timebook permissions and ai.harness.view, even when combined with another role. Its authenticated routes MUST allow only timebook, AI conversation/query, own password settings and logout. Other accounts MUST retain existing behavior.
+#### Scenario: Dedicated account navigation and direct access
+- **WHEN** a dedicated operator signs in
+- **THEN** only timebook and AI appear in business navigation, own password change remains accessible, and dashboard, notifications, objects, procurement and contract intake requests are denied
+#### Scenario: AI data boundary
+- **WHEN** a dedicated operator asks AI for other business data or receives another role
+- **THEN** non-timebook effective permissions remain absent and business query tools return no business data
+
 ### Requirement: AI 历史结果权限一致
 工日簿查询 MUST 将来源与查询指纹保存在 AI Run，并按工日簿专属权限校验历史读取和后续会话，不得套用通用业务对象授权。其他对象的历史授权规则 MUST 保持不变。
 

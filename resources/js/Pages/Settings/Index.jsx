@@ -27,7 +27,7 @@ export default function Index({ updateEmailUrl, updatePasswordUrl }) {
         <Layout title="用户设置" eyebrow="个人账号">
             <Head title="用户设置" />
             <div className="account-settings">
-                <section className="surface">
+                {!auth.password_only && <section className="surface">
                     <div className="section-head"><h2>登录账号</h2></div>
                     <p className="muted">{auth.user.name}，您可以修改自己的登录邮箱。角色和业务权限保持不变。</p>
                     <form className="account-form" aria-label="修改登录邮箱" onSubmit={updateEmail}>
@@ -44,7 +44,7 @@ export default function Index({ updateEmailUrl, updatePasswordUrl }) {
                         <div><button type="submit" disabled={emailForm.processing}>{emailForm.processing ? '保存中...' : '保存登录邮箱'}</button></div>
                         {emailForm.recentlySuccessful && <p role="status">登录邮箱已更新。</p>}
                     </form>
-                </section>
+                </section>}
                 <section className="surface" id="password">
                     <div className="section-head"><h2>修改密码</h2></div>
                     <p className="muted">新密码至少 8 位，不能与当前密码相同。</p>
