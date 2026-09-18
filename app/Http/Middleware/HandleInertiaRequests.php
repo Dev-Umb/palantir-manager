@@ -24,7 +24,7 @@ class HandleInertiaRequests extends Middleware
         if ($passwordOnly) {
             abort_unless($request->routeIs('timebook.*', 'ai.index', 'ai.messages', 'ai.conversations.show',
                 'ai.runs.store', 'ai.runs.show', 'ai.runs.events', 'ai.runs.cancel',
-                'settings.index', 'settings.password', 'logout'), 403);
+                'settings.index', 'settings.email', 'settings.password', 'logout'), 403);
         }
 
         if ($request->is('procurement-hub', 'procurement-hub/*')) {
@@ -85,6 +85,7 @@ class HandleInertiaRequests extends Middleware
             return [
                 ['key' => 'timebook', 'label' => '工日簿', 'href' => route('timebook.index'), 'visible' => $can('timebook.view'), 'mobile_priority' => 25],
                 ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
+                ['key' => 'settings', 'label' => '用户设置', 'href' => route('settings.index'), 'visible' => true, 'mobile_priority' => 90],
             ];
         }
         $objects = BusinessObject::query()

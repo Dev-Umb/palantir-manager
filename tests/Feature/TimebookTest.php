@@ -276,13 +276,20 @@ class TimebookTest extends TestCase
         $this->assertFalse($user->canDo('object.project.view'));
         $this->actingAs($user)->get('/timebook')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('auth.password_only', true)->where('notificationUnreadCount', 0)
-            ->where('nav', fn ($nav) => collect($nav)->pluck('key')->all() === ['timebook', 'ai']));
+            ->where('nav', fn ($nav) => collect($nav)->pluck('key')->all() === ['timebook', 'ai', 'settings']));
         $this->get('/ai')->assertOk();
         $this->get('/settings')->assertOk();
         foreach (['/', '/notifications', '/objects/project', '/objects/customer', '/admin/rbac', '/procurement-hub', '/ai/contracts', '/relation-options', '/purchase-request'] as $path) {
             $this->getJson($path)->assertForbidden();
         }
-        $this->putJson('/settings/email', [])->assertForbidden();
+        $this->putJson('/settings/email', ['email' => 'operator-new@example.test', 'current_password' => 'wrong'])->assertUnprocessable();
+        $other = User::factory()->create();
+        $this->putJson('/settings/email', ['email' => $other->email, 'current_password' => 'password'])->assertUnprocessable();
+        $permissions = $user->permissionKeys();
+        $this->put('/settings/email', ['email' => 'operator-new@example.test', 'current_password' => 'password', 'user_id' => $other->id])->assertRedirect('/settings');
+        $this->assertSame('operator-new@example.test', $user->fresh()->email);
+        $this->assertSame($other->email, $other->fresh()->email);
+        $this->assertSame($permissions, $user->fresh()->permissionKeys());
         $this->put('/settings/password', ['current_password' => 'password', 'password' => 'Changed-Test-9876!', 'password_confirmation' => 'Changed-Test-9876!'])->assertRedirect('/settings');
         $this->assertTrue($user->fresh()->is_password_changed);
         $access = app(XycDataAccess::class);
