@@ -146,6 +146,11 @@ class SyncXycMetadata
             }
         }
 
+        $timebookGrants = DB::table('permission_role')
+            ->whereIn('permission_id', $permissionByKey->filter(fn (Permission $permission) => str_starts_with($permission->key, 'timebook.'))->pluck('id'))
+            ->get(['role_id', 'permission_id'])->map(fn ($row) => (array) $row)->all();
+        $rows = collect([...$rows, ...$timebookGrants])->unique(fn ($row) => $row['role_id'].':'.$row['permission_id'])->values()->all();
+
         DB::table('permission_role')->delete();
 
         if ($rows) {

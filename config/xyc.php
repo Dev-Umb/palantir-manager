@@ -38,6 +38,13 @@ return [
     ],
 
     'permissions' => [
+        ['key' => 'timebook.view', 'module' => 'timebook', 'action' => 'view', 'label' => '查看工日簿'],
+        ['key' => 'timebook.create', 'module' => 'timebook', 'action' => 'create', 'label' => '新增记工'],
+        ['key' => 'timebook.update', 'module' => 'timebook', 'action' => 'update', 'label' => '修改记工'],
+        ['key' => 'timebook.delete', 'module' => 'timebook', 'action' => 'delete', 'label' => '删除及恢复记工'],
+        ['key' => 'timebook.export', 'module' => 'timebook', 'action' => 'export', 'label' => '导出工日簿'],
+        ['key' => 'timebook.audit', 'module' => 'timebook', 'action' => 'audit', 'label' => '查看记工留痕'],
+        ['key' => 'timebook.ai.query', 'module' => 'timebook', 'action' => 'ai.query', 'label' => 'AI 只读查询工日簿'],
         ['key' => 'dashboard.view', 'module' => 'dashboard', 'action' => 'view', 'label' => '查看大盘'],
         ['key' => 'requisition.create', 'module' => 'quick', 'action' => 'create', 'label' => '提交采购申请'],
         ['key' => 'ai.harness.view', 'module' => 'ai', 'action' => 'view', 'label' => '使用 AI 数据助手'],

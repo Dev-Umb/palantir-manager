@@ -73,6 +73,10 @@ class AuthController extends Controller
 
     private function loginFallback(User $user): string
     {
+        if ($user->canDo('timebook.view') && ! $user->canDo('dashboard.view') && ! $user->canDo('object.project.view')) {
+            return route('timebook.index');
+        }
+
         $roles = $user->roles()->pluck('name');
         $isBusinessOnly = $roles->contains('business')
             && $roles->intersect(['admin', 'finance', 'tender'])->isEmpty();

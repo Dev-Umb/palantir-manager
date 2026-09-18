@@ -51,6 +51,13 @@ class AiHistoryAuthorization
 
         foreach ($provenance as $source) {
             $key = $source['object_key'] ?? '';
+            if ($key === 'timebook') {
+                if (! $user->canDo('timebook.view') || ! $user->canDo('timebook.ai.query')) {
+                    return false;
+                }
+
+                continue;
+            }
             if (! $user->canDo("object.{$key}.view")) {
                 return false;
             }

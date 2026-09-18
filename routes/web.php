@@ -26,6 +26,8 @@ Route::post('/webhooks/feishu/events', FeishuEventController::class)
     ->middleware('throttle:feishu-webhook')
     ->name('webhooks.feishu.events');
 
+require __DIR__.'/timebook.php';
+
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/login', [AuthController::class, 'authenticate'])->middleware('throttle:login')->name('login.store');

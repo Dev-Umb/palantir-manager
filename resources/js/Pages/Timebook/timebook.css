@@ -1,0 +1,31 @@
+.timebook { display: grid; gap: 18px; min-width: 0; }
+.timebook .timebook-section { padding: 20px; min-width: 0; }
+.timebook h2 { margin: 0 0 16px; font-size: 19px; }
+.timebook-totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.timebook-totals section { padding: 18px; display: grid; gap: 8px; }
+.timebook-totals strong { font-size: 26px; }
+.timebook-totals small { font-size: 13px; font-weight: 400; }
+.timebook-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.timebook fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.timebook label { display: grid; gap: 7px; min-width: 0; }
+.timebook input, .timebook select { width: 100%; min-width: 0; padding: 10px; border: 1px solid #cbd5e1; border-radius: 7px; background: white; color: #172033; }
+.timebook-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin: 10px 0; }
+.timebook button { min-height: 40px; padding: 7px 12px; border: 1px solid #cbd5e1; border-radius: 7px; background: white; color: #172033; cursor: pointer; }
+.timebook button[aria-pressed="true"], .timebook button[type="submit"] { background: #172033; color: white; }
+.timebook button:disabled { opacity: .5; cursor: default; }
+.timebook :focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.timebook-hint { font-size: 13px; color: #526173; line-height: 1.6; }
+.timebook-table { overflow-x: auto; max-width: 100%; margin: 15px 0; }
+.timebook table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.timebook th, .timebook td { padding: 11px; border-bottom: 1px solid #e2e8f0; text-align: left; min-width: 100px; vertical-align: top; max-width: 320px; overflow-wrap: anywhere; }
+.timebook th { white-space: nowrap; background: #f1f5f9; }
+.timebook td.timebook-actions { min-width: 220px; }
+.timebook-modal { position: fixed; inset: 0; z-index: 100; background: #17203380; display: grid; place-items: center; padding: 16px; }
+.timebook-modal > section { background: white; color: #172033; border-radius: 12px; padding: 24px; width: min(720px, 100%); max-height: 85vh; overflow-y: auto; overflow-wrap: anywhere; }
+.timebook-modal article { border-bottom: 1px solid #e2e8f0; padding: 10px 0; }
+@media (max-width: 700px) {
+    .timebook-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .timebook-form { grid-template-columns: 1fr; }
+    .timebook .timebook-section { padding: 14px; }
+    .timebook button { min-height: 44px; }
+}

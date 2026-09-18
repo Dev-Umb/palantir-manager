@@ -103,6 +103,7 @@ class AiToolEventProjector
     {
         return match ($call->name) {
             'list_visible_objects' => '正在读取可用数据范围',
+            'query_timebook' => '正在查询工日簿',
             'get_object_record' => '正在读取记录详情',
             'query_object_records' => '正在查询'.$this->objectLabel($call->arguments['object'] ?? null),
             'export_feishu_document' => '正在生成飞书云文档',

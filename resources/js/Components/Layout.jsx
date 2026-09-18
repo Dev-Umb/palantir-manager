@@ -14,6 +14,7 @@ const iconFor = {
     rbac: ShieldCheck,
     settings: Settings,
     ai: Bot,
+    timebook: ClipboardCheck,
 };
 
 export default function Layout({ title, eyebrow, children, aside, immersive = false, hideHeader = false }) {
