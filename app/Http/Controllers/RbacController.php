@@ -4,12 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Actions\DeleteRbacUser;
 use App\Actions\UpdateRbacUserRoles;
+use App\Http\Requests\ResetUserPasswordRequest;
 use App\Models\AuditLog;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,6 +33,7 @@ class RbacController extends Controller
 
                 return [
                     ...$user->toArray(),
+                    'reset_password_url' => route('rbac.users.password', $user),
                     'can_delete' => $blockReason === null,
                     'delete_block_reason' => $blockReason,
                 ];
@@ -52,6 +56,27 @@ class RbacController extends Controller
         $delete->handle($user, $request->user());
 
         return back()->with('status', '用户已删除。');
+    }
+
+    public function resetPassword(ResetUserPasswordRequest $request, User $user): RedirectResponse
+    {
+        DB::transaction(function () use ($request, $user): void {
+            $target = User::query()->lockForUpdate()->findOrFail($user->id);
+            $target->password = $request->validated('password');
+            $target->is_password_changed = false;
+            $target->setRememberToken(Str::random(60));
+            $target->save();
+
+            AuditLog::query()->create([
+                'user_id' => $request->user()->id,
+                'action' => 'rbac.user_password.reset',
+                'subject_type' => User::class,
+                'subject_id' => (string) $target->id,
+                'payload' => [],
+            ]);
+        });
+
+        return back()->with('status', '密码已重置，该用户需重新修改密码。');
     }
 
     public function updateRolePermissions(Request $request, Role $role): RedirectResponse

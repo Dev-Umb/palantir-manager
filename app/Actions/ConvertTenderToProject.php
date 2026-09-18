@@ -9,6 +9,7 @@ use App\Models\Role;
 use App\Models\TenderNotification;
 use App\Models\User;
 use App\Support\ObjectRelations;
+use App\Support\ProjectVisibility;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -17,6 +18,7 @@ class ConvertTenderToProject
     public function __construct(
         private CreateObjectRecord $records,
         private ObjectRelations $relations,
+        private ProjectVisibility $visibility,
     ) {}
 
     public function handle(ObjectRecord $tender, User $assignee, User $actor): ObjectRecord
@@ -38,6 +40,7 @@ class ConvertTenderToProject
                 ->with('businessObject')
                 ->lockForUpdate()
                 ->findOrFail($tender->id);
+            abort_unless($this->visibility->allowsRecordWrite($actor, $lockedTender), 403);
             if ($lockedTender->businessObject?->key !== 'tender') {
                 throw ValidationException::withMessages([
                     'tender' => '只能流转招投标记录。',

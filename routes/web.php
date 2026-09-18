@@ -1,11 +1,15 @@
 <?php
 
+use App\Http\Controllers\AccountSettingsController;
+use App\Http\Controllers\AiContractIntakeController;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\AiRunController;
 use App\Http\Controllers\AiWriteProposalController;
 use App\Http\Controllers\AttachmentController;
+use App\Http\Controllers\AttachmentPreviewController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FeishuEventController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OntologyController;
 use App\Http\Controllers\ProjectContractAmountController;
@@ -17,6 +21,10 @@ use App\Http\Controllers\RequisitionController;
 use App\Http\Controllers\ShopFloorController;
 use App\Http\Controllers\TenderConversionController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/webhooks/feishu/events', FeishuEventController::class)
+    ->middleware('throttle:feishu-webhook')
+    ->name('webhooks.feishu.events');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');
@@ -40,6 +48,10 @@ Route::post('/team-log/public', [ShopFloorController::class, 'publicTeamLogStore
     ->name('team-logs.public.store');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/settings', [AccountSettingsController::class, 'index'])->name('settings.index');
+    Route::put('/settings/email', [AccountSettingsController::class, 'updateEmail'])->middleware('throttle:6,1')->name('settings.email');
+    Route::put('/settings/password', [AccountSettingsController::class, 'updatePassword'])->middleware('throttle:6,1')->name('settings.password');
+
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/', DashboardController::class)->middleware('permission:dashboard.view')->name('dashboard');
@@ -50,6 +62,14 @@ Route::middleware('auth')->group(function () {
         ->name('tender-notifications.read');
     Route::middleware('permission:ai.harness.view')->group(function () {
         Route::get('/ai', [AiController::class, 'index'])->name('ai.index');
+        Route::get('/ai/contracts', [AiContractIntakeController::class, 'index'])->name('ai.contracts.index');
+        Route::get('/ai/contracts/projects', [AiContractIntakeController::class, 'projects'])->name('ai.contracts.projects');
+        Route::get('/ai/contracts/projects/{project}', [AiContractIntakeController::class, 'project'])->name('ai.contracts.project');
+        Route::post('/ai/contracts', [AiContractIntakeController::class, 'store'])->middleware('throttle:ai-post')->name('ai.contracts.store');
+        Route::get('/ai/contracts/{intake}', [AiContractIntakeController::class, 'show'])->name('ai.contracts.show');
+        Route::post('/ai/contracts/{intake}/retry', [AiContractIntakeController::class, 'retry'])->middleware('throttle:ai-post')->name('ai.contracts.retry');
+        Route::post('/ai/contracts/{intake}/preview', [AiContractIntakeController::class, 'preview'])->middleware('throttle:ai-post')->name('ai.contracts.preview');
+        Route::post('/ai/contracts/{intake}/confirm', [AiContractIntakeController::class, 'confirm'])->middleware('throttle:ai-post')->name('ai.contracts.confirm');
         Route::post('/ai/runs', [AiRunController::class, 'store'])->middleware('throttle:ai-post')->name('ai.runs.store');
         Route::get('/ai/runs/{run}', [AiRunController::class, 'show'])->name('ai.runs.show');
         Route::get('/ai/runs/{run}/events', [AiRunController::class, 'events'])->name('ai.runs.events');
@@ -63,6 +83,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/ai/messages', [AiController::class, 'messages'])->middleware('throttle:ai-post')->name('ai.messages');
         Route::get('/ai/conversations/{conversation}', [AiController::class, 'show'])->name('ai.conversations.show');
     });
+    Route::get('/attachment-previews/{record}/{field}/{index?}', [AttachmentPreviewController::class, 'show'])
+        ->whereNumber('index')->name('attachments.preview');
+    Route::get('/attachment-content/{record}/{field}/{index?}', [AttachmentPreviewController::class, 'content'])
+        ->whereNumber('index')->name('attachments.content');
     Route::get('/attachments/{record}/{field}/{index?}', AttachmentController::class)
         ->whereNumber('index')
         ->name('attachments.download');
@@ -107,9 +131,12 @@ Route::middleware('auth')->group(function () {
         ->name('tenders.convert');
 
     Route::middleware('permission:rbac.manage')->group(function () {
+        Route::put('/admin/users/{user}/password', [RbacController::class, 'resetPassword'])->middleware('throttle:6,1')->name('rbac.users.password');
         Route::get('/admin/rbac', [RbacController::class, 'index'])->name('rbac.index');
         Route::put('/admin/users/{user}/roles', [RbacController::class, 'updateUserRoles'])->name('rbac.users.roles');
         Route::delete('/admin/users/{user}', [RbacController::class, 'destroyUser'])->name('rbac.users.destroy');
         Route::put('/admin/roles/{role}/permissions', [RbacController::class, 'updateRolePermissions'])->name('rbac.roles.permissions');
     });
 });
+
+require __DIR__.'/procurement_hub.php';

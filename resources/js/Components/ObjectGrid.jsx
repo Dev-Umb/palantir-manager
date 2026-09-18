@@ -7,6 +7,7 @@ import { Check, Eye, EyeOff, Pencil, Trash2, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { businessText } from '../businessLanguage';
 import ComboBox from './ComboBox';
+import AttachmentTray from './AttachmentTray';
 import CustomerContactCell from './CustomerContactCell';
 import FeedbackDialog from './FeedbackDialog';
 import { FieldControl } from './FieldControl';
@@ -150,7 +151,7 @@ export default function ObjectGrid({
                         <CustomerContactCell
                             contacts={record.contacts || []}
                             customerName={record.title || '当前客户'}
-                            canCreate={canCreateContact}
+                            canCreate={canCreateContact && params.data.__record.can_update !== false}
                             onOpen={() => onContactOpen?.(record)}
                             onCreate={() => onContactCreate?.(record)}
                         />
@@ -453,6 +454,7 @@ function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOp
 
 function GridActions({ object, record, can, onDelete, recordListHref }) {
     const canUpdate = can.update && record.can_update !== false;
+    const canDelete = can.delete && record.can_delete !== false;
     const detailObjectKey = object.key === 'project_business_summary' ? 'project' : object.key;
     function approve() {
         router.post(`/requests/${record.id}/approve`, {}, { preserveScroll: true });
@@ -508,12 +510,12 @@ function GridActions({ object, record, can, onDelete, recordListHref }) {
                             <XCircle size={14} /> 驳回
                         </button>
                     ),
-                    can.delete && (
+                    canDelete && (
                         <button key="delete" type="button" className="danger" onClick={destroy} aria-label={`删除 ${record.code}`}>
                             <Trash2 size={14} /> 删除
                         </button>
                     ),
-                    !canUpdate && !can.delete && (
+                    !canUpdate && !canDelete && (
                         <span key="readonly" className="row-action-readonly"><EyeOff size={14} /> 只读</span>
                     ),
                 ].filter(Boolean)}
@@ -589,11 +591,26 @@ function renderValue(object, field, record, value, relationOptions, row = null) 
         const text = Array.isArray(record?.display?.[field.key]) ? record.display[field.key].join('、') : '';
         return text ? <span title={text}>{text}</span> : <span className="empty-value">—</span>;
     }
+    if (record?.attachment_previews?.[field.key]?.length) return <AttachmentTray compact files={record.attachment_previews[field.key]} label={field.label} />;
     if (field.type === 'file') return <a className="relation-chip" href={record?.display?.[field.key] || value} target="_blank" rel="noreferrer">查看附件</a>;
     if (field.type === 'files') {
         const attachments = Array.isArray(record?.display?.[field.key]) ? record.display[field.key] : [];
         return attachments.length
-            ? <span title={`${attachments.length} 个附件`}>{attachments.length} 个附件</span>
+            ? (
+                <span className="attachment-links" title={`${attachments.length} 个附件`}>
+                    {attachments.map((url, index) => (
+                        <a
+                            className="relation-chip"
+                            href={url}
+                            key={url}
+                            target="_blank"
+                            rel="noreferrer"
+                        >
+                            下载{index + 1}
+                        </a>
+                    ))}
+                </span>
+            )
             : <span className="empty-value">—</span>;
     }
     if (field.type === 'account') {

@@ -19,3 +19,5 @@ Schedule::command('xyc:sync-tender-notifications')
 Schedule::command('xyc:sync-tender-notifications')
     ->dailyAt('13:40')
     ->withoutOverlapping();
+
+Schedule::command('hub:sync')->twiceDaily(0, 12)->timezone('Asia/Shanghai')->withoutOverlapping();

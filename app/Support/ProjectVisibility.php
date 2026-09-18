@@ -15,7 +15,7 @@ class ProjectVisibility
     {
         $roles = $this->roles($user);
 
-        if (in_array('admin', $roles, true) || in_array('finance', $roles, true)) {
+        if ($this->hasGlobalBusinessView($user) || in_array('admin', $roles, true) || in_array('finance', $roles, true)) {
             return $query;
         }
 
@@ -34,6 +34,11 @@ class ProjectVisibility
         BusinessObject $object,
         User $user,
     ): Builder|Relation {
+        if ($this->hasGlobalBusinessView($user)
+            && in_array($object->key, BusinessWorkspace::RETAINED_OBJECT_KEYS, true)) {
+            return $query;
+        }
+
         if ($object->key === 'project') {
             return $this->scope($query, $user);
         }
@@ -113,6 +118,10 @@ class ProjectVisibility
 
     public function allowsProjectUpdate(User $user, ObjectRecord $project): bool
     {
+        if ($this->hasGlobalBusinessView($user)) {
+            return (string) ($project->payload['business_owner_user_id'] ?? '') === (string) $user->id;
+        }
+
         $roles = $this->roles($user);
         if (in_array('admin', $roles, true) || in_array('finance', $roles, true)) {
             return true;
@@ -138,15 +147,78 @@ class ProjectVisibility
         );
     }
 
-    /** @return array<int, string> */
-    public function visibleProjectIds(User $user): array
+    public function hasGlobalBusinessView(User $user): bool
+    {
+        return in_array('business_manager_view', $this->roles($user), true);
+    }
+
+    /** Additional ownership restriction; object and field permissions are checked by callers. */
+    public function allowsRecordWrite(User $user, ObjectRecord $record): bool
+    {
+        if (! $this->hasGlobalBusinessView($user)) {
+            return $this->allowsRecord($user, $record);
+        }
+
+        $record->loadMissing('businessObject');
+
+        return match ($record->businessObject?->key) {
+            'project' => $this->allowsProjectUpdate($user, $record),
+            'customer' => $this->allowsCustomerWrite($user, $record),
+            'customer_contact' => ($customer = ObjectRecord::query()
+                ->whereRelation('businessObject', 'key', 'customer')
+                ->find($record->payload['customer_id'] ?? ''))
+                && $this->allowsCustomerWrite($user, $customer),
+            'tender' => (string) $record->created_by === (string) $user->id,
+            default => false,
+        };
+    }
+
+    public function allowsCustomerWrite(User $user, ObjectRecord $customer): bool
+    {
+        return $this->customerWritePermissions($user, [$customer->id])[$customer->id] ?? false;
+    }
+
+    /** @param array<int, string> $customerIds
+     * @return array<string, bool>
+     */
+    public function customerWritePermissions(User $user, array $customerIds): array
+    {
+        if ($customerIds === []) {
+            return [];
+        }
+
+        $customers = ObjectRecord::query()->whereRelation('businessObject', 'key', 'customer')
+            ->whereKey($customerIds)->get(['id', 'created_by']);
+        $projects = ObjectRecord::query()->whereRelation('businessObject', 'key', 'project')
+            ->whereIn('payload->customer_id', $customerIds)->get(['payload'])
+            ->groupBy('payload.customer_id');
+
+        return $customers->mapWithKeys(function (ObjectRecord $customer) use ($projects, $user): array {
+            $linked = $projects->get($customer->id, collect());
+            $hasForeign = $linked->contains(fn (ObjectRecord $project): bool => (string) ($project->payload['business_owner_user_id'] ?? '') !== (string) $user->id);
+
+            return [$customer->id => ! $hasForeign
+                && ($linked->isNotEmpty() || (string) $customer->created_by === (string) $user->id)];
+        })->all();
+    }
+
+    /**
+     * @param  array<int, string>|null  $projectIds
+     * @return array<int, string>
+     */
+    public function visibleProjectIds(User $user, ?array $projectIds = null): array
     {
         $project = BusinessObject::where('key', 'project')->first();
         if (! $project) {
             return [];
         }
 
-        return $this->scope($project->records(), $user)
+        $query = $this->scope($project->records(), $user);
+        if ($projectIds !== null) {
+            $query->whereIn('id', $projectIds);
+        }
+
+        return $query
             ->pluck('id')
             ->all();
     }

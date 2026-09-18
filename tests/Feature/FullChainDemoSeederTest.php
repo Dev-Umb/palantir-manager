@@ -98,7 +98,7 @@ class FullChainDemoSeederTest extends TestCase
             ->active()
             ->exists());
         $this->assertSame(
-            [ProjectNotification::TYPE_SIGNATURE, ProjectNotification::TYPE_PAYMENT],
+            [ProjectNotification::TYPE_SIGNATURE],
             ProjectNotification::query()
                 ->where('project_id', $this->scenarioProject('letter_due')->id)
                 ->active()

@@ -64,5 +64,8 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(10)->by('ai:user:'.($request->user()?->id ?? 'guest')),
             Limit::perMinute(30)->by('ai:ip:'.$request->ip()),
         ]);
+        RateLimiter::for('feishu-webhook', fn (Request $request): array => [
+            Limit::perMinute(120)->by('feishu-webhook:'.$request->ip()),
+        ]);
     }
 }

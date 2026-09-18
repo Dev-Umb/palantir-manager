@@ -6,11 +6,13 @@ use App\Actions\SyncProjectNotifications;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\ProjectNotification;
+use App\Models\ProjectReminderState;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -305,8 +307,9 @@ class BusinessContractWorkflowTest extends TestCase
             'overall_status' => '已拿到加工函',
             'contract_status' => '已有加工函',
             'processing_letter_at' => now()->subMonthNoOverflow()->toISOString(),
-            'payment_reminder_anchor_at' => now()->subMonthNoOverflow()->toISOString(),
+            'last_payment_date' => now()->subMonthNoOverflow()->toDateString(),
             'payment_status' => '部分回款',
+            'unpaid_amount' => 100000,
         ]);
 
         $sync = app(SyncProjectNotifications::class);
@@ -330,6 +333,155 @@ class BusinessContractWorkflowTest extends TestCase
         $this->assertTrue(ProjectNotification::query()->where('user_id', $admin->id)->exists());
         $this->assertTrue(ProjectNotification::query()->where('user_id', $finance->id)->where('type', ProjectNotification::TYPE_PAYMENT)->exists());
         $this->assertFalse(ProjectNotification::query()->where('user_id', $informed->id)->exists());
+    }
+
+    public function test_microsecond_status_anchor_does_not_reset_a_second_precision_reminder_state(): void
+    {
+        Carbon::setTestNow('2026-09-01 09:00:00');
+        $this->userWithRole('admin', '管理员');
+        $business = $this->userWithRole('business', '业务员');
+        $project = $this->project($business, '微秒锚点项目', [
+            'overall_status' => '投标中',
+            'overall_status_changed_at' => '2026-08-17T09:00:00.438925Z',
+        ]);
+        $sync = app(SyncProjectNotifications::class);
+
+        $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
+        DB::table('project_reminder_states')
+            ->where('project_id', $project->id)
+            ->where('type', ProjectNotification::TYPE_BID)
+            ->update(['anchor_at' => '2026-08-17 09:00:00']);
+
+        $second = $sync->handleProjects([$project->id]);
+        $occurrences = ProjectNotification::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $business->id)
+            ->value('occurrences');
+        $this->assertSame(0, $second['triggered']);
+        $this->assertSame(1, $occurrences);
+    }
+
+    public function test_opening_notification_center_does_not_run_reminder_synchronization(): void
+    {
+        Carbon::setTestNow('2026-09-01 09:00:00');
+        $admin = $this->userWithRole('admin', '管理员');
+        $business = $this->userWithRole('business', '业务员');
+        $this->project($business, '通知页只读项目', [
+            'overall_status' => '投标中',
+            'overall_status_changed_at' => now()->subDays(15)->toISOString(),
+        ]);
+
+        $this->actingAs($admin)->get('/notifications')->assertOk();
+
+        $this->assertDatabaseEmpty('project_reminder_states');
+        $this->assertDatabaseEmpty('project_notifications');
+        $this->assertDatabaseEmpty('notification_deliveries');
+    }
+
+    public function test_payment_reminder_requires_an_eligible_stage_positive_debt_and_a_month_old_valid_last_payment_date(): void
+    {
+        Carbon::setTestNow('2026-09-01 09:00:00');
+        $this->userWithRole('admin', '管理员');
+        $this->userWithRole('finance', '财务');
+        $owner = $this->userWithRole('business', '业务员');
+        $anchor = now()->subMonthNoOverflow()->toDateString();
+        $processing = $this->project($owner, '加工函阶段未回款', [
+            'overall_status' => '已拿到加工函',
+            'contract_status' => '已有加工函',
+            'last_payment_date' => $anchor,
+            'payment_status' => '未回款',
+            'unpaid_amount' => 100000,
+        ]);
+        $signed = $this->project($owner, '合同签署阶段部分回款', [
+            'overall_status' => '合同签署',
+            'contract_status' => '已签署',
+            'last_payment_date' => $anchor,
+            'payment_status' => '部分回款',
+            'unpaid_amount' => 50000,
+        ]);
+        $early = $this->project($owner, '早期阶段未回款', [
+            'overall_status' => '已中标',
+            'last_payment_date' => $anchor,
+            'payment_status' => '未回款',
+            'unpaid_amount' => 100000,
+        ]);
+        $noDebt = $this->project($owner, '加工函阶段无欠款', [
+            'overall_status' => '已拿到加工函',
+            'last_payment_date' => $anchor,
+            'payment_status' => '部分回款',
+            'unpaid_amount' => 0,
+        ]);
+        $missingDate = $this->project($owner, '加工函阶段缺少末次回款日期', [
+            'overall_status' => '已拿到加工函',
+            'unpaid_amount' => 100000,
+        ]);
+        $invalidDate = $this->project($owner, '加工函阶段末次回款日期无效', [
+            'overall_status' => '已拿到加工函',
+            'last_payment_date' => '不是日期',
+            'unpaid_amount' => 100000,
+        ]);
+        $notDue = $this->project($owner, '加工函阶段未满自然月', [
+            'overall_status' => '已拿到加工函',
+            'last_payment_date' => now()->subMonthNoOverflow()->addDay()->toDateString(),
+            'unpaid_amount' => 100000,
+        ]);
+
+        $result = app(SyncProjectNotifications::class)->handleProjects([
+            $processing->id, $signed->id, $early->id, $noDebt->id,
+            $missingDate->id, $invalidDate->id, $notDue->id,
+        ]);
+
+        $this->assertSame(2, $result['triggered']);
+        $this->assertSame(3, ProjectNotification::where('project_id', $processing->id)->where('type', ProjectNotification::TYPE_PAYMENT)->count());
+        $this->assertSame(3, ProjectNotification::where('project_id', $signed->id)->where('type', ProjectNotification::TYPE_PAYMENT)->count());
+        $this->assertFalse(ProjectNotification::whereIn('project_id', [
+            $early->id, $noDebt->id, $missingDate->id, $invalidDate->id, $notDue->id,
+        ])->where('type', ProjectNotification::TYPE_PAYMENT)->exists());
+        $this->assertSame(1, $processing->fresh()->payload['collection_count']);
+        $this->assertSame(1, $signed->fresh()->payload['collection_count']);
+    }
+
+    public function test_incomplete_payment_repeats_every_fifteen_days_after_the_first_natural_month(): void
+    {
+        Carbon::setTestNow('2026-02-28 09:00:00');
+        $this->userWithRole('admin', '管理员');
+        $this->userWithRole('finance', '财务');
+        $owner = $this->userWithRole('business', '业务员');
+        $project = $this->project($owner, '十五天重复回款提醒项目', [
+            'overall_status' => '合同签署',
+            'contract_status' => '已签署',
+            'last_payment_date' => '2026-01-31',
+            'payment_reminder_anchor_at' => '2026-02-27T09:00:00Z',
+            'payment_status' => '部分回款',
+            'unpaid_amount' => 75000,
+        ]);
+        $sync = app(SyncProjectNotifications::class);
+
+        $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
+        $this->assertSame(1, $project->fresh()->payload['collection_count']);
+        $this->assertSame(1, ProjectNotification::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $owner->id)
+            ->value('occurrences'));
+
+        $nextDueAt = ProjectReminderState::query()
+            ->where('project_id', $project->id)
+            ->where('type', ProjectNotification::TYPE_PAYMENT)
+            ->firstOrFail()
+            ->next_due_at;
+        $this->assertSame(15.0, now()->diffInDays($nextDueAt));
+
+        Carbon::setTestNow($nextDueAt->copy()->subSecond());
+        $this->assertSame(0, $sync->handleProjects([$project->id])['triggered'], 'Reminder triggered before the 15-day due time.');
+
+        Carbon::setTestNow($nextDueAt);
+        $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
+        $this->assertSame(2, $project->fresh()->payload['collection_count']);
+        $this->assertSame(2, ProjectNotification::query()
+            ->where('project_id', $project->id)
+            ->where('user_id', $owner->id)
+            ->value('occurrences'));
+        $this->assertSame(0, $sync->handleProjects([$project->id])['triggered'], 'Reminder duplicated in the same 15-day cycle.');
     }
 
     public function test_project_filters_support_top_level_and_or_logic(): void
@@ -571,38 +723,49 @@ class BusinessContractWorkflowTest extends TestCase
     {
         Carbon::setTestNow('2026-02-28 09:00:00');
         $admin = $this->userWithRole('admin', '管理员');
-        $finance = $this->userWithRole('finance', '财务');
+        $this->userWithRole('finance', '财务');
         $owner = $this->userWithRole('business', '业务员');
         $project = $this->project($owner, '月末回款项目', [
-            'overall_status' => '已拿到加工函',
-            'contract_status' => '已有加工函',
-            'processing_letter_at' => '2026-01-31T09:00:00+08:00',
-            'payment_reminder_anchor_at' => '2026-01-31T09:00:00+08:00',
+            'overall_status' => '合同签署',
+            'contract_status' => '已签署',
+            'last_payment_date' => '2026-01-31',
             'payment_status' => '部分回款',
+            'unpaid_amount' => 100000,
         ]);
         $sync = app(SyncProjectNotifications::class);
         $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
         $this->assertSame(1, $project->fresh()->payload['collection_count']);
 
-        $payload = [...$project->fresh()->payload, 'paid_amount' => 50000];
-        $this->actingAs($finance)->put("/records/{$project->id}", ['payload' => $payload])->assertRedirect();
+        $project->update(['payload' => [
+            ...$project->fresh()->payload,
+            'last_payment_date' => '2026-02-28',
+            'paid_amount' => 50000,
+            'unpaid_amount' => 50000,
+        ]]);
+        $this->assertSame(0, $sync->handleProjects([$project->id])['triggered']);
         $this->assertSame(0, ProjectNotification::query()->where('project_id', $project->id)->active()->count());
 
         Carbon::setTestNow('2026-03-28 09:00:00');
         $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
         $this->assertSame(2, $project->fresh()->payload['collection_count']);
 
-        $this->actingAs($finance)->put("/records/{$project->id}", ['payload' => [
-            ...$project->fresh()->payload, 'payment_status' => '已回款',
-        ]])->assertRedirect();
+        $project->update(['payload' => [
+            ...$project->fresh()->payload,
+            'payment_status' => '部分回款',
+            'unpaid_amount' => 0,
+        ]]);
+        $this->assertSame(0, $sync->handleProjects([$project->id])['triggered']);
         $this->assertSame(0, ProjectNotification::query()->where('project_id', $project->id)->active()->count());
 
         Carbon::setTestNow('2026-04-02 09:00:00');
-        $this->actingAs($finance)->put("/records/{$project->id}", ['payload' => [
-            ...$project->fresh()->payload, 'payment_status' => '部分回款',
-        ]])->assertRedirect();
+        $project->update(['payload' => [
+            ...$project->fresh()->payload,
+            'last_payment_date' => '2026-04-02',
+            'unpaid_amount' => 25000,
+        ]]);
+        $this->assertSame(0, $sync->handleProjects([$project->id])['triggered']);
         Carbon::setTestNow('2026-05-02 09:00:00');
-        $this->assertSame(2, $sync->handleProjects([$project->id])['triggered']);
+        $this->assertSame(1, $sync->handleProjects([$project->id])['triggered']);
         $this->assertSame(3, $project->fresh()->payload['collection_count']);
 
         $this->actingAs($owner)->put("/records/{$project->id}", ['payload' => [

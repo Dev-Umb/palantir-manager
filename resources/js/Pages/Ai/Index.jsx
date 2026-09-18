@@ -1,3 +1,4 @@
+import './ContractIntake.css';
 import { Head } from '@inertiajs/react';
 import {
     Bot,
@@ -23,8 +24,11 @@ import { getEcho } from '../../echo';
 import { applyRunEvent, isTerminal, normalizeRun } from './runState';
 
 const Artifact = lazy(() => import('./Artifacts'));
+const HtmlReportReader = lazy(() => import('./Artifacts').then((module) => ({ default: module.HtmlReportReader })));
+const ContractIntake = lazy(() => import('./ContractIntake'));
 
-export default function AiIndex({ conversations: initialConversations }) {
+export default function AiIndex({ conversations: initialConversations, canUploadContracts = false }) {
+    const [contractUploadOpen, setContractUploadOpen] = useState(false);
     const [conversations, setConversations] = useState(initialConversations || []);
     const [conversationId, setConversationId] = useState(null);
     const [runs, setRuns] = useState([]);
@@ -33,6 +37,26 @@ export default function AiIndex({ conversations: initialConversations }) {
     const [posting, setPosting] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
     const [connection, setConnection] = useState('idle');
+    const [reportSelection, setReportSelection] = useState(null);
+    const reportOpenerRef = useRef(null);
+    const reportRun = runs.find((run) => run.id === reportSelection?.runId);
+    const selectedReport = reportRun?.artifacts?.find((artifact) => artifact.id === reportSelection?.artifactId && artifact.type === 'html');
+
+    const closeReport = useCallback(() => {
+        setReportSelection(null);
+    }, []);
+
+    useEffect(() => {
+        if (!selectedReport) {
+            if (reportOpenerRef.current?.isConnected) reportOpenerRef.current.focus();
+            reportOpenerRef.current = null;
+        }
+    }, [selectedReport]);
+
+    function openReport(runId, artifact, opener) {
+        reportOpenerRef.current = opener;
+        setReportSelection({ runId, artifactId: artifact.id });
+    }
     const endRef = useRef(null);
     const scrollRef = useRef(null);
     const composerRef = useRef(null);
@@ -184,16 +208,19 @@ export default function AiIndex({ conversations: initialConversations }) {
     }
 
     async function openConversation(id) {
+        setReportSelection(null);
         setError('');
         setHistoryOpen(false);
         const response = await fetch(`/ai/conversations/${id}`, { headers: { Accept: 'application/json' } });
         if (!response.ok) return;
         const data = await response.json();
+        setReportSelection(null);
         setConversationId(id);
         setRuns(data.runs?.length ? data.runs.map(normalizeRun) : legacyRuns(data.messages || []));
     }
 
     function newConversation() {
+        setReportSelection(null);
         setConversationId(null);
         setRuns([]);
         setMessage('');
@@ -217,6 +244,7 @@ export default function AiIndex({ conversations: initialConversations }) {
     return (
         <Layout title="AI 数据助手" eyebrow="AI 数据助手" immersive hideHeader>
             <Head title="AI 数据助手" />
+            {contractUploadOpen && <Suspense fallback={<p role="status">正在打开合同上传…</p>}><ContractIntake onClose={() => setContractUploadOpen(false)} /></Suspense>}
             <div className="ai-v2-shell">
                 <header className="ai-v2-toolbar">
                     <div className="ai-v2-toolbar-main">
@@ -228,9 +256,10 @@ export default function AiIndex({ conversations: initialConversations }) {
                             <span><ConnectionDot state={connection} />{connectionLabel(connection, activeRun)}</span>
                         </div>
                     </div>
-                    <button className="ghost-button" type="button" onClick={newConversation}>
-                        <Plus size={16} /> 新对话
-                    </button>
+                    <div className="ai-contract-toolbar">
+                        {canUploadContracts && <button className="ghost-button" type="button" onClick={() => setContractUploadOpen(true)}>上传项目合同</button>}
+                        <button className="ghost-button" type="button" onClick={newConversation}><Plus size={16} /> 新对话</button>
+                    </div>
                 </header>
 
                 <aside className={`ai-history-drawer ${historyOpen ? 'open' : ''}`} aria-hidden={!historyOpen}>
@@ -261,49 +290,64 @@ export default function AiIndex({ conversations: initialConversations }) {
                 </aside>
                 {historyOpen && <button className="ai-drawer-backdrop" type="button" onClick={() => setHistoryOpen(false)} aria-label="关闭对话历史" />}
 
-                <main className="ai-thread-view">
-                    <div className="ai-thread-scroll" ref={scrollRef} onScroll={handleThreadScroll}>
-                        {runs.length === 0 ? <AiEmptyState onPrompt={setMessage} /> : runs.map((run) => (
-                            <RunTurn
-                                key={run.id}
-                                run={run}
-                                onRetry={() => sendMessage(null, run.input, run.id)}
-                                onQuickReply={(value) => sendMessage(null, value)}
-                                onProposalAction={(proposalId, action) => handleProposalAction(run.id, proposalId, action)}
-                            />
-                        ))}
-                        {error && <div className="ai-inline-error"><CircleAlert size={16} />{error}</div>}
-                        <div ref={endRef} />
-                    </div>
-
-                    <form className="ai-composer" onSubmit={sendMessage}>
-                        <textarea
-                            ref={composerRef}
-                            value={message}
-                            onChange={(event) => setMessage(event.target.value)}
-                            onKeyDown={handleComposerKeyDown}
-                            rows={1}
-                            placeholder="询问项目、采购、生产或回款数据"
-                            aria-label="发送给数据分析助手"
-                        />
-                        <div className="ai-composer-actions">
-                            {activeRun && (
-                                <button className="ai-stop-button" type="button" onClick={cancelRun} title="停止当前任务">
-                                    <Square size={15} fill="currentColor" />
-                                </button>
-                            )}
-                            <button className="ai-send-button" type="submit" disabled={posting || !message.trim()} title="发送">
-                                {posting ? <LoaderCircle className="spin" size={18} /> : <SendHorizontal size={18} />}
-                            </button>
+                <div className={`ai-reading-layout ${selectedReport ? 'has-report' : ''}`}>
+                    <main className="ai-thread-view">
+                        <div className="ai-thread-scroll" ref={scrollRef} onScroll={handleThreadScroll}>
+                            {runs.length === 0 ? <AiEmptyState onPrompt={setMessage} /> : runs.map((run) => (
+                                <RunTurn
+                                    key={run.id}
+                                    run={run}
+                                    onOpenReport={(artifact, opener) => openReport(run.id, artifact, opener)}
+                                    onRetry={() => sendMessage(null, run.input, run.id)}
+                                    onQuickReply={(value) => sendMessage(null, value)}
+                                    onProposalAction={(proposalId, action) => handleProposalAction(run.id, proposalId, action)}
+                                />
+                            ))}
+                            {error && <div className="ai-inline-error"><CircleAlert size={16} />{error}</div>}
+                            <div ref={endRef} />
                         </div>
-                    </form>
-                </main>
+
+                        <form className="ai-composer" onSubmit={sendMessage}>
+                            <textarea
+                                ref={composerRef}
+                                value={message}
+                                onChange={(event) => setMessage(event.target.value)}
+                                onKeyDown={handleComposerKeyDown}
+                                rows={1}
+                                placeholder="查询项目、业务员回款，或上传项目合同"
+                                aria-label="发送给数据分析助手"
+                            />
+                            <div className="ai-composer-actions">
+                                {activeRun && (
+                                    <button className="ai-stop-button" type="button" onClick={cancelRun} title="停止当前任务">
+                                        <Square size={15} fill="currentColor" />
+                                    </button>
+                                )}
+                                <button className="ai-send-button" type="submit" disabled={posting || !message.trim()} title="发送">
+                                    {posting ? <LoaderCircle className="spin" size={18} /> : <SendHorizontal size={18} />}
+                                </button>
+                            </div>
+                        </form>
+                    </main>
+                    {selectedReport && (
+                        <Suspense fallback={<div className="ai-waiting" role="status">正在打开报告</div>}>
+                            <HtmlReportReader artifact={selectedReport} onClose={closeReport}>
+                                {reportRun.data_quality?.length > 0 && <DataQuality items={reportRun.data_quality} />}
+                                {reportRun.sources?.length > 0 && <Sources items={reportRun.sources} />}
+                                {reportRun.status === 'failed' && <p role="alert">{reportRun.error?.message || '分析未完成，报告可能不完整。'}</p>}
+                            </HtmlReportReader>
+                        </Suspense>
+                    )}
+                </div>
             </div>
         </Layout>
     );
 }
 
-function RunTurn({ run, onRetry, onQuickReply, onProposalAction }) {
+export function RunTurn({ run, onRetry, onQuickReply, onProposalAction, onOpenReport }) {
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const queryArtifacts = (run.artifacts || []).filter((artifact) => ['table', 'chart'].includes(artifact.type));
+    const visibleArtifacts = (run.artifacts || []).filter((artifact) => !['table', 'chart'].includes(artifact.type));
     const active = ['queued', 'running'].includes(run.status);
 
     return (
@@ -331,16 +375,37 @@ function RunTurn({ run, onRetry, onQuickReply, onProposalAction }) {
                         </div>
                     )}
                     {!run.answer && active && <div className="ai-waiting"><LoaderCircle className="spin" size={15} />正在准备回答</div>}
-                    {run.artifacts?.map((artifact) => (
+                    {visibleArtifacts.map((artifact) => (
                         <Suspense key={artifact.id} fallback={<div className="ai-waiting">正在加载结果视图</div>}>
                             <Artifact
                                 artifact={artifact}
+                                onOpenReport={onOpenReport}
                                 onQuickReply={onQuickReply}
                                 onProposalAction={onProposalAction}
                                 canAct={!active}
                             />
                         </Suspense>
                     ))}
+                    {queryArtifacts.length > 0 && (
+                        <section className="ai-query-details">
+                            <button
+                                type="button"
+                                aria-expanded={detailsOpen}
+                                aria-controls={`query-details-${run.id}`}
+                                onClick={() => setDetailsOpen((value) => !value)}
+                            >
+                                <ChevronDown size={15} className={detailsOpen ? 'open' : ''} />
+                                查询明细和图表 <span>{queryArtifacts.length} 项</span>
+                            </button>
+                            <div id={`query-details-${run.id}`} hidden={!detailsOpen}>
+                                {detailsOpen && queryArtifacts.map((artifact) => (
+                                    <Suspense key={artifact.id} fallback={<div className="ai-waiting">正在加载查询明细</div>}>
+                                        <Artifact artifact={artifact} />
+                                    </Suspense>
+                                ))}
+                            </div>
+                        </section>
+                    )}
                     {run.data_quality?.length > 0 && <DataQuality items={run.data_quality} />}
                     {run.sources?.length > 0 && <Sources items={run.sources} />}
                     {run.status === 'failed' && (
@@ -415,7 +480,7 @@ function Sources({ items }) {
 }
 
 function AiEmptyState({ onPrompt }) {
-    const prompts = ['帮我提交一张采购申请', '帮我填写今天的班组日报', '本月欠款最高的 5 个项目'];
+    const prompts = ['我的项目当前未回款合计多少', '当前未回款最多的 5 个项目', '帮我上传并识别项目合同'];
     return (
         <div className="ai-v2-empty">
             <div className="ai-empty-mark"><Bot size={22} /></div>

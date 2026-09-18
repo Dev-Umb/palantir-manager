@@ -5,6 +5,7 @@ namespace App\Ai;
 use DomainException;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
+use TijsVerkoyen\CssToInlineStyles\CssToInlineStyles;
 
 class HtmlArtifactSanitizer
 {
@@ -37,7 +38,13 @@ class HtmlArtifactSanitizer
             ->dropElement('base')
             ->withMaxInputLength(self::MAX_BYTES);
 
-        $sanitized = (new HtmlSanitizer($config))->sanitize($html);
+        $styledHtml = preg_match('/<\s*style\b/i', $html)
+            ? (new CssToInlineStyles)->convert($html)
+            : $html;
+        if (strlen($styledHtml) > self::MAX_BYTES) {
+            throw new DomainException('HTML artifact exceeds the 100KB limit after applying styles.');
+        }
+        $sanitized = (new HtmlSanitizer($config))->sanitize($styledHtml);
 
         return [
             'html' => $sanitized,

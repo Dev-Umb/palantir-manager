@@ -28,6 +28,7 @@ return [
         ['name' => 'basic', 'label' => '基础角色', 'description' => '默认注册角色：只看大盘和提交采购申请。', 'locked' => false],
         ['name' => 'admin', 'label' => '管理', 'description' => '系统管理、RBAC、全部对象权限。', 'locked' => true],
         ['name' => 'business', 'label' => '业务', 'description' => '客户、合同和项目推进。', 'locked' => false],
+        ['name' => 'business_manager_view', 'label' => '业务管理查看', 'description' => '查看全部业务数据，仅维护本人归属且原有权限允许的数据；共享客户只读。', 'locked' => true],
         ['name' => 'engineering', 'label' => '技术', 'description' => '图纸设计、拆解和请购；不访问项目主档。', 'locked' => false],
         ['name' => 'procurement', 'label' => '采购', 'description' => '采购申请、采购单和到货处理。', 'locked' => false],
         ['name' => 'production_manager', 'label' => '生产负责人', 'description' => '维护生产班组、成员和生产信息。', 'locked' => false],
@@ -47,6 +48,15 @@ return [
         'basic' => ['dashboard.view', 'requisition.create', 'ai.harness.view'],
         'admin' => ['*'],
         'business' => ['dashboard.view', 'ai.harness.view'],
+        'business_manager_view' => [
+            'dashboard.view',
+            'object.customer.view',
+            'object.customer_contact.view',
+            'object.tender.view',
+            'object.project.view',
+            'object.project_business_summary.view',
+            'object.contract.view',
+        ],
         'engineering' => ['dashboard.view', 'requisition.create', 'ai.harness.view'],
         'procurement' => ['dashboard.view', 'ai.harness.view'],
         'production_manager' => ['dashboard.view', 'requisition.create', 'ai.harness.view'],
@@ -193,6 +203,7 @@ return [
         [
             'key' => 'contract', 'label' => '合同表', 'group' => '业务与合同', 'code_prefix' => 'HT', 'title_field' => 'code', 'roles' => ['business'], 'write_roles' => [],
             'fields' => [
+                $field('business_owner_name', '负责业务员', 'lookup', ['readonly' => true, 'source' => 'project_business_owner']),
                 $code('contract_no', '合同编号'),
                 $relation('customer_id', '客户', 'customer', ['required' => true]),
                 $relation('project_id', '项目名称', 'project', ['required' => true]),

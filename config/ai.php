@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('AI_PROVIDER', 'ark'),
+    'default' => env('AI_PROVIDER', 'aimon'),
     'default_for_images' => 'gemini',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
@@ -53,6 +53,20 @@ return [
     */
 
     'providers' => [
+        'aimon' => [
+            'driver' => 'openai',
+            'key' => env('AIMON_API_KEY'),
+            'url' => env('AIMON_BASE_URL', 'https://aimon.umb.ink/v1'),
+            'store' => false,
+            'models' => [
+                'text' => [
+                    'default' => env('AIMON_MODEL', 'gpt-6-astra'),
+                    'cheapest' => env('AIMON_MODEL', 'gpt-6-astra'),
+                    'smartest' => env('AIMON_MODEL', 'gpt-6-astra'),
+                ],
+            ],
+        ],
+
         'ark' => [
             'driver' => 'ark-openai',
             'key' => env('ARK_API_KEY'),

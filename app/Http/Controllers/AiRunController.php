@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Ai\AiHistoryAuthorization;
 use App\Ai\AiRunContextFactory;
 use App\Ai\AiRunEventPublisher;
 use App\Ai\AiRunRequestFingerprint;
@@ -14,7 +15,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\ConversationStore;
-use Laravel\Ai\Models\Conversation;
 
 class AiRunController extends Controller
 {
@@ -51,8 +51,9 @@ class AiRunController extends Controller
 
         if (filled($data['conversation_id'] ?? null)) {
             abort_unless(
-                Conversation::whereKey($data['conversation_id'])->where('user_id', $request->user()->id)->exists(),
+                app(AiHistoryAuthorization::class)->allowsConversation($request->user(), $data['conversation_id']),
                 403,
+                AiHistoryAuthorization::MESSAGE,
             );
         }
 
@@ -123,6 +124,8 @@ class AiRunController extends Controller
         if ($created) {
             RunAiHarness::dispatch($run->id);
         }
+
+        $this->authorizeRun($request, $run);
 
         return $this->createdResponse($run);
     }
@@ -199,7 +202,7 @@ class AiRunController extends Controller
 
     private function authorizeRun(Request $request, AiRun $run): void
     {
-        abort_unless($run->user_id === $request->user()->id, 403);
+        abort_unless(app(AiHistoryAuthorization::class)->allowsRun($request->user(), $run), 403, AiHistoryAuthorization::MESSAGE);
     }
 
     private function assertHarnessEnabled(): void

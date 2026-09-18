@@ -24,7 +24,7 @@ class ProjectCustomerController extends Controller
 
     public function show(Request $request, ObjectRecord $customer): JsonResponse
     {
-        $this->authorizeCustomerManager($request);
+        abort_unless($request->user()->canDo('object.customer.view'), 403);
         $this->guardObject($customer, 'customer');
         $this->guardVisible($request, $customer);
         $this->relations->preloadLabels(collect([$customer]), $request->user());
@@ -67,6 +67,7 @@ class ProjectCustomerController extends Controller
         $contact = DB::transaction(function () use ($customer, $data, $contactData, $request, $writer): ?ObjectRecord {
             $this->relations->lockReferenceGraph();
             $locked = ObjectRecord::query()->lockForUpdate()->findOrFail($customer->id);
+            abort_unless($this->projectVisibility->allowsRecordWrite($request->user(), $locked), 403);
             $before = $locked->payload ?? [];
             $payload = $writer->normalizePayload($locked->businessObject, [...$before, ...$data], $before);
             $locked->update(['payload' => $payload, 'title' => $data['name']]);
@@ -96,6 +97,7 @@ class ProjectCustomerController extends Controller
         $this->guardObject($customer, 'customer');
         $this->guardVisible($request, $customer);
         $data = $this->contactData($request);
+        abort_unless($this->projectVisibility->allowsRecordWrite($request->user(), $customer), 403);
         $contact = $writer->handle(
             BusinessObject::where('key', 'customer_contact')->firstOrFail(),
             [...$data, 'customer_id' => $customer->id],
@@ -117,7 +119,9 @@ class ProjectCustomerController extends Controller
         $data = $this->contactData($request);
 
         DB::transaction(function () use ($contact, $data, $request): void {
+            $this->relations->lockReferenceGraph();
             $locked = ObjectRecord::query()->lockForUpdate()->findOrFail($contact->id);
+            abort_unless($this->projectVisibility->allowsRecordWrite($request->user(), $locked), 403);
             $before = $locked->payload ?? [];
             $payload = [...$before, ...$data];
             $locked->update(['payload' => $payload, 'title' => $data['name']]);

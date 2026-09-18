@@ -21,6 +21,7 @@ class ProjectContractAmountController extends Controller
         $user = request()->user();
         abort_unless($this->workspace->isAdmin($user) || $this->workspace->isFinance($user), 403);
         abort_unless($this->projectVisibility->allowsProject($user, $project), 403);
+        abort_unless($this->projectVisibility->allowsRecordWrite($user, $project), 403);
 
         $this->resync->handle($project, $user);
 

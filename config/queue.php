@@ -44,6 +44,15 @@ return [
             'after_commit' => false,
         ],
 
+        'ai_database' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'ai',
+            'retry_after' => max(240, (int) env('AI_QUEUE_RETRY_AFTER', 240)),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

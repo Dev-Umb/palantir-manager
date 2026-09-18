@@ -227,6 +227,9 @@ class OntologyController extends Controller
                     foreach ($items as $item) {
                         $item = is_array($item) ? $item : [];
                         $row = $fields->map(function (array $field) use ($record, $payload, $item) {
+                            if (($field['source'] ?? null) === 'project_business_owner') {
+                                return $this->safeCsvCell($this->relations->contractBusinessOwnerName($record));
+                            }
                             $container = ($field['scope'] ?? null) === 'item' ? $item : $payload;
                             $value = match ($field['system'] ?? null) {
                                 'code' => $record->code,
@@ -334,7 +337,7 @@ class OntologyController extends Controller
         abort_unless($this->workspace->allowsDirectObjectAccess($object), 404);
         abort_unless($request->user()->canDo("object.{$object->key}.update")
             && $this->workspace->writableFieldKeys($object, $request->user()) !== [], 403);
-        abort_unless($this->projectVisibility->allowsRecord($request->user(), $record), 403);
+        abort_unless($this->projectVisibility->allowsRecordWrite($request->user(), $record), 403);
         if ($object->key === 'project') {
             abort_unless($this->projectVisibility->allowsProjectUpdate($request->user(), $record), 403);
         }
@@ -357,6 +360,7 @@ class OntologyController extends Controller
                 BusinessObject::query()->whereKey($object->id)->lockForUpdate()->firstOrFail();
             }
             $lockedRecord = ObjectRecord::query()->lockForUpdate()->findOrFail($record->id);
+            abort_unless($this->projectVisibility->allowsRecordWrite($request->user(), $lockedRecord), 403);
             $oldPayload = $lockedRecord->payload ?? [];
             $payload = $this->mergeReadonlyPayload($object, $payload, $oldPayload);
             if ($object->key === 'project' && $contractBatch) {
@@ -376,6 +380,9 @@ class OntologyController extends Controller
                 $payload = $this->inboundMaterials->handle($payload, $request->user());
             }
             $payload = $writer->normalizePayload($object, $payload, $oldPayload, $request->user());
+            if ($object->key === 'project' && array_key_exists('_statement_order', $oldPayload)) {
+                $payload['_statement_order'] = $oldPayload['_statement_order'];
+            }
             $this->guardTenderStatus($object, $payload, $oldPayload);
             if ($object->key === 'customer_contact') {
                 foreach (['position', 'remark', 'status'] as $legacyKey) {
@@ -489,7 +496,7 @@ class OntologyController extends Controller
         abort_unless($this->workspace->allowsDirectObjectAccess($object), 404);
         abort_unless($request->user()->canDo("object.{$object->key}.delete")
             && $this->workspace->canDelete($object, $request->user()), 403);
-        abort_unless($this->projectVisibility->allowsRecord($request->user(), $record), 403);
+        abort_unless($this->projectVisibility->allowsRecordWrite($request->user(), $record), 403);
 
         DB::transaction(function () use ($record, $object, $request, $writer): void {
             $this->relations->lockReferenceGraph();
@@ -497,6 +504,7 @@ class OntologyController extends Controller
                 BusinessObject::query()->whereKey($object->id)->lockForUpdate()->firstOrFail();
             }
             $lockedRecord = ObjectRecord::query()->lockForUpdate()->findOrFail($record->id);
+            abort_unless($this->projectVisibility->allowsRecordWrite($request->user(), $lockedRecord), 403);
             $oldPayload = $lockedRecord->payload ?? [];
             if ($object->key === 'tender' && ! empty($oldPayload['converted_project_id'])) {
                 throw ValidationException::withMessages([
@@ -653,6 +661,9 @@ class OntologyController extends Controller
         return $query->where(function (Builder $query) use ($object, $needle, $lowerNeedle, $payloadKeys): void {
             $query->whereLike('code', $needle, caseSensitive: false)
                 ->orWhereLike('title', $needle, caseSensitive: false);
+            if ($object->key === 'contract') {
+                $query->orWhereLike($this->relations->contractBusinessOwnerExpression(), $needle, caseSensitive: false);
+            }
             if ($object->key !== self::BUSINESS_SUMMARY_KEY) {
                 $query->orWhereRaw('LOWER(CAST(payload AS TEXT)) LIKE ?', [$lowerNeedle]);
             }
@@ -745,6 +756,10 @@ class OntologyController extends Controller
             'title' => 'title',
             default => "payload->{$key}",
         };
+
+        if (($field['source'] ?? null) === 'project_business_owner') {
+            $column = $this->relations->contractBusinessOwnerExpression();
+        }
 
         if ($operator === 'is_empty') {
             $query->where(function (Builder $empty) use ($column): void {
@@ -850,13 +865,19 @@ class OntologyController extends Controller
         $direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
         $isProjectTitleField = $object->key === 'project' && ($field['key'] ?? null) === $object->title_field;
         $query->reorder();
-        if ($object->key === 'project' && ! $isProjectTitleField) {
-            $query->orderBy('title');
-        }
         if (($field['system'] ?? null) === 'code') {
             $query->orderBy('code', $direction);
         } elseif (($field['system'] ?? null) === 'title' || $isProjectTitleField) {
             $query->orderBy('title', $direction);
+        } elseif ($object->key === 'contract' && ($field['source'] ?? null) === 'project_business_owner') {
+            $query->orderBy($this->relations->contractBusinessOwnerExpression(), $direction);
+        } elseif ($object->key === 'project' && ($field['type'] ?? null) === 'account') {
+            $driver = DB::connection()->getDriverName();
+            $key = str_replace(["'", '"'], '', (string) $field['key']);
+            $expression = $driver === 'pgsql'
+                ? "(SELECT users.name FROM users WHERE CAST(users.id AS TEXT) = object_records.payload->>'{$key}' LIMIT 1)"
+                : "(SELECT users.name FROM users WHERE CAST(users.id AS TEXT) = CAST(json_extract(object_records.payload, '$.{$key}') AS TEXT) LIMIT 1)";
+            $query->orderByRaw("{$expression} {$direction}");
         } elseif (in_array($field['type'] ?? null, ['number', 'range'], true)) {
             $driver = DB::connection()->getDriverName();
             $key = str_replace('"', '', (string) $field['key']);
@@ -872,13 +893,20 @@ class OntologyController extends Controller
 
     private function applyDefaultProjectSort(Builder|Relation $query, BusinessObject $object): void
     {
-        if ($object->key !== 'project') {
+        if (! in_array($object->key, ['project', self::BUSINESS_SUMMARY_KEY], true)) {
             return;
         }
 
+        $driver = DB::connection()->getDriverName();
+        $statementOrder = $driver === 'pgsql'
+            ? "CAST(payload->>'_statement_order' AS NUMERIC)"
+            : "CAST(json_extract(payload, '$._statement_order') AS REAL)";
+
         $query->reorder()
-            ->orderBy('title')
-            ->orderBy('id');
+            ->orderByRaw("CASE WHEN {$statementOrder} IS NULL THEN 1 ELSE 0 END")
+            ->orderByRaw("{$statementOrder} ASC")
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id');
     }
 
     private function perPage(Request $request): int
@@ -1310,7 +1338,11 @@ class OntologyController extends Controller
             $payload['overall_status_changed_at'] = now()->toISOString();
         }
 
-        if (($oldPayload['contract_amount'] ?? null) !== ($payload['contract_amount'] ?? null)
+        $contractAmountChanged = is_numeric($oldPayload['contract_amount'] ?? null)
+            && is_numeric($payload['contract_amount'] ?? null)
+                ? (float) $oldPayload['contract_amount'] !== (float) $payload['contract_amount']
+                : ($oldPayload['contract_amount'] ?? null) !== ($payload['contract_amount'] ?? null);
+        if ($contractAmountChanged
             && ($this->workspace->isAdmin($user) || $this->workspace->isFinance($user))) {
             $payload['contract_amount_source'] = 'manual';
             $payload['contract_amount_synced_at'] = null;
@@ -1327,7 +1359,11 @@ class OntologyController extends Controller
             'payment_status',
         ];
         $paymentChanged = collect($paymentKeys)->contains(
-            fn (string $key): bool => ($oldPayload[$key] ?? null) !== ($payload[$key] ?? null),
+            fn (string $key): bool => ! in_array($key, ['last_payment_date', 'payment_status'], true)
+                && is_numeric($oldPayload[$key] ?? null)
+                && is_numeric($payload[$key] ?? null)
+                    ? (float) $oldPayload[$key] !== (float) $payload[$key]
+                    : ($oldPayload[$key] ?? null) !== ($payload[$key] ?? null),
         );
         if ($paymentChanged && ($this->workspace->isAdmin($user) || $this->workspace->isFinance($user))) {
             $payload['payment_reminder_anchor_at'] = now()->toISOString();

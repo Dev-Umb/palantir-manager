@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import AiIndex from './Index';
-import { HtmlArtifact, htmlDocument } from './Artifacts';
+import { HtmlArtifact, HtmlReportReader, htmlDocument } from './Artifacts';
 
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
@@ -33,12 +33,17 @@ describe('AI assistant layout', () => {
 
 describe('AI HTML artifact', () => {
     it('renders only inside a sandboxed iframe with a restrictive CSP', () => {
-        render(<HtmlArtifact artifact={{
+        const artifact = {
             id: 'html-1',
             type: 'html',
             title: '静态报告',
             data: { html: '<h2 onclick="alert(1)">报告</h2><script>alert(1)</script>' },
-        }} />);
+        };
+        const onOpen = vi.fn();
+        render(<HtmlArtifact artifact={artifact} onOpenReport={onOpen} />);
+        fireEvent.click(screen.getByRole('button', { name: '打开报告：静态报告' }));
+        expect(onOpen).toHaveBeenCalledWith(artifact, expect.anything());
+        render(<HtmlReportReader artifact={artifact} onClose={vi.fn()} />);
 
         const frame = screen.getByTitle('静态报告');
         expect(frame.getAttribute('sandbox')).toBe('');

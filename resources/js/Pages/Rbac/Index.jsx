@@ -1,7 +1,8 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import Layout from '../../Components/Layout';
+import PasswordFields from '../../Components/PasswordFields';
 import { businessText, permissionGroupLabel } from '../../businessLanguage';
 
 export default function Index({ users, roles, permissions }) {
@@ -42,6 +43,7 @@ function UserRoleEditor({ user, roles }) {
     const [saved, setSaved] = useState(initialRoleIds);
     const [processing, setProcessing] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [resettingPassword, setResettingPassword] = useState(false);
     const isDirty = !sameIds(selected, saved);
 
     function toggle(id) {
@@ -85,6 +87,7 @@ function UserRoleEditor({ user, roles }) {
                 ))}
             </div>
             <div className="user-row-actions">
+                <button type="button" className="secondary-button" onClick={() => setResettingPassword(true)} disabled={resettingPassword || deleting} aria-label={`重置${user.name}的密码`}>重置密码</button>
                 {isDirty && <span className="unsaved-badge" role="status">有未保存修改</span>}
                 <button
                     type="button"
@@ -106,7 +109,35 @@ function UserRoleEditor({ user, roles }) {
                 </button>
                 {user.delete_block_reason && <small>{user.delete_block_reason}</small>}
             </div>
+            {resettingPassword && <PasswordResetForm user={user} onClose={() => setResettingPassword(false)} />}
         </article>
+    );
+}
+
+function PasswordResetForm({ user, onClose }) {
+    const form = useForm({ current_password: '', password: '', password_confirmation: '' });
+
+    function submit(event) {
+        event.preventDefault();
+        form.put(user.reset_password_url, {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+                onClose();
+            },
+        });
+    }
+
+    return (
+        <form className="account-form password-reset-panel" aria-label={`重置${user.name}的密码`} onSubmit={submit}>
+            <strong>重置 {user.name} 的密码</strong>
+            <p className="muted">验证您自己的密码后，为该用户设置临时密码。重置后将提醒该用户重新修改密码。</p>
+            <PasswordFields form={form} prefix={`reset-${user.id}`} reset />
+            <div className="section-actions">
+                <button type="submit" disabled={form.processing}>{form.processing ? '重置中...' : '确认重置密码'}</button>
+                <button type="button" className="secondary-button" disabled={form.processing} onClick={onClose}>取消</button>
+            </div>
+        </form>
     );
 }
 

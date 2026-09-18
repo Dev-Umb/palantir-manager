@@ -13,7 +13,7 @@ use LogicException;
     'id', 'conversation_id', 'user_id', 'client_request_id', 'request_hash', 'retry_parent_id',
     'attempt_number', 'status', 'input', 'context_snapshot', 'answer', 'artifacts', 'sources',
     'provenance', 'data_quality', 'usage', 'error', 'failure_category', 'last_event_seq',
-    'cancel_requested_at', 'cancel_reason', 'started_at', 'finished_at',
+    'cancel_requested_at', 'cancel_reason', 'started_at', 'finished_at', 'origin', 'channel_context',
 ])]
 class AiRun extends Model
 {
@@ -38,6 +38,7 @@ class AiRun extends Model
             'data_quality' => 'array',
             'usage' => 'array',
             'error' => 'array',
+            'channel_context' => 'array',
             'cancel_requested_at' => 'datetime',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',

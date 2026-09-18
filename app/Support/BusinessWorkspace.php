@@ -126,7 +126,7 @@ class BusinessWorkspace
         }
 
         if ($this->isFinance($user)) {
-            return self::FINANCE_FIELD_KEYS;
+            return [...self::FINANCE_FIELD_KEYS, 'first_shipment_date', 'last_shipment_date'];
         }
 
         if ($this->isBusiness($user)) {

@@ -35,4 +35,26 @@ return [
         ],
     ],
 
+    'feishu' => [
+        'enabled' => env('FEISHU_ENABLED', false),
+        'base_url' => env('FEISHU_BASE_URL', 'https://open.feishu.cn/open-apis'),
+        'app_id' => env('FEISHU_APP_ID'),
+        'app_secret' => env('FEISHU_APP_SECRET'),
+        'verification_token' => env('FEISHU_VERIFICATION_TOKEN'),
+        'tenant_key' => env('FEISHU_TENANT_KEY'),
+        'rollout_user_id' => env('FEISHU_ROLLOUT_USER_ID'),
+        'rollout_user_ids' => env('FEISHU_ROLLOUT_USER_IDS'),
+        'attachment_disk' => env('FEISHU_ATTACHMENT_DISK', 'local'),
+        'attachment_max_bytes' => env('FEISHU_ATTACHMENT_MAX_BYTES', 20 * 1024 * 1024),
+        'cli' => [
+            'enabled' => env('FEISHU_CLI_ENABLED', false),
+            'binary' => env('FEISHU_CLI_BINARY', 'lark-cli'),
+            'profile' => env('FEISHU_CLI_PROFILE', 'palantir'),
+            'timeout' => env('FEISHU_CLI_TIMEOUT', 45),
+            'max_rows' => env('FEISHU_CLI_MAX_ROWS', 200),
+            'max_columns' => env('FEISHU_CLI_MAX_COLUMNS', 20),
+            'max_payload_bytes' => env('FEISHU_CLI_MAX_PAYLOAD_BYTES', 200000),
+        ],
+    ],
+
 ];

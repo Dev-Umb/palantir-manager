@@ -5,6 +5,11 @@ import Layout from '../../Components/Layout';
 export default function NotificationsIndex({ notifications, tenderNotifications, unreadCount }) {
     const items = notifications?.data || [];
     const tenderItems = tenderNotifications?.data || [];
+    const readOptions = {
+        only: ['notifications', 'tenderNotifications', 'unreadCount', 'notificationUnreadCount'],
+        preserveScroll: true,
+        preserveState: true,
+    };
 
     return (
         <Layout title="通知中心" eyebrow="通知中心">
@@ -14,10 +19,10 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                     <div>
                         <p>风险提醒</p>
                         <h2>通知记录</h2>
-                        <span>当前有 {unreadCount} 条未读风险提醒，已处理风险仍保留历史记录。</span>
+                        <span>当前有 {unreadCount} 条未读风险提醒，已读通知会自动归档。</span>
                     </div>
                     {unreadCount > 0 && (
-                        <button className="ghost-button" type="button" onClick={() => router.patch('/notifications/read-all')}>
+                        <button className="ghost-button" type="button" onClick={() => router.patch('/notifications/read-all', {}, readOptions)}>
                             <CheckCheck size={16} /> 全部已读
                         </button>
                     )}
@@ -46,7 +51,7 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                                         <td>{formatDate(notification.triggered_at)}</td>
                                         <td>
                                             {!notification.read_at && (
-                                                <button className="ghost-button" type="button" onClick={() => router.patch(`/notifications/${notification.id}/read`)}>
+                                                <button className="ghost-button" type="button" onClick={() => router.patch(`/notifications/${notification.id}/read`, {}, readOptions)}>
                                                     <Check size={15} /> 标为已读
                                                 </button>
                                             )}
@@ -69,17 +74,7 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                     </div>
                 ) : null}
 
-                {notifications?.links?.length > 3 && (
-                    <nav className="pagination" aria-label="通知分页">
-                        {notifications.links.map((link, index) => link.url ? (
-                            <Link key={`${link.label}-${index}`} className={link.active ? 'active' : ''} href={link.url} preserveScroll>
-                                <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                            </Link>
-                        ) : (
-                            <span key={`${link.label}-${index}`} dangerouslySetInnerHTML={{ __html: link.label }} />
-                        ))}
-                    </nav>
-                )}
+                <NotificationPagination pagination={notifications} ariaLabel="通知分页" />
             </section>
             {tenderItems.length > 0 && (
                 <section className="surface">
@@ -112,7 +107,7 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                                         <td>{formatTenderDate(notification.deadline_at || notification.triggered_at)}</td>
                                         <td>
                                             {!notification.read_at && (
-                                                <button className="ghost-button" type="button" onClick={() => router.patch(notification.read_url)}>
+                                                <button className="ghost-button" type="button" onClick={() => router.patch(notification.read_url, {}, readOptions)}>
                                                     <Check size={15} /> 标为已读
                                                 </button>
                                             )}
@@ -132,20 +127,26 @@ export default function NotificationsIndex({ notifications, tenderNotifications,
                             </tbody>
                         </table>
                     </div>
-                    {tenderNotifications?.links?.length > 3 && (
-                        <nav className="pagination" aria-label="招投标通知分页">
-                            {tenderNotifications.links.map((link, index) => link.url ? (
-                                <Link key={`${link.label}-${index}`} className={link.active ? 'active' : ''} href={link.url} preserveScroll>
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Link>
-                            ) : (
-                                <span key={`${link.label}-${index}`} dangerouslySetInnerHTML={{ __html: link.label }} />
-                            ))}
-                        </nav>
-                    )}
+                    <NotificationPagination pagination={tenderNotifications} ariaLabel="招投标通知分页" />
                 </section>
             )}
         </Layout>
+    );
+}
+
+function NotificationPagination({ pagination, ariaLabel }) {
+    if (!pagination?.last_page || pagination.last_page <= 1) return null;
+
+    return (
+        <nav className="object-pagination" aria-label={ariaLabel}>
+            {pagination.prev_page_url ? (
+                <Link className="small-action" href={pagination.prev_page_url} preserveScroll>上一页</Link>
+            ) : <span className="disabled">上一页</span>}
+            <span>第 {pagination.current_page} / {pagination.last_page} 页，共 {pagination.total} 条</span>
+            {pagination.next_page_url ? (
+                <Link className="small-action" href={pagination.next_page_url} preserveScroll>下一页</Link>
+            ) : <span className="disabled">下一页</span>}
+        </nav>
     );
 }
 

@@ -22,6 +22,11 @@ class XycDataAccess
 
     public function visibleObjects(User $user): array
     {
+        $user = $user->fresh();
+        if (! $user) {
+            return [];
+        }
+
         $objects = BusinessObject::orderBy('sort_order')->get()
             ->filter(fn (BusinessObject $object) => $user->canDo("object.{$object->key}.view"))
             ->values()
@@ -47,6 +52,11 @@ class XycDataAccess
 
     public function queryRecords(User $user, array $input): array
     {
+        $user = $user->fresh();
+        if (! $user) {
+            return $this->denied('forbidden', '账号权限已失效。');
+        }
+
         $startedAt = microtime(true);
         $object = $this->objectForUser($user, (string) ($input['object'] ?? ''));
         if (! $object) {
@@ -57,8 +67,36 @@ class XycDataAccess
             return $this->denied('forbidden', '无权访问该业务对象，或该业务对象不存在。');
         }
 
+        $legacyAlias = $object->key === 'project' && str_contains(json_encode($input), '"arrears"');
+        if ($object->key === 'project') {
+            $input['select'] = array_map(fn ($field) => $field === 'arrears' ? 'unpaid_amount' : $field, $input['select'] ?? []);
+            foreach (['filters', 'metrics'] as $section) {
+                foreach ($input[$section] ?? [] as $index => $item) {
+                    if (($item['field'] ?? null) === 'arrears') {
+                        $input[$section][$index]['field'] = 'unpaid_amount';
+                    }
+                }
+            }
+            foreach (['group_by'] as $field) {
+                if (($input[$field] ?? null) === 'arrears') {
+                    $input[$field] = 'unpaid_amount';
+                }
+            }
+            if (($input['sort']['field'] ?? null) === 'arrears') {
+                $input['sort']['field'] = 'unpaid_amount';
+            }
+        }
+
         if ($invalid = $this->invalidInputField($object, $input)) {
             return $this->denied('invalid_field', "字段 {$invalid} 不存在或不可查询。");
+        }
+
+        $queryFields = [...array_column($input['filters'] ?? [], 'field'), ...array_column($input['metrics'] ?? [], 'field'), $input['group_by'] ?? '', $input['sort']['field'] ?? ''];
+        foreach ($object->fields as $field) {
+            if (($field['type'] ?? null) === 'multirelation' && ($field['target'] ?? null) === 'project'
+                && in_array($field['key'], $queryFields, true)) {
+                return $this->denied('invalid_field', '关联项目请通过项目对象按当前权限查询。');
+            }
         }
 
         $query = $this->recordsQuery($user, $object);
@@ -68,16 +106,22 @@ class XycDataAccess
                 ->limit(AiQueryProvenance::RECORD_ID_LIMIT + 1)
                 ->pluck($query->getModel()->qualifyColumn('id'))
                 ->all();
-            $result = filled($input['group_by'] ?? null)
-                ? $this->aggregatePostgres($object, $query, (string) $input['group_by'], $input)
+            $result = (filled($input['group_by'] ?? null) || filled($input['metrics'] ?? null))
+                ? $this->aggregatePostgres($object, $query, (string) ($input['group_by'] ?? ''), $input)
                 : $this->listPostgres($object, $query, $input, $user);
         } else {
             $records = $query->latest()->get();
             $records = $this->filterRecords($records, $input['filters'] ?? []);
             $recordIds = $records->pluck('id')->all();
-            $result = filled($input['group_by'] ?? null)
-                ? $this->aggregateRecords($object, $records, (string) $input['group_by'], $input)
+            $result = (filled($input['group_by'] ?? null) || filled($input['metrics'] ?? null))
+                ? $this->aggregateRecords($object, $records, (string) ($input['group_by'] ?? ''), $input)
                 : $this->listRecords($object, $records, $input, user: $user);
+        }
+
+        $result['truncated'] = ($result['truncated'] ?? false) || empty($input['group_by']) && empty($input['metrics'])
+            && count($result['rows']) < $result['record_count'];
+        if ($legacyAlias) {
+            $result['warnings'][] = ['type' => 'field_alias', 'message' => 'arrears 已映射为项目主档 unpaid_amount（未回款金额），不再补算独立欠款。'];
         }
 
         $result['provenance'] = $this->provenance->make(
@@ -105,6 +149,11 @@ class XycDataAccess
 
     public function getRecord(User $user, string $objectKey, string $id): array
     {
+        $user = $user->fresh();
+        if (! $user) {
+            return $this->denied('forbidden', '账号权限已失效。');
+        }
+
         $object = $this->objectForUser($user, $objectKey);
         if (! $object) {
             return $this->denied('forbidden', '无权访问该业务对象，或该业务对象不存在。');
@@ -116,7 +165,8 @@ class XycDataAccess
         }
 
         $this->relations->preloadLabels(collect([$record]), $user);
-        $row = $this->relations->formatRecord($record);
+        $row = $this->relations->formatRecord($record, $user);
+        $row['payload'] = array_intersect_key($row['payload'], array_flip(array_column($object->fields, 'key')));
 
         $result = [
             'ok' => true,
@@ -149,7 +199,15 @@ class XycDataAccess
 
         $object = BusinessObject::where('key', $key)->first();
 
-        return $object && $user->canDo("object.{$object->key}.view") ? $object : null;
+        if (! $object || ! $user->canDo("object.{$object->key}.view")) {
+            return null;
+        }
+
+        if ($key === 'project_business_summary') {
+            return $this->objectForUser($user, 'project');
+        }
+
+        return $object;
     }
 
     private function recordsQuery(User $user, BusinessObject $object): Builder|Relation
@@ -161,7 +219,29 @@ class XycDataAccess
             $query->where('created_by', $user->id);
         }
 
+        $project = BusinessObject::where('key', 'project')->first();
+        foreach ($object->fields as $field) {
+            if (($field['type'] ?? null) !== 'relation' || ($field['target'] ?? null) !== 'project') {
+                continue;
+            }
+            $visibleIds = $project && $user->canDo('object.project.view')
+                ? $this->projectVisibility->scope($project->records(), $user)->selectRaw('CAST(object_records.id AS TEXT)')
+                : ObjectRecord::query()->whereRaw('1 = 0')->selectRaw('CAST(id AS TEXT)');
+            $query->where(function (Builder $nested) use ($field, $visibleIds): void {
+                $nested->whereNull("payload->{$field['key']}")
+                    ->orWhere("payload->{$field['key']}", '')
+                    ->orWhereIn("payload->{$field['key']}", $visibleIds);
+            });
+        }
+
         return $query;
+    }
+
+    public function canAccessSources(User $user, string $objectKey, array $ids): bool
+    {
+        $object = $this->objectForUser($user, $objectKey);
+
+        return $object && $this->recordsQuery($user, $object)->whereKey($ids)->count() === count(array_unique($ids));
     }
 
     private function isPostgres(Builder|Relation $query): bool
@@ -196,7 +276,7 @@ class XycDataAccess
                 ]),
                 'is_empty' => $query->whereRaw("({$textExpression} IS NULL OR {$textExpression} = '')"),
                 'not_empty' => $query->whereRaw("({$textExpression} IS NOT NULL AND {$textExpression} <> '')"),
-                'in' => $query->where(function (Builder $nested) use ($valueExpression, $filter) {
+                'in' => empty($filter['values']) ? $query->whereRaw('1 = 0') : $query->where(function (Builder $nested) use ($valueExpression, $filter) {
                     foreach ((array) ($filter['values'] ?? []) as $index => $item) {
                         $method = $index === 0 ? 'whereRaw' : 'orWhereRaw';
                         $nested->{$method}("{$valueExpression} = ?", [$item]);
@@ -236,11 +316,14 @@ class XycDataAccess
 
     private function aggregatePostgres(BusinessObject $object, Builder|Relation $query, string $groupBy, array $input): array
     {
-        $metrics = collect($input['metrics'] ?? [['op' => 'count', 'label' => '数量']])->values();
+        $metrics = collect(filled($input['metrics'] ?? null) ? $input['metrics'] : [['op' => 'count', 'label' => '数量']])->values();
         $recordCount = (clone $query)->count();
-        $groupExpression = $this->postgresTextExpression($groupBy);
+        $groupExpression = $groupBy !== '' ? $this->postgresTextExpression($groupBy) : "'全部'";
         $normalizedGroup = "COALESCE(NULLIF({$groupExpression}, ''), '未填写')";
-        $aggregateQuery = $query->reorder()->selectRaw("{$normalizedGroup} AS ai_group");
+        $aggregateQuery = $query->reorder()->select([]);
+        if ($groupBy !== '') {
+            $aggregateQuery->selectRaw("{$normalizedGroup} AS ai_group");
+        }
 
         foreach ($metrics as $index => $metric) {
             $op = is_array($metric) ? ($metric['op'] ?? 'count') : 'count';
@@ -257,16 +340,13 @@ class XycDataAccess
 
             if ($numericExpression !== null && $op !== 'count') {
                 $aggregateQuery->selectRaw("COUNT(*) FILTER (WHERE {$numericExpression} IS NULL) AS missing_{$index}");
-                if ($field === 'arrears') {
-                    $explicit = $this->postgresJsonText('arrears');
-                    $aggregateQuery->selectRaw(
-                        "COUNT(*) FILTER (WHERE ({$explicit} IS NULL OR {$explicit} = '') AND {$numericExpression} IS NOT NULL) AS derived_{$index}",
-                    );
-                }
+
             }
         }
 
-        $aggregateQuery->groupByRaw($normalizedGroup);
+        if ($groupBy !== '') {
+            $aggregateQuery->groupByRaw($normalizedGroup);
+        }
         $sort = $input['sort'] ?? null;
         $sortIndex = is_array($sort)
             ? $metrics->search(fn ($metric) => is_array($metric) && ($metric['label'] ?? null) === ($sort['field'] ?? null))
@@ -274,15 +354,20 @@ class XycDataAccess
         $direction = is_array($sort) && ($sort['direction'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
         if ($sortIndex !== false) {
             $aggregateQuery->orderByRaw("metric_{$sortIndex} {$direction} NULLS LAST");
-        } else {
+        } elseif ($groupBy !== '') {
             $aggregateQuery->orderByRaw("ai_group {$direction}");
         }
 
-        $results = $aggregateQuery->limit($this->limit($input['limit'] ?? null))->get();
-        $rows = $results->map(function (ObjectRecord $record) use ($metrics) {
-            $row = ['group' => $record->getAttribute('ai_group')];
+        $limit = $this->limit($input['limit'] ?? null);
+        $results = $aggregateQuery->limit($limit + 1)->get();
+        $truncated = $results->count() > $limit;
+        $results = $results->take($limit);
+        $rows = $results->map(function (ObjectRecord $record) use ($metrics, $groupBy) {
+            $row = $groupBy === '' ? [] : ['group' => $record->getAttribute('ai_group')];
             foreach ($metrics as $index => $metric) {
-                $label = is_array($metric) ? ($metric['label'] ?? ($metric['field'] ?? '数量')) : '数量';
+                $op = $metric['op'] ?? 'count';
+                $field = $metric['field'] ?? '';
+                $label = $metric['label'] ?? ($field ? "{$op}_{$field}" : $op);
                 $value = $record->getAttribute("metric_{$index}");
                 $row[$label] = $value === null
                     ? null
@@ -301,6 +386,7 @@ class XycDataAccess
             'rows' => $rows,
             'sources' => [$this->source($object, $recordCount)],
             'data_quality' => $this->postgresAggregateDataQuality($results, $metrics),
+            'truncated' => $truncated,
         ];
     }
 
@@ -313,9 +399,6 @@ class XycDataAccess
 
             $field = (string) $metric['field'];
             $missing = $results->sum(fn (ObjectRecord $record) => (int) $record->getAttribute("missing_{$index}"));
-            $derived = $field === 'arrears'
-                ? $results->sum(fn (ObjectRecord $record) => (int) $record->getAttribute("derived_{$index}"))
-                : 0;
 
             return collect([
                 $missing > 0 ? [
@@ -323,11 +406,7 @@ class XycDataAccess
                     'field' => $field,
                     'message' => "{$missing} 条记录的 {$field} 缺失，聚合时保留为空且未按 0 计算。",
                 ] : null,
-                $derived > 0 ? [
-                    'type' => 'derived',
-                    'field' => $field,
-                    'message' => "{$derived} 条记录的欠款按合同金额减回款金额补算。",
-                ] : null,
+
             ])->filter();
         })->values()->all();
     }
@@ -350,19 +429,6 @@ class XycDataAccess
 
     private function postgresNumericExpression(string $field): string
     {
-        if ($field === 'arrears') {
-            $arrears = $this->postgresJsonText('arrears');
-            $contract = $this->postgresJsonText('contract_amount');
-            $paid = $this->postgresJsonText('paid_amount');
-            $arrearsNumber = $this->postgresSafeNumeric($arrears);
-            $contractNumber = $this->postgresSafeNumeric($contract);
-            $paidNumber = $this->postgresSafeNumeric($paid);
-
-            return "CASE WHEN {$arrearsNumber} IS NOT NULL THEN {$arrearsNumber} "
-                ."WHEN {$contractNumber} IS NOT NULL OR {$paidNumber} IS NOT NULL "
-                ."THEN GREATEST(COALESCE({$contractNumber}, 0) - COALESCE({$paidNumber}, 0), 0) ELSE NULL END";
-        }
-
         return $this->postgresSafeNumeric($this->postgresTextExpression($field));
     }
 
@@ -395,13 +461,21 @@ class XycDataAccess
         $operator = $filter['operator'] ?? 'eq';
         $expected = $filter['value'] ?? null;
 
+        if (in_array($operator, ['gt', 'gte', 'lt', 'lte', 'between'], true) && ($actual === null || $actual === '')) {
+            return false;
+        }
+
+        if (in_array($operator, ['gt', 'gte', 'lt', 'lte'], true) && is_numeric($expected) && ! is_numeric($actual)) {
+            return false;
+        }
+
         return match ($operator) {
             'contains' => str_contains(mb_strtolower((string) $actual), mb_strtolower((string) $expected)),
-            'gt' => (float) $actual > (float) $expected,
-            'gte' => (float) $actual >= (float) $expected,
-            'lt' => (float) $actual < (float) $expected,
-            'lte' => (float) $actual <= (float) $expected,
-            'in' => in_array($actual, (array) ($filter['values'] ?? []), true),
+            'gt' => $actual > $expected,
+            'gte' => $actual >= $expected,
+            'lt' => $actual < $expected,
+            'lte' => $actual <= $expected,
+            'in' => in_array((string) $actual, array_map('strval', (array) ($filter['values'] ?? [])), true),
             'between' => $actual >= (($filter['values'] ?? [])[0] ?? null)
                 && $actual <= (($filter['values'] ?? [])[1] ?? null),
             'is_empty' => $actual === null || $actual === '',
@@ -429,22 +503,14 @@ class XycDataAccess
 
         $this->relations->preloadLabels($rows, $user);
 
-        $derivedArrears = false;
-        $projectedRows = $rows->map(function (ObjectRecord $record) use ($object, $selected, &$derivedArrears) {
-            $formatted = $this->relations->formatRecord($record);
+        $projectedRows = $rows->map(function (ObjectRecord $record) use ($selected, $user) {
+            $formatted = $this->relations->formatRecord($record, $user);
 
-            return collect($selected)->mapWithKeys(function (array $field) use ($record, $formatted, $object, &$derivedArrears) {
+            return collect($selected)->mapWithKeys(function (array $field) use ($record, $formatted) {
                 $key = $field['key'];
-                if ($object->key === 'project' && $key === 'arrears' && blank($record->payload['arrears'] ?? null)) {
-                    $derivedArrears = filled($record->payload['contract_amount'] ?? null)
-                        || filled($record->payload['paid_amount'] ?? null);
-                }
-
-                $value = $object->key === 'project' && $key === 'arrears'
-                    ? $this->recordValue($record, $key)
-                    : (array_key_exists($key, $formatted['display'])
-                        ? $formatted['display'][$key]
-                        : $this->recordValue($record, $key));
+                $value = array_key_exists($key, $formatted['display'])
+                    ? $formatted['display'][$key]
+                    : $this->recordValue($record, $key);
 
                 if (($field['type'] ?? null) === 'number' && is_numeric($value)) {
                     $value = (float) $value;
@@ -461,47 +527,46 @@ class XycDataAccess
             'record_count' => $recordCount,
             'rows' => $projectedRows,
             'sources' => [$this->source($object, $recordCount)],
-            'data_quality' => $derivedArrears ? [[
-                'type' => 'derived',
-                'field' => 'arrears',
-                'message' => '部分项目欠款为空，已按合同金额减回款金额补算。',
-            ]] : [],
+            'data_quality' => collect($selected)->where('type', 'number')->flatMap(function (array $field) use ($rows): array {
+                $missing = $rows->filter(fn (ObjectRecord $record): bool => ! is_numeric($this->recordValue($record, $field['key'])))->count();
+
+                return $missing ? [['type' => 'missing', 'field' => $field['key'], 'message' => "当前返回记录中 {$missing} 条{$field['label']}未填写，不代表零。"]] : [];
+            })->values()->all(),
         ];
     }
 
     private function aggregateRecords(BusinessObject $object, Collection $records, string $groupBy, array $input): array
     {
-        $metrics = $input['metrics'] ?? [['op' => 'count', 'label' => '数量']];
-        $rows = $records
-            ->groupBy(fn (ObjectRecord $record) => (string) ($this->recordValue($record, $groupBy) ?: '未填写'))
-            ->map(function (Collection $group, string $value) use ($metrics) {
-                $row = ['group' => $value];
+        $metrics = filled($input['metrics'] ?? null) ? $input['metrics'] : [['op' => 'count', 'label' => '数量']];
+        $groups = $groupBy === '' ? collect(['全部' => $records]) : $records->groupBy(fn (ObjectRecord $record) => (string) ($this->recordValue($record, $groupBy) ?? '未填写'));
+        $rows = $groups->map(function (Collection $group, string $value) use ($metrics, $groupBy) {
+            $row = $groupBy === '' ? [] : ['group' => $value];
 
-                foreach ($metrics as $metric) {
-                    if (! is_array($metric)) {
-                        continue;
-                    }
-
-                    $op = $metric['op'] ?? 'count';
-                    $field = (string) ($metric['field'] ?? '');
-                    $label = $metric['label'] ?? ($field ? "{$op}_{$field}" : $op);
-                    $values = $field === ''
-                        ? collect()
-                        : $group->map(fn (ObjectRecord $record) => $this->recordValue($record, $field))
-                            ->filter(fn ($value) => is_numeric($value))
-                            ->map(fn ($value) => (float) $value);
-
-                    $row[$label] = match ($op) {
-                        'sum' => $values->isEmpty() ? null : round($values->sum(), 2),
-                        'avg' => $values->isEmpty() ? null : round($values->avg(), 2),
-                        'min' => $values->isEmpty() ? null : $values->min(),
-                        'max' => $values->isEmpty() ? null : $values->max(),
-                        default => $group->count(),
-                    };
+            foreach ($metrics as $metric) {
+                if (! is_array($metric)) {
+                    continue;
                 }
 
-                return $row;
-            })
+                $op = $metric['op'] ?? 'count';
+                $field = (string) ($metric['field'] ?? '');
+                $label = $metric['label'] ?? ($field ? "{$op}_{$field}" : $op);
+                $values = $field === ''
+                    ? collect()
+                    : $group->map(fn (ObjectRecord $record) => $this->recordValue($record, $field))
+                        ->filter(fn ($value) => is_numeric($value))
+                        ->map(fn ($value) => (float) $value);
+
+                $row[$label] = match ($op) {
+                    'sum' => $values->isEmpty() ? null : round($values->sum(), 2),
+                    'avg' => $values->isEmpty() ? null : round($values->avg(), 2),
+                    'min' => $values->isEmpty() ? null : $values->min(),
+                    'max' => $values->isEmpty() ? null : $values->max(),
+                    default => $group->count(),
+                };
+            }
+
+            return $row;
+        })
             ->values();
 
         $sort = $input['sort'] ?? null;
@@ -519,10 +584,6 @@ class XycDataAccess
             ->unique()
             ->flatMap(function (string $field) use ($records) {
                 $missing = $records->filter(fn (ObjectRecord $record) => ! is_numeric($this->recordValue($record, $field)))->count();
-                $derived = $field === 'arrears'
-                    ? $records->filter(fn (ObjectRecord $record) => blank($record->payload['arrears'] ?? null)
-                        && is_numeric($this->recordValue($record, 'arrears')))->count()
-                    : 0;
 
                 return collect([
                     $missing > 0 ? [
@@ -530,11 +591,7 @@ class XycDataAccess
                         'field' => $field,
                         'message' => "{$missing} 条记录的 {$field} 缺失，聚合时保留为空且未按 0 计算。",
                     ] : null,
-                    $derived > 0 ? [
-                        'type' => 'derived',
-                        'field' => $field,
-                        'message' => "{$derived} 条记录的欠款按合同金额减回款金额补算。",
-                    ] : null,
+
                 ])->filter();
             })
             ->values()
@@ -549,6 +606,7 @@ class XycDataAccess
             'rows' => $rows->take($this->limit($input['limit'] ?? null))->all(),
             'sources' => [$this->source($object, $records->count())],
             'data_quality' => $dataQuality,
+            'truncated' => $rows->count() > $this->limit($input['limit'] ?? null),
         ];
     }
 
@@ -573,30 +631,21 @@ class XycDataAccess
             'title' => $record->title,
             'created_at' => $record->created_at?->toDateString(),
             'updated_at' => $record->updated_at?->toDateString(),
-            'arrears' => $this->projectArrears($record),
             default => $record->payload[$field] ?? null,
         };
-    }
-
-    private function projectArrears(ObjectRecord $record): mixed
-    {
-        $arrears = $record->payload['arrears'] ?? null;
-        if ($arrears !== null && $arrears !== '') {
-            return $arrears;
-        }
-
-        $contract = $record->payload['contract_amount'] ?? null;
-        $paid = $record->payload['paid_amount'] ?? null;
-        if (! is_numeric($contract) && ! is_numeric($paid)) {
-            return null;
-        }
-
-        return (float) max((float) $contract - (float) $paid, 0);
     }
 
     private function invalidInputField(BusinessObject $object, array $input): ?string
     {
         $allowed = collect($this->fieldDefinitions($object))->pluck('key');
+        foreach ($input['metrics'] ?? [] as $metric) {
+            if (! is_array($metric) || ! in_array($metric['op'] ?? 'count', ['count', 'sum', 'avg', 'min', 'max'], true)) {
+                return 'metrics.op';
+            }
+            if (($metric['op'] ?? 'count') !== 'count' && blank($metric['field'] ?? null)) {
+                return 'metrics.field';
+            }
+        }
         $requested = collect($input['select'] ?? [])
             ->merge(collect($input['filters'] ?? [])->pluck('field'))
             ->merge(collect($input['metrics'] ?? [])->pluck('field'))
@@ -633,9 +682,6 @@ class XycDataAccess
     private function fieldDefinitions(BusinessObject $object): array
     {
         $objectFields = collect($object->fields);
-        $compatibilityFields = $object->key === 'project' && ! $objectFields->contains('key', 'arrears')
-            ? [['key' => 'arrears', 'label' => '欠款', 'type' => 'number']]
-            : [];
 
         return [
             ['key' => 'id', 'label' => '记录 ID', 'type' => 'text'],
@@ -649,7 +695,6 @@ class XycDataAccess
                 'type' => $field['type'],
                 'target' => $field['target'] ?? null,
             ])->all(),
-            ...$compatibilityFields,
         ];
     }
 

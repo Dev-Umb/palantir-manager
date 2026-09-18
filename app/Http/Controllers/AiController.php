@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\ProcessAiContractIntake;
+use App\Ai\AiHistoryAuthorization;
 use App\Ai\XycDataAgent;
 use App\Models\AiRun;
 use App\Models\AuditLog;
@@ -24,6 +26,7 @@ class AiController extends Controller
         return Inertia::render('Ai/Index', [
             'conversations' => $this->conversations($request),
             'messages' => [],
+            'canUploadContracts' => app(ProcessAiContractIntake::class)->canUpload($request->user()),
         ]);
     }
 
@@ -36,11 +39,11 @@ class AiController extends Controller
 
         $provider = config('ai.default', 'ark');
         if (! Ai::hasFakeGatewayFor(XycDataAgent::class) && blank(config("ai.providers.{$provider}.key"))) {
-            return response()->json(['message' => 'AI 服务尚未配置 ARK_API_KEY。'], 422);
+            return response()->json(['message' => 'AI 服务尚未配置。'], 422);
         }
 
         if (! empty($data['conversation_id'])) {
-            abort_unless($this->conversationBelongsToUser($data['conversation_id'], $request), 403);
+            abort_unless($this->conversationBelongsToUser($data['conversation_id'], $request), 403, AiHistoryAuthorization::MESSAGE);
         }
 
         $agent = XycDataAgent::make(user: $request->user());
@@ -87,7 +90,7 @@ class AiController extends Controller
     public function show(Request $request, string $conversation): JsonResponse
     {
         abort_unless(config('ai.harness_v2'), 404);
-        abort_unless($this->conversationBelongsToUser($conversation, $request), 403);
+        abort_unless($this->conversationBelongsToUser($conversation, $request), 403, AiHistoryAuthorization::MESSAGE);
 
         return response()->json([
             'messages' => ConversationMessage::where('conversation_id', $conversation)
@@ -121,6 +124,8 @@ class AiController extends Controller
             ->orderByDesc('updated_at')
             ->limit(20)
             ->get()
+            ->filter(fn (Conversation $conversation): bool => app(AiHistoryAuthorization::class)->allowsConversation($request->user(), $conversation->id))
+            ->values()
             ->map(fn (Conversation $conversation) => [
                 'id' => $conversation->id,
                 'title' => $conversation->title,
@@ -131,7 +136,7 @@ class AiController extends Controller
 
     private function conversationBelongsToUser(string $id, Request $request): bool
     {
-        return Conversation::whereKey($id)->where('user_id', $request->user()->id)->exists();
+        return app(AiHistoryAuthorization::class)->allowsConversation($request->user(), $id);
     }
 
     private function normalizeResponse($response): array

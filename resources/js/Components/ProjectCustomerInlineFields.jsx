@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import MultiComboBox from './MultiComboBox';
 import { useRemoteOptions } from './useRemoteOptions';
 
-export default function ProjectCustomerInlineFields({ profile, onChange, customerOptions = {}, contactOptions = {} }) {
+export default function ProjectCustomerInlineFields({ profile, onChange, customerOptions = {}, contactOptions = {}, initialCustomer = null }) {
+    const [pickedCustomer, setPickedCustomer] = useState(null);
     const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
     const [customerQuery, setCustomerQuery] = useState(profile.name || '');
     const customerItems = useMemo(
@@ -27,6 +28,10 @@ export default function ProjectCustomerInlineFields({ profile, onChange, custome
     );
     const selectedContactIds = profile.contacts.filter((contact) => contact.id).map((contact) => contact.id);
 
+    const selectedCustomer = [pickedCustomer, ...customerItems].find((item) => item?.id === profile.customer_id);
+    const readonly = (selectedCustomer?.meta?.can_update
+        ?? (initialCustomer?.id === profile.customer_id ? initialCustomer.can_update : undefined)) === false;
+
     useEffect(() => {
         setCustomerQuery(profile.name || '');
     }, [profile.customer_id, profile.name]);
@@ -34,10 +39,11 @@ export default function ProjectCustomerInlineFields({ profile, onChange, custome
     function changeCustomerName(name) {
         setCustomerQuery(name);
         setCustomerMenuOpen(true);
-        onChange({ ...profile, name, overwrite_confirmed: false });
+        if (!readonly) onChange({ ...profile, name, overwrite_confirmed: false });
     }
 
     function pickCustomer(item) {
+        setPickedCustomer(item);
         onChange({
             customer_id: item.id,
             name: customerName(item),
@@ -97,7 +103,11 @@ export default function ProjectCustomerInlineFields({ profile, onChange, custome
     return (
         <fieldset className="project-customer-inline wide">
             <legend>客户与联系人资料</legend>
-            <p className="muted wide">填写后随项目一次保存并同步到客户主档；客户按名称和地址识别。</p>
+            <p className="muted wide">{readonly ? '该客户主档及联系人为只读；可选择已有客户和联系人关联到本项目。' : '填写后随项目一次保存并同步到客户主档；客户按名称和地址识别。'}</p>
+            {readonly && <button type="button" className="secondary-button small-action" onClick={() => {
+                setPickedCustomer(null);
+                onChange({ customer_id: '', name: '', address: '', level: '', customer_nature: '', contacts: [], overwrite_confirmed: false });
+            }}>改为新建客户</button>}
             <label>
                 <span>客户名称<b>*</b></span>
                 <div className="creatable-combo">
@@ -134,11 +144,11 @@ export default function ProjectCustomerInlineFields({ profile, onChange, custome
             </label>
             <label className="wide">
                 <span>客户地址</span>
-                <input value={profile.address} onChange={(event) => onChange({ ...profile, address: event.target.value, overwrite_confirmed: false })} />
+                <input readOnly={readonly} value={profile.address} onChange={(event) => onChange({ ...profile, address: event.target.value, overwrite_confirmed: false })} />
             </label>
             <label>
                 <span>客户等级</span>
-                <select value={profile.level} onChange={(event) => onChange({ ...profile, level: event.target.value, overwrite_confirmed: false })}>
+                <select disabled={readonly} value={profile.level} onChange={(event) => onChange({ ...profile, level: event.target.value, overwrite_confirmed: false })}>
                     <option value="">未选择</option>
                     <option value="A">A</option>
                     <option value="B">B</option>
@@ -147,7 +157,7 @@ export default function ProjectCustomerInlineFields({ profile, onChange, custome
             </label>
             <label>
                 <span>客户性质</span>
-                <select value={profile.customer_nature} onChange={(event) => onChange({ ...profile, customer_nature: event.target.value, overwrite_confirmed: false })}>
+                <select disabled={readonly} value={profile.customer_nature} onChange={(event) => onChange({ ...profile, customer_nature: event.target.value, overwrite_confirmed: false })}>
                     <option value="">未选择</option>
                     <option value="国央企">国央企</option>
                     <option value="私企">私企</option>
@@ -167,18 +177,18 @@ export default function ProjectCustomerInlineFields({ profile, onChange, custome
             <div className="wide project-contact-rows">
                 <div className="project-contact-rows-head">
                     <strong>客户联系人</strong>
-                    <button type="button" className="secondary-button small-action" onClick={addContact}><Plus size={14} /> 添加联系人行</button>
+                    {!readonly && <button type="button" className="secondary-button small-action" onClick={addContact}><Plus size={14} /> 添加联系人行</button>}
                 </div>
                 {profile.contacts.length === 0 && <p className="muted">暂无联系人，可从下拉选择或添加联系人行。</p>}
                 {profile.contacts.map((contact, index) => (
                     <div className="project-contact-row" key={contact.id || `new-contact-${index}`}>
                         <label>
                             <span>联系人姓名*</span>
-                            <input value={contact.name} required onChange={(event) => changeContact(index, 'name', event.target.value)} />
+                            <input readOnly={readonly} value={contact.name} required onChange={(event) => changeContact(index, 'name', event.target.value)} />
                         </label>
                         <label>
                             <span>手机号</span>
-                            <input value={contact.phone} onChange={(event) => changeContact(index, 'phone', event.target.value)} />
+                            <input readOnly={readonly} value={contact.phone} onChange={(event) => changeContact(index, 'phone', event.target.value)} />
                         </label>
                         <button type="button" className="icon-link" aria-label={`移除联系人 ${contact.name || index + 1}`} onClick={() => removeContact(index)}>
                             <Trash2 size={15} />

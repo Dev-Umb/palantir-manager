@@ -19,6 +19,8 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, SoftDeletes;
 
+    protected $attributes = ['is_password_changed' => false];
+
     private ?array $permissionKeyCache = null;
 
     /**
@@ -31,6 +33,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_password_changed' => 'boolean',
         ];
     }
 

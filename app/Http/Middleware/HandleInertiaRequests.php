@@ -6,6 +6,7 @@ use App\Models\BusinessObject;
 use App\Models\ProjectNotification;
 use App\Models\TenderNotification;
 use App\Support\BusinessWorkspace;
+use App\Support\HubAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
@@ -19,12 +20,30 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
         $permissions = $user ? $user->permissionKeys() : [];
 
+        if ($request->is('procurement-hub', 'procurement-hub/*')) {
+            $canRead = HubAccess::canRead($user);
+            $canManage = HubAccess::canManage($user);
+
+            return [
+                ...parent::share($request),
+                'auth' => ['user' => $user?->only('id', 'name', 'email', 'is_password_changed'), 'roles' => $user?->roles->map->only(['id', 'name', 'label'])->values() ?? [], 'permissions' => $permissions, 'settings_url' => \Illuminate\Support\Facades\Route::has('settings.index') ? route('settings.index') : null],
+                'nav' => [
+                    ['key' => 'hub', 'exact' => true, 'label' => '招采信息中心', 'href' => route('hub.index'), 'visible' => $canRead],
+                    ['key' => 'hub-follows', 'label' => '我的关注', 'href' => route('hub.follows'), 'visible' => $canRead],
+                    ['key' => 'platform', 'label' => '返回主平台', 'href' => '/', 'visible' => true],
+                ],
+                'notificationUnreadCount' => 0,
+                'flash' => ['status' => fn () => $request->session()->get('status')],
+            ];
+        }
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $user ? $user->only('id', 'name', 'email') : null,
+                'user' => $user ? $user->only('id', 'name', 'email', 'is_password_changed') : null,
                 'roles' => $user ? $user->roles->sortBy('label')->map->only(['id', 'name', 'label'])->values() : [],
                 'permissions' => $permissions,
+                'settings_url' => $user ? route('settings.index') : null,
             ],
             'nav' => $user ? $this->navigation($request, $permissions) : [],
             'notificationUnreadCount' => fn () => $user
@@ -96,7 +115,9 @@ class HandleInertiaRequests extends Middleware
                     ])
                     ->values(),
             ],
+            ['key' => 'settings', 'label' => '用户设置', 'href' => route('settings.index'), 'visible' => true, 'mobile_priority' => 90],
             ['key' => 'rbac', 'label' => '用户与权限', 'href' => route('rbac.index'), 'visible' => $can('rbac.manage'), 'mobile_priority' => 80],
+            ['key' => 'hub', 'exact' => true, 'label' => '招采信息中心', 'href' => route('hub.index'), 'visible' => HubAccess::canRead($request->user()), 'mobile_priority' => 65],
             ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
         ];
     }

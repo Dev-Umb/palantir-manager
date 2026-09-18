@@ -6,12 +6,15 @@ use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\User;
+use App\Support\ProjectVisibility;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class SyncProjectCustomerProfile
 {
+    public function __construct(private ProjectVisibility $visibility) {}
+
     /** @var array<string, string> */
     private const CUSTOMER_FIELD_LABELS = [
         'name' => '客户名称',
@@ -153,6 +156,15 @@ class SyncProjectCustomerProfile
         CreateObjectRecord $writer,
     ): ObjectRecord {
         $before = $customer->payload ?? [];
+        if ($this->visibility->hasGlobalBusinessView($user)
+            && ! $this->visibility->allowsRecordWrite($user, $customer)) {
+            foreach ($this->customerPayload($profile) as $key => $value) {
+                abort_unless($this->text($before[$key] ?? ($key === 'name' ? $customer->title : '')) === $value, 403, '该客户资料为只读。');
+            }
+
+            return $customer;
+        }
+
         $payload = $writer->normalizePayload(
             $customer->businessObject,
             [...$before, ...$this->customerPayload($profile)],
@@ -234,6 +246,14 @@ class SyncProjectCustomerProfile
     private function updateContact(ObjectRecord $record, array $contact, User $user): void
     {
         $before = $record->payload ?? [];
+        if ($this->visibility->hasGlobalBusinessView($user)
+            && ! $this->visibility->allowsRecordWrite($user, $record)) {
+            abort_unless($this->text($before['name'] ?? $record->title) === $contact['name']
+                && $this->text($before['phone'] ?? '') === $contact['phone'], 403, '该联系人资料为只读。');
+
+            return;
+        }
+
         $payload = [...$before, 'name' => $contact['name'], 'phone' => $contact['phone']];
         if ($payload === $before && $record->title === $contact['name']) {
             return;

@@ -68,7 +68,7 @@ class BuildCompanyOperationsDashboard
         $asOf = now()->toISOString();
         $cockpit = [
             'meta' => [
-                'scope' => $this->isAdmin($user) ? '公司全量' : '我的可见范围',
+                'scope' => ($this->isAdmin($user) || $this->projectVisibility->hasGlobalBusinessView($user)) ? '公司全量' : '我的可见范围',
                 'as_of' => $asOf,
             ],
             'kpis' => [],

@@ -1,3 +1,4 @@
+import AttachmentTray from './AttachmentTray';
 import { Plus, Trash2 } from 'lucide-react';
 
 const attachmentFields = [
@@ -33,6 +34,7 @@ export function projectContractsForEdit(records = []) {
         contract_chase_record: record.payload?.contract_chase_record || '',
         contract_qty: record.payload?.contract_qty ?? '',
         remark: record.payload?.remark || '',
+        attachment_previews: record.attachment_previews || {},
         existing_processing_letter_attachments: record.payload?.processing_letter_attachments || [],
         existing_contract_attachments: record.payload?.contract_attachments || [],
         existing_statement_attachments: record.payload?.statement_attachments || [],
@@ -135,7 +137,7 @@ export default function ProjectContractEditor({ contracts, onChange, deletedCont
                         {attachmentFields.map(([field, existingField, label]) => (
                             <div className="project-contract-attachment wide" key={field}>
                                 <span>{label}</span>
-                                {(contract[existingField] || []).length > 0 && (
+                                {contract.attachment_previews?.[field]?.length > 0 ? <AttachmentTray files={contract.attachment_previews[field]} label={label} /> : (contract[existingField] || []).length > 0 && (
                                     <div className="attachment-list">
                                         {contract[existingField].map((url, attachmentIndex) => (
                                             <a key={`${url}-${attachmentIndex}`} href={url} target="_blank" rel="noreferrer">
@@ -184,7 +186,7 @@ export function ProjectContractsDetail({ contracts = [] }) {
                     {attachmentFields.map(([field, , label]) => (contract.payload?.[field] || []).length > 0 && (
                         <div className="attachment-list" key={field}>
                             <span>{label}</span>
-                            {contract.payload[field].map((url, index) => <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer">附件 {index + 1}</a>)}
+                            {contract.attachment_previews?.[field]?.length > 0 ? <AttachmentTray files={contract.attachment_previews[field]} label={label} /> : contract.payload[field].map((url, index) => <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer">附件 {index + 1}</a>)}
                         </div>
                     ))}
                 </article>

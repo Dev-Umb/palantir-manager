@@ -80,7 +80,7 @@ class BuildAiUpdateProposal
     {
         if (! $user->canDo("object.{$object->key}.update")
             || $object->read_only
-            || ! $this->projectVisibility->allowsRecord($user, $record)) {
+            || ! $this->projectVisibility->allowsRecordWrite($user, $record)) {
             throw new AuthorizationException('当前账号没有修改该业务资料的权限。');
         }
     }

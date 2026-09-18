@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Bell, Bot, Box, ClipboardCheck, ClipboardPlus, Database, HardHat, LayoutDashboard, LogOut, Menu, ShieldCheck, UserRound, X } from 'lucide-react';
+import { Bell, Bot, Box, ClipboardCheck, ClipboardPlus, Database, HardHat, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { businessText } from '../businessLanguage';
 import { useDialogFocus } from './useDialogFocus';
@@ -12,12 +12,14 @@ const iconFor = {
     'team-log': HardHat,
     ontology: Database,
     rbac: ShieldCheck,
+    settings: Settings,
     ai: Bot,
 };
 
 export default function Layout({ title, eyebrow, children, aside, immersive = false, hideHeader = false }) {
     const page = usePage();
     const { auth, nav, flash, notificationUnreadCount = 0 } = page.props;
+    const passwordChangeRequired = auth.user?.is_password_changed === false;
     const visibleNav = (nav || []).filter((item) => item.visible);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const preferredMobileKeys = ['dashboard', 'notifications', 'ontology'];
@@ -63,7 +65,7 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                     {visibleNav.map((item) => {
                         const itemLabel = businessText(item.label);
                         const Icon = iconFor[item.key] || LayoutDashboard;
-                        const open = isActive(page.url, item.href) || (item.children || []).some((group) => group.items.some((child) => isActive(page.url, child.href, true)));
+                        const open = isActive(page.url, item.href, item.exact === true) || (item.children || []).some((group) => group.items.some((child) => isActive(page.url, child.href, true)));
                         const moduleGroups = (item.children || []).filter((group) => group.items?.length > 0);
                         return (
                             <div key={item.href} className="nav-group">
@@ -145,7 +147,13 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                 onMenuClose={() => setMobileMenuOpen(false)}
                 onLogout={logout}
             />
-            <main className={`workspace ${immersive ? 'workspace-immersive' : ''}`}>
+            <main className={`workspace ${immersive ? 'workspace-immersive' : ''}`} style={immersive && passwordChangeRequired ? { gridTemplateRows: `${!hideHeader ? 'auto ' : ''}auto minmax(0, 1fr)` } : undefined}>
+                {passwordChangeRequired && (
+                    <div className="password-reminder" role="status">
+                        <span>为保障账号安全，请修改密码。修改完成前将持续提醒。</span>
+                        <Link href={`${auth.settings_url}#password`}>修改密码</Link>
+                    </div>
+                )}
                 {!hideHeader && (
                     <header className="workspace-head">
                         <div>
@@ -262,7 +270,7 @@ function MobileNavigation({
 }
 
 function isNavItemActive(currentUrl, item) {
-    return isActive(currentUrl, item.href)
+    return isActive(currentUrl, item.href, item.exact === true)
         || (item.children || []).some((group) => group.items.some((child) => isActive(currentUrl, child.href, true)));
 }
 

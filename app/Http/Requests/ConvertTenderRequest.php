@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\ObjectRecord;
+use App\Support\ProjectVisibility;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -17,7 +18,8 @@ class ConvertTenderRequest extends FormRequest
 
         return $record instanceof ObjectRecord
             && $record->businessObject?->key === 'tender'
-            && (bool) $this->user()?->canDo('object.tender.update');
+            && (bool) $this->user()?->canDo('object.tender.update')
+            && app(ProjectVisibility::class)->allowsRecordWrite($this->user(), $record);
     }
 
     /**

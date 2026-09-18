@@ -3,11 +3,15 @@
 namespace App\Jobs;
 
 use App\Ai\AiFailureClassifier;
+use App\Ai\AiHistoryAuthorization;
 use App\Ai\AiRunEventPublisher;
 use App\Ai\AiToolEventProjector;
+use App\Ai\FeishuDataAgent;
 use App\Ai\XycDataAgent;
+use App\Integrations\Feishu\FeishuRunAuthorization;
 use App\Models\AiRun;
 use App\Models\AuditLog;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\RequestException;
@@ -50,9 +54,28 @@ class RunAiHarness implements ShouldQueue
         AiRunEventPublisher $events,
         AiToolEventProjector $tools,
         AiFailureClassifier $failures,
+        FeishuRunAuthorization $feishuAuthorization,
     ): void {
         $run = AiRun::with('user')->findOrFail($this->runId);
         if (in_array($run->status, ['completed', 'failed', 'cancelled'], true)) {
+            return;
+        }
+
+        if ($run->origin === 'feishu') {
+            $boundUser = $feishuAuthorization->resolveUser($run);
+            if (! $boundUser) {
+                $this->denyFeishuRun($run, $events);
+
+                return;
+            }
+
+            $run->setRelation('user', $boundUser);
+        }
+
+        if (! $run->user || ! $run->user->canDo('ai.harness.view')
+            || ! app(AiHistoryAuthorization::class)->allowsConversation($run->user, $run->conversation_id)) {
+            $this->denyRun($run, $events);
+
             return;
         }
 
@@ -79,13 +102,20 @@ class RunAiHarness implements ShouldQueue
                 return;
             }
 
+            $actor = $run->user->fresh();
+            if (! $actor || ! app(AiHistoryAuthorization::class)->allowsConversation($actor, $run->conversation_id)) {
+                throw new AuthorizationException(AiHistoryAuthorization::MESSAGE);
+            }
+
             $events->publish($run, 'answer.delta', ['delta' => $buffer]);
             $buffer = '';
             $lastFlush = microtime(true);
         };
 
         try {
-            $agent = XycDataAgent::make(user: $run->user)
+            $agent = ($run->origin === 'feishu'
+                ? FeishuDataAgent::make(user: $run->user)
+                : XycDataAgent::make(user: $run->user))
                 ->continue($run->conversation_id, $run->user);
             $stream = $agent->stream(
                 $run->input,
@@ -103,6 +133,10 @@ class RunAiHarness implements ShouldQueue
                 $periodicTextCheck = $textDeltasSinceCancellationCheck >= 8
                     && microtime(true) - ($lastCancellationCheck ?? 0) >= 0.5;
                 if ($cancelCheckable && ($lastCancellationCheck === null || $toolBoundary || $periodicTextCheck)) {
+                    $actor = $run->user->fresh();
+                    if (! $actor || ! app(AiHistoryAuthorization::class)->allowsConversation($actor, $run->conversation_id)) {
+                        throw new AuthorizationException(AiHistoryAuthorization::MESSAGE);
+                    }
                     $cancelRequested = AiRun::whereKey($run->id)->whereNotNull('cancel_requested_at')->exists();
                     $lastCancellationCheck = microtime(true);
                     $textDeltasSinceCancellationCheck = 0;
@@ -162,11 +196,15 @@ class RunAiHarness implements ShouldQueue
             ]);
 
             $this->audit($run, 'ai.run.completed');
+            $this->notifyFeishu($run);
+        } catch (AuthorizationException $exception) {
+            $this->denyRun($run, $events);
         } catch (Throwable $exception) {
             $failure = $failures->classify($exception);
             $attempt = $this->attempts();
             $this->reportAttemptFailure($run, $exception, $failure, $attempt);
             if ($failure['recoverable'] && $attempt < $this->tries) {
+                $authorizationProvenance = $run->provenance ?? [];
                 $run->update([
                     'status' => 'queued',
                     'answer' => null,
@@ -184,6 +222,7 @@ class RunAiHarness implements ShouldQueue
                     'attempt' => $attempt + 1,
                     'failure_category' => $failure['category'],
                     'reset_output' => true,
+                    'authorization_provenance' => $authorizationProvenance,
                     ...Arr::only($failure, ['provider_status', 'provider_response_excerpt']),
                 ]);
                 $this->release($this->backoff()[$attempt - 1] ?? 3);
@@ -199,6 +238,7 @@ class RunAiHarness implements ShouldQueue
             ]);
             $events->publish($run, 'run.failed', $run->error);
             $this->audit($run, 'ai.run.failed');
+            $this->notifyFeishu($run);
         }
     }
 
@@ -240,6 +280,7 @@ class RunAiHarness implements ShouldQueue
         }
 
         $this->audit($run, 'ai.run.failed');
+        $this->notifyFeishu($run);
     }
 
     private function audit(AiRun $run, string $action): void
@@ -282,5 +323,39 @@ class RunAiHarness implements ShouldQueue
             'reason' => $run->cancel_reason,
         ]);
         $this->audit($run, 'ai.run.cancelled');
+    }
+
+    private function notifyFeishu(AiRun $run): void
+    {
+        if ($run->origin === 'feishu') {
+            SendFeishuAiReply::dispatch($run->id)->afterCommit();
+        }
+    }
+
+    private function denyRun(AiRun $run, AiRunEventPublisher $events): void
+    {
+        $run->update([
+            'status' => 'failed',
+            'answer' => null,
+            'artifacts' => [],
+            'error' => ['message' => AiHistoryAuthorization::MESSAGE],
+            'failure_category' => 'authorization',
+            'finished_at' => now(),
+        ]);
+        $events->publish($run, 'run.failed', $run->error);
+        $this->audit($run, 'ai.run.authorization_denied');
+    }
+
+    private function denyFeishuRun(AiRun $run, AiRunEventPublisher $events): void
+    {
+        $run->update([
+            'status' => 'failed',
+            'error' => ['message' => '飞书账号绑定或数据权限已失效，请联系管理员重新绑定。'],
+            'failure_category' => 'authorization',
+            'finished_at' => now(),
+        ]);
+        $events->publish($run, 'run.failed', $run->error);
+        $this->audit($run, 'ai.run.authorization_denied');
+        $this->notifyFeishu($run);
     }
 }

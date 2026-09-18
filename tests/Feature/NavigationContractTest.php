@@ -22,7 +22,10 @@ class NavigationContractTest extends TestCase
 
         $this->actingAs($admin)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->has('auth')->has('flash')->has('notificationUnreadCount')
-            ->has('nav', 5)
+            ->has('nav', 7)
+            ->where('nav.3.key', 'settings')
+            ->where('nav.5.key', 'hub')
+            ->where('nav.6.key', 'ai')
             ->where('nav.0.key', 'dashboard')
             ->where('nav.0.label', '经营大盘')
             ->where('nav.0.mobile_priority', 10)

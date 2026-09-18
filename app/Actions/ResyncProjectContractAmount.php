@@ -21,7 +21,8 @@ class ResyncProjectContractAmount
             $contractObject = BusinessObject::query()->where('key', 'contract')->firstOrFail();
             $amount = round($contractObject->records()
                 ->where('payload->project_id', $lockedProject->id)
-                ->sum('payload->amount'), 2);
+                ->get(['payload'])
+                ->sum(fn (ObjectRecord $contract): float => (float) ($contract->payload['amount'] ?? 0)), 2);
             $payload = $lockedProject->payload ?? [];
             $before = $payload['contract_amount'] ?? null;
             $payload['contract_amount'] = $amount;

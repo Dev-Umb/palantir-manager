@@ -4,6 +4,7 @@ import FeedbackDialog from './FeedbackDialog';
 import { useDialogFocus } from './useDialogFocus';
 
 export default function CustomerContactModal({ mode = 'detail', contactObjectId, customer, contacts = [], contact = null, can = {}, onSaved, onDeleted, onClose }) {
+    can = customer?.can_update === false ? { create: false, update: false, delete: false } : can;
     const [view, setView] = useState(mode);
     const [activeContact, setActiveContact] = useState(contact);
     const [name, setName] = useState(contact?.name || '');

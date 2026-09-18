@@ -30,7 +30,7 @@ class AiRunRecoveryTest extends TestCase
         $run = $this->createRun([
             'artifacts' => [['id' => 'form-1', 'type' => 'form']],
             'sources' => [['object_key' => 'project', 'record_count' => 1]],
-            'provenance' => [['query_hash' => 'query-1', 'result_hash' => 'result-1']],
+            'provenance' => [['object_key' => 'project', 'record_ids' => [], 'query_hash' => 'query-1', 'result_hash' => 'result-1']],
             'data_quality' => [['message' => 'partial']],
         ]);
         $exception = $this->requestException(400, json_encode([
@@ -129,7 +129,9 @@ class AiRunRecoveryTest extends TestCase
 
     private function createRun(array $overrides = []): AiRun
     {
+        app(\App\Actions\SyncXycMetadata::class)->handle();
         $user = User::factory()->create();
+        $user->roles()->attach(\App\Models\Role::where('name', 'admin')->firstOrFail());
         $conversationId = app(ConversationStore::class)->storeConversation($user->id, 'AI recovery test');
 
         return AiRun::create([
@@ -195,6 +197,7 @@ class AiRunRecoveryTest extends TestCase
             app(AiRunEventPublisher::class),
             app(AiToolEventProjector::class),
             app(AiFailureClassifier::class),
+            app(\App\Integrations\Feishu\FeishuRunAuthorization::class),
         );
     }
 }

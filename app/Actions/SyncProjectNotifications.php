@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Integrations\Feishu\FeishuNotificationDispatcher;
 use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 class SyncProjectNotifications
 {
+    public function __construct(private FeishuNotificationDispatcher $feishu) {}
+
     /** @return array{created: int, reactivated: int, resolved: int, triggered: int} */
     public function handle(): array
     {
@@ -132,7 +135,9 @@ class SyncProjectNotifications
         $paymentRecipients = array_values(array_unique([...$businessRecipients, ...$finances, ...$admins]));
         $statusAnchor = $this->date($payload['overall_status_changed_at'] ?? null, $project->updated_at ?? $now);
         $processingAnchor = $this->date($payload['processing_letter_at'] ?? null, $statusAnchor);
-        $paymentAnchor = $this->date($payload['payment_reminder_anchor_at'] ?? null, $processingAnchor);
+        $paymentAnchor = $this->dateOrNull($payload['last_payment_date'] ?? null);
+        $unpaidAmount = $payload['unpaid_amount'] ?? null;
+        $hasOutstandingBalance = is_numeric($unpaidAmount) && (float) $unpaidAmount > 0;
         $definitions = [];
 
         if ($status === '投标中') {
@@ -159,11 +164,13 @@ class SyncProjectNotifications
                 'recipients' => $lifecycleRecipients,
             ];
         }
-        if (! empty($payload['processing_letter_at']) && ($payload['payment_status'] ?? '未回款') !== '已回款') {
+        if (in_array($status, ['已拿到加工函', '合同签署'], true)
+            && $hasOutstandingBalance
+            && $paymentAnchor !== null) {
             $definitions[ProjectNotification::TYPE_PAYMENT] = [
                 'anchor' => $paymentAnchor,
                 'first' => '1_month',
-                'repeat' => '1_month',
+                'repeat' => '15_days',
                 'recipients' => $paymentRecipients,
             ];
         }
@@ -311,6 +318,7 @@ class SyncProjectNotifications
                 ]);
                 $summary['created']++;
                 $this->auditNotification('notification.created', $notification);
+                $this->feishu->dispatch($notification);
 
                 continue;
             }
@@ -327,6 +335,7 @@ class SyncProjectNotifications
                 $summary['reactivated']++;
             }
             $this->auditNotification($reactivated ? 'notification.reactivated' : 'notification.repeated', $notification);
+            $this->feishu->dispatch($notification);
         }
     }
 
@@ -342,7 +351,21 @@ class SyncProjectNotifications
 
     private function date(mixed $value, Carbon $fallback): Carbon
     {
-        return is_string($value) && $value !== '' ? Carbon::parse($value) : $fallback->copy();
+        return (is_string($value) && $value !== '' ? Carbon::parse($value) : $fallback->copy())
+            ->startOfSecond();
+    }
+
+    private function dateOrNull(mixed $value): ?Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->startOfSecond();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** @return array{created: int, reactivated: int, resolved: int, triggered: int} */

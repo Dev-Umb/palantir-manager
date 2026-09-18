@@ -1,3 +1,4 @@
+import AttachmentTray from '../../Components/AttachmentTray';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -44,8 +45,11 @@ export default function Index({ objects = [], contactObject = null, currentObjec
     const [columnOrder, setColumnOrder] = useState(() => hasFixedColumnOrder ? [] : readColumnOrder(storageKey));
     const [columnWidths, setColumnWidths] = useState(() => readColumnWidths(widthStorageKey));
     const orderedFields = useMemo(
-        () => hasFixedColumnOrder ? currentObject.fields : fieldsInColumnOrder(currentObject.fields, columnOrder),
-        [columnOrder, currentObject.fields, hasFixedColumnOrder],
+        () => hasFixedColumnOrder ? currentObject.fields : fieldsInColumnOrder(
+            currentObject.fields,
+            currentObject.key === 'contract' ? ['business_owner_name', ...columnOrder] : columnOrder,
+        ),
+        [columnOrder, currentObject.fields, currentObject.key, hasFixedColumnOrder],
     );
     const createForm = useForm(currentObject.key === 'project'
         ? { payload: defaults(currentObject.fields, params), contracts: [], deleted_contract_ids: [] }
@@ -261,12 +265,12 @@ export default function Index({ objects = [], contactObject = null, currentObjec
                     }}
                 />
             )}
-            {mode === 'detail' && selectedRecord && (
+            {(mode === 'detail' || (mode === 'edit' && selectedRecord?.can_update === false)) && selectedRecord && (
                 <Modal title={`${selectedRecord.code} · 详情`} closeHref={closeHref}>
                     <RecordDetail object={currentObject} record={selectedRecord} fields={orderedFields} relationOptions={relationOptions} contactCan={contactCan} onContactDetail={openContactDetail} onContactCreate={openContactCreate} can={can} />
                 </Modal>
             )}
-            {mode === 'convert' && can.convert && selectedRecord && !selectedRecord.payload?.converted_project_id && (
+            {mode === 'convert' && can.convert && selectedRecord && selectedRecord.can_update !== false && !selectedRecord.payload?.converted_project_id && (
                 <TenderConversionModal
                     record={selectedRecord}
                     businessUsers={businessUsers}
@@ -770,6 +774,7 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
             )}
             {objectKey === 'project' && canManageCustomers && (
                 <ProjectCustomerInlineFields
+                    initialCustomer={record?.customer}
                     profile={customerProfile}
                     onChange={setCustomerProfile}
                     customerOptions={relationOptions.customer_id || {}}
@@ -815,6 +820,7 @@ function RecordDetail({ object, record, fields, relationOptions, contactCan, onC
 
     return (
         <>
+            {record.can_update === false && <p className="muted">当前数据为只读。</p>}
             <div className="detail-grid">
                 <div>
                     <span>编号</span>
@@ -837,9 +843,9 @@ function RecordDetail({ object, record, fields, relationOptions, contactCan, onC
             )}
             {object.key === 'project' && <ProjectContacts contacts={record.contacts || []} />}
             {object.key === 'project' && can.view_contracts && <ProjectContractsDetail contracts={record.contracts || []} />}
-            {object.key === 'project' && can.sync_contract_amount && <ContractAmountSync project={record} />}
+            {object.key === 'project' && can.sync_contract_amount && record.can_update !== false && <ContractAmountSync project={record} />}
             {object.key === 'customer' && <CustomerContacts customer={record} contacts={record.contacts || []} can={contactCan} onDetail={onContactDetail} onCreate={onContactCreate} />}
-            {object.key === 'tender' && can.convert && !record.payload?.converted_project_id && (
+            {object.key === 'tender' && can.convert && record.can_update !== false && !record.payload?.converted_project_id && (
                 <div className="form-actions">
                     <span>确认中标后将创建项目主档并指派接手业务员。</span>
                     <Link className="action-button" href={`/objects/tender?record=${record.id}&mode=convert`} preserveScroll>
@@ -1006,7 +1012,7 @@ function CustomerContacts({ customer, contacts, can = {}, onDetail, onCreate }) 
                 </div>
                 <div className="section-actions">
                     <span>共 {contacts.length} 位联系人</span>
-                    {can.create && (
+                    {can.create && customer.can_update !== false && (
                         <button type="button" className="small-action action-button" onClick={() => onCreate?.(customer)}>
                             <Plus size={15} /> 新增联系人
                         </button>
@@ -1057,6 +1063,7 @@ function cellValue(objectKey, field, record, relationOptions) {
     if (value === null || value === undefined || value === '') return '';
     if (field.type === 'relation') return <span className="relation-chip">{value}</span>;
     if (['multirelation', 'multiaccount'].includes(field.type)) return (Array.isArray(value) ? value : []).map((label, index) => <span className="relation-chip" key={`${label}-${index}`}>{label}</span>);
+    if (record.attachment_previews?.[field.key]?.length) return <AttachmentTray files={record.attachment_previews[field.key]} label={field.label} />;
     if (field.type === 'file') return <a className="relation-chip" href={value} target="_blank" rel="noreferrer">查看附件</a>;
     if (field.type === 'files') return (Array.isArray(value) ? value : []).map((url, index) => <a className="relation-chip" href={url} target="_blank" rel="noreferrer" key={`${url}-${index}`}>附件 {index + 1}</a>);
     return String(formatObjectNumber(objectKey, field, value));

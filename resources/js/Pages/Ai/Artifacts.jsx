@@ -15,6 +15,10 @@ import {
     ChartColumn,
     CircleAlert,
     CircleX,
+    FileText,
+    ArrowUpRight,
+    Minimize2,
+    X,
     ListChecks,
     LoaderCircle,
     Maximize2,
@@ -22,7 +26,7 @@ import {
     SendHorizontal,
     TableProperties,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Bar,
     BarChart,
@@ -42,10 +46,10 @@ import {
 const gridModules = [CellStyleModule, ClientSideRowModelModule, ColumnApiModule, NumberFilterModule, TextFilterModule];
 const chartColors = ['#2f6f9f', '#2f8f6b', '#b7791f', '#c2413d', '#667085', '#7a5aa6'];
 
-export default function Artifact({ artifact, onQuickReply, onProposalAction, canAct = true }) {
+export default function Artifact({ artifact, onQuickReply, onProposalAction, onOpenReport, canAct = true }) {
     if (artifact.type === 'table') return <TableArtifact artifact={artifact} />;
     if (artifact.type === 'chart') return <ChartArtifact artifact={artifact} />;
-    if (artifact.type === 'html') return <HtmlArtifact artifact={artifact} />;
+    if (artifact.type === 'html') return <HtmlArtifact artifact={artifact} onOpenReport={onOpenReport} />;
     if (artifact.type === 'choice') return <ChoiceArtifact artifact={artifact} onQuickReply={onQuickReply} canAct={canAct} />;
     if (artifact.type === 'form') return <FormArtifact artifact={artifact} onQuickReply={onQuickReply} canAct={canAct} />;
     if (artifact.type === 'write_proposal' || artifact.type === 'update_proposal') {
@@ -307,24 +311,89 @@ function ChartArtifact({ artifact }) {
     );
 }
 
-export function HtmlArtifact({ artifact }) {
-    const [expanded, setExpanded] = useState(false);
-    const document = useMemo(() => htmlDocument(artifact.data?.html || ''), [artifact]);
+export function HtmlArtifact({ artifact, onOpenReport }) {
+    if (!artifact.data?.html?.trim()) {
+        return <p className="ai-inline-error">{artifact.title || '报告'}：报告内容为空，请重新生成。</p>;
+    }
 
     return (
-        <section className="ai-artifact ai-html-artifact">
-            <ArtifactHeading artifact={artifact} icon={<ShieldCheck size={15} />} badge="静态 HTML" />
+        <button
+            type="button"
+            className="ai-report-card"
+            onClick={(event) => onOpenReport?.(artifact, event.currentTarget)}
+            aria-label={`打开报告：${artifact.title || '分析报告'}`}
+        >
+            <span className="ai-report-card-icon"><FileText size={22} /></span>
+            <span><strong>{artifact.title || '分析报告'}</strong><small>查看完整报告</small></span>
+            <ArrowUpRight size={18} />
+        </button>
+    );
+}
+
+export function HtmlReportReader({ artifact, onClose, children }) {
+    const [enlarged, setEnlarged] = useState(false);
+    const [smallScreen, setSmallScreen] = useState(() => window.matchMedia?.('(max-width: 1100px)').matches || false);
+    const modal = enlarged || smallScreen;
+    const dialogRef = useRef(null);
+    const closeRef = useRef(null);
+    const document = useMemo(() => htmlDocument(artifact.data?.html || ''), [artifact.data?.html]);
+
+    useEffect(() => {
+        const media = window.matchMedia?.('(max-width: 1100px)');
+        if (!media) return undefined;
+        const update = () => setSmallScreen(media.matches);
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
+
+    useEffect(() => {
+        if (modal) dialogRef.current?.showModal();
+        closeRef.current?.focus();
+    }, [modal]);
+
+    useEffect(() => {
+        if (modal) return undefined;
+        const dismiss = (event) => {
+            if (event.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', dismiss);
+        return () => window.removeEventListener('keydown', dismiss);
+    }, [modal, onClose]);
+
+    const content = (
+        <>
+            <header className="ai-report-reader-heading">
+                <div><FileText size={18} /><h2 id="ai-report-title">{artifact.title || '分析报告'}</h2></div>
+                <div>
+                    {!smallScreen && (
+                        <button type="button" className="icon-button" onClick={() => setEnlarged((value) => !value)} title={enlarged ? '还原阅读区' : '放大阅读'}>
+                            {enlarged ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+                        </button>
+                    )}
+                    <button ref={closeRef} type="button" className="icon-button" onClick={onClose} title="关闭报告"><X size={18} /></button>
+                </div>
+            </header>
+            <div className="ai-report-context">{children}</div>
             <iframe
-                title={artifact.title || 'HTML 分析结果'}
+                title={artifact.title || '分析报告'}
                 srcDoc={document}
                 sandbox=""
                 referrerPolicy="no-referrer"
-                style={{ height: expanded ? 640 : 360 }}
             />
-            <button type="button" className="ai-expand-html" onClick={() => setExpanded((value) => !value)}>
-                <Maximize2 size={14} /> {expanded ? '收起' : '展开查看'}
-            </button>
-        </section>
+        </>
+    );
+
+    return modal ? (
+        <dialog
+            ref={dialogRef}
+            className="ai-report-reader ai-report-reader-modal"
+            aria-labelledby="ai-report-title"
+            onCancel={(event) => { event.preventDefault(); onClose(); }}
+        >
+            {content}
+        </dialog>
+    ) : (
+        <section className="ai-report-reader" role="region" aria-labelledby="ai-report-title">{content}</section>
     );
 }
 
@@ -346,7 +415,7 @@ export function htmlDocument(html) {
     });
     const csp = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'";
 
-    return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html{color:#151b22;background:#fff;font:14px/1.65 Inter,system-ui,sans-serif}body{margin:0;padding:18px}table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;border:1px solid #e3e7ec;text-align:left}th{background:#f5f7f9}*{box-sizing:border-box;max-width:100%}</style></head><body>${safe}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html{color:#151b22;background:#fff;font:14px/1.65 Inter,system-ui,sans-serif}body{margin:0;padding:28px}h1{font-size:26px;line-height:1.3}h2{font-size:20px;margin-top:28px}h3{font-size:16px}p{margin:12px 0}table{width:100%;border-collapse:collapse}th,td{padding:8px 10px;border:1px solid #e3e7ec;text-align:left}th{background:#f5f7f9}*{box-sizing:border-box;max-width:100%}</style></head><body>${safe}</body></html>`;
 }
 
 function formatCell(value) {

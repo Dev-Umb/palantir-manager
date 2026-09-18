@@ -578,6 +578,36 @@ describe('ObjectGrid date editing', () => {
             .toBe('/attachments/drawing-1/attachment');
     });
 
+    it('renders every contract attachment as an individual download link', async () => {
+        render(
+            <ObjectGrid
+                object={{ key: 'contract', label: '合同表' }}
+                records={[{
+                    id: 'contract-1',
+                    code: 'HT-001',
+                    title: 'HT-001',
+                    payload: { contract_attachments: ['first.pdf', 'second.pdf'] },
+                    display: {
+                        contract_attachments: [
+                            '/attachments/contract-1/contract_attachments/0',
+                            '/attachments/contract-1/contract_attachments/1',
+                        ],
+                    },
+                }]}
+                fields={[{ key: 'contract_attachments', label: '合同附件', type: 'files' }]}
+                can={{ update: false, delete: false }}
+                selectedRecordId={null}
+                relationOptions={{}}
+                onRecordChange={() => {}}
+            />,
+        );
+
+        expect((await screen.findByRole('link', { name: '下载1' })).getAttribute('href'))
+            .toBe('/attachments/contract-1/contract_attachments/0');
+        expect(screen.getByRole('link', { name: '下载2' }).getAttribute('href'))
+            .toBe('/attachments/contract-1/contract_attachments/1');
+    });
+
     it('renders an item relation column when an existing row has no relation value or snapshot', async () => {
         expect(() => render(
             <ObjectGrid

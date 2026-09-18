@@ -6,6 +6,7 @@ use App\Actions\AcknowledgeWorkflowTask;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\User;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -14,6 +15,9 @@ use Illuminate\Validation\ValidationException;
 class ObjectRelations
 {
     private const OPTION_LIMIT = 50;
+
+    /** @var array<string, bool> Rendering metadata only; writes always recheck current ownership. */
+    private array $customerWritePermissions = [];
 
     private const INACTIVE_RELATION_TARGETS = [
         'material',
@@ -27,6 +31,9 @@ class ObjectRelations
 
     /** @var array<int, string> */
     private array $accountLabelCache = [];
+
+    /** @var array<string, string|null> */
+    private array $contractBusinessOwnerNames = [];
 
     /** @var array<string, array<int, string>> */
     private array $projectIdsByContact = [];
@@ -47,6 +54,7 @@ class ObjectRelations
         private ProjectVisibility $projectVisibility,
         private ReferenceGraphLock $referenceGraphLock,
         private AcknowledgeWorkflowTask $workflowTasks,
+        private AttachmentPreview $attachmentPreview,
     ) {}
 
     public function lockReferenceGraph(): void
@@ -166,7 +174,13 @@ class ObjectRelations
                         && ($field['key'] ?? null) === 'customer_id'
                         && ($field['target'] ?? null) === 'customer',
                 ),
-                'multirelation' => $this->multirelationDisplayLabels($payload, $field, $value),
+                'multirelation' => $this->multirelationDisplayLabels(
+                    $payload,
+                    $field,
+                    $value,
+                    $record->businessObject->key === 'project'
+                        && ($field['key'] ?? null) === 'customer_contact_ids',
+                ),
                 'account' => $this->accountLabel($value),
                 'multiaccount' => $this->accountLabels($value),
                 default => $value,
@@ -179,6 +193,7 @@ class ObjectRelations
             'title' => $record->title,
             'payload' => $payload,
             'display' => $display,
+            'attachment_previews' => $this->attachmentPreview->descriptors($record),
             'created_at' => $record->created_at?->toISOString(),
             'is_new_task' => $this->workflowTasks->visibleTo($record, $user),
         ];
@@ -186,6 +201,14 @@ class ObjectRelations
         if ($record->businessObject->key === 'project' && $user) {
             $formatted['can_update'] = $this->projectVisibility->allowsProjectUpdate($user, $record);
             $formatted['is_informed_project'] = $this->projectVisibility->isInformedProject($user, $record);
+        }
+
+        if ($user && $this->projectVisibility->hasGlobalBusinessView($user)) {
+            $canWrite = $record->businessObject->key === 'customer' && array_key_exists($record->id, $this->customerWritePermissions)
+                ? $this->customerWritePermissions[$record->id]
+                : $this->projectVisibility->allowsRecordWrite($user, $record);
+            $formatted['can_update'] = $canWrite && $user->canDo("object.{$record->businessObject->key}.update");
+            $formatted['can_delete'] = $canWrite && $user->canDo("object.{$record->businessObject->key}.delete");
         }
 
         if ($record->businessObject->key === 'customer') {
@@ -236,8 +259,12 @@ class ObjectRelations
     }
 
     /** @return array<int, string> */
-    private function multirelationDisplayLabels(array $payload, array $field, mixed $value): array
-    {
+    private function multirelationDisplayLabels(
+        array $payload,
+        array $field,
+        mixed $value,
+        bool $includeCustomerContactPhone = false,
+    ): array {
         $snapshots = collect($payload['_snapshots'][$field['key']] ?? [])
             ->filter(fn ($snapshot) => is_array($snapshot)
                 && is_string($snapshot['id'] ?? null)
@@ -246,12 +273,26 @@ class ObjectRelations
 
         return collect(is_array($value) ? $value : [])
             ->filter(fn ($id) => is_string($id) && $id !== '')
-            ->map(function (string $id) use ($snapshots): string {
+            ->map(function (string $id) use ($snapshots, $includeCustomerContactPhone): string {
                 $snapshot = $snapshots->get($id);
 
-                return is_array($snapshot)
+                $fallbackLabel = is_array($snapshot)
                     ? $snapshot['label']
                     : ($this->labelForId($id)['label'] ?? '关联记录不存在');
+
+                if (! $includeCustomerContactPhone) {
+                    return $fallbackLabel;
+                }
+
+                $contact = $this->contactDetailsById[$id] ?? null;
+                if (! is_array($contact)) {
+                    return $fallbackLabel;
+                }
+
+                $name = trim($contact['name']);
+                $phone = trim($contact['phone']);
+
+                return $phone === '' ? $name : "{$name}({$phone})";
             })
             ->values()
             ->all();
@@ -270,19 +311,44 @@ class ObjectRelations
     {
         $this->labelCache = [];
         $this->accountLabelCache = [];
+        $this->contractBusinessOwnerNames = [];
         $this->projectIdsByContact = [];
         $this->contactsByCustomer = [];
         $this->projectsByCustomer = [];
         $this->contactDetailsById = [];
         $this->customerDetailsById = [];
         $records->each(fn (ObjectRecord $record) => $record->loadMissing('businessObject'));
+        $this->attachmentPreview->preload($records);
         $this->preloadRelationLabels($records);
         $this->preloadDerivedRelations($records, $user);
+        $this->customerWritePermissions = [];
+        if ($user && $this->projectVisibility->hasGlobalBusinessView($user)) {
+            $ids = $records->filter(fn (ObjectRecord $record): bool => $record->businessObject->key === 'customer')->pluck('id')
+                ->merge(array_keys($this->customerDetailsById))->unique()->values()->all();
+            $this->customerWritePermissions = $this->projectVisibility->customerWritePermissions($user, $ids);
+            foreach ($this->customerDetailsById as $id => &$customer) {
+                $customer['can_update'] = $this->customerWritePermissions[$id] ?? false;
+            }
+            unset($customer);
+        }
     }
 
     public function preloadRelationLabels(Collection $records): void
     {
         $records->each(fn (ObjectRecord $record) => $record->loadMissing('businessObject'));
+
+        $contractIds = $records
+            ->filter(fn (ObjectRecord $record): bool => $record->businessObject?->key === 'contract')
+            ->pluck('id');
+        if ($contractIds->isNotEmpty()) {
+            ObjectRecord::query()->whereIn('id', $contractIds)
+                ->select('id')
+                ->selectRaw($this->contractBusinessOwnerExpression()->getValue(DB::connection()->getQueryGrammar()).' AS business_owner_name')
+                ->get()
+                ->each(function (ObjectRecord $record): void {
+                    $this->contractBusinessOwnerNames[$record->id] = $record->getAttribute('business_owner_name');
+                });
+        }
 
         $accountIds = $records
             ->flatMap(function (ObjectRecord $record): array {
@@ -492,6 +558,15 @@ class ObjectRelations
                     $errors["payload.{$field['key']}"] = ($field['target'] ?? null) === 'project'
                         ? "{$field['label']}包含当前用户不可访问的项目。"
                         : "{$field['label']}包含当前用户不可访问的关联记录。";
+
+                    continue;
+                }
+
+                if ($this->projectVisibility->hasGlobalBusinessView($user)
+                    && (($object->key === 'customer_contact' && $target->key === 'customer')
+                        || $target->key === 'project')
+                    && $records->contains(fn (ObjectRecord $related): bool => ! $this->projectVisibility->allowsRecordWrite($user, $related))) {
+                    $errors["payload.{$field['key']}"] = '不能通过关联修改他人或共享的业务数据。';
 
                     continue;
                 }
@@ -813,9 +888,10 @@ class ObjectRelations
                 ->limit(self::OPTION_LIMIT)
                 ->get(['id', 'business_object_id', 'code', 'title', 'payload']),
             $target,
+            $user,
         ));
         $availableIds = $availableItems->pluck('id')->flip();
-        $selectedItems = collect($this->formatOptionRecords($selectedRecords, $target))
+        $selectedItems = collect($this->formatOptionRecords($selectedRecords, $target, $user))
             ->reject(fn (array $item) => $availableIds->has($item['id']))
             ->values();
 
@@ -1061,11 +1137,15 @@ class ObjectRelations
         return $this->formatOptionRecords(
             $query->limit(self::OPTION_LIMIT)->get(['id', 'business_object_id', 'code', 'title', 'payload']),
             $object,
+            $user,
         );
     }
 
-    private function formatOptionRecords(Collection $records, BusinessObject $object): array
+    private function formatOptionRecords(Collection $records, BusinessObject $object, ?User $user = null): array
     {
+        $customerPermissions = $user && $object->key === 'customer' && $this->projectVisibility->hasGlobalBusinessView($user)
+            ? $this->projectVisibility->customerWritePermissions($user, $records->pluck('id')->all())
+            : [];
         $leaders = collect();
         if ($object->key === 'production_team') {
             $leaderIds = $records->pluck('payload.leader_id')->filter()->unique()->values();
@@ -1080,15 +1160,48 @@ class ObjectRelations
                 'label' => $this->recordLabel($record, $object),
                 'code' => $record->code,
                 'title' => $record->title,
-                'meta' => $this->optionMeta($record, $object, $leaders),
+                'meta' => [...$this->optionMeta($record, $object, $leaders), ...(array_key_exists($record->id, $customerPermissions) ? ['can_update' => $customerPermissions[$record->id]] : [])],
             ])
             ->values()
             ->all();
     }
 
+    public function contractBusinessOwnerExpression(): Expression
+    {
+        $grammar = DB::connection()->getQueryGrammar();
+        $projectReference = $grammar->wrap('object_records.payload->project_id');
+        $ownerReference = $grammar->wrap('contract_project.payload->business_owner_user_id');
+        $query = DB::table('object_records as contract_project')
+            ->join('business_objects as contract_project_object', 'contract_project_object.id', '=', 'contract_project.business_object_id')
+            ->join('users as contract_owner', fn ($join) => $join
+                ->whereRaw("CAST(contract_owner.id AS TEXT) = CAST({$ownerReference} AS TEXT)"))
+            ->whereRaw("contract_project_object.key = 'project'")
+            ->whereRaw("CAST(contract_project.id AS TEXT) = CAST({$projectReference} AS TEXT)")
+            ->whereNull('contract_owner.deleted_at')
+            ->select('contract_owner.name')
+            ->limit(1);
+
+        return DB::raw('('.$query->toSql().')');
+    }
+
+    public function contractBusinessOwnerName(ObjectRecord $contract): ?string
+    {
+        if (! array_key_exists($contract->id, $this->contractBusinessOwnerNames)) {
+            $this->contractBusinessOwnerNames[$contract->id] = ObjectRecord::query()
+                ->whereKey($contract->id)
+                ->selectRaw($this->contractBusinessOwnerExpression()->getValue(DB::connection()->getQueryGrammar()).' AS business_owner_name')
+                ->value('business_owner_name');
+        }
+
+        return $this->contractBusinessOwnerNames[$contract->id];
+    }
+
     private function payloadWithDerivedRelations(ObjectRecord $record): array
     {
         $payload = $record->payload ?? [];
+        if ($record->businessObject?->key === 'contract') {
+            $payload['business_owner_name'] = $this->contractBusinessOwnerName($record);
+        }
         if ($record->businessObject?->key === 'customer_contact') {
             $payload['project_ids'] = $this->projectIdsByContact[$record->id] ?? [];
         }

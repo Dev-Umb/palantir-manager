@@ -20,7 +20,7 @@ class QueryObjectRecordsTool implements Tool
 
     public function description(): Stringable|string
     {
-        return 'Query visible records for one business object with optional filters, grouping, metrics, sorting, and limit. For purchase requests, query material with id, name, and spec; unit belongs to requisition, not material.';
+        return 'Query visible records for one business object with optional filters, grouping, metrics, sorting, and limit. For totals, supply metrics without group_by to aggregate every matching visible record. Project debt uses unpaid_amount > 0; never derive arrears. Resolve salesperson names to account IDs first.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -54,7 +54,7 @@ class QueryObjectRecordsTool implements Tool
                 'value' => $schema->union(['string', 'number', 'boolean', 'null'])->nullable(),
                 'values' => $schema->array()->items($schema->string())->nullable(),
             ]))->nullable(),
-            'group_by' => $schema->string()->nullable(),
+            'group_by' => $schema->string()->nullable()->description('Omit for an overall total; metrics then aggregate all matching visible records.'),
             'metrics' => $schema->array()->items($schema->object([
                 'op' => $schema->string()->enum(['count', 'sum', 'avg', 'min', 'max'])->required(),
                 'field' => $schema->string()->nullable(),

@@ -5,15 +5,19 @@ namespace App\Actions;
 use App\Models\AuditLog;
 use App\Models\ObjectRecord;
 use App\Models\User;
+use App\Support\ProjectVisibility;
 use Illuminate\Support\Facades\DB;
 
 class AcknowledgeWorkflowTask
 {
+    public function __construct(private ProjectVisibility $visibility) {}
+
     public function visibleTo(ObjectRecord $record, ?User $user): bool
     {
         if (! $user
             || ! $record->workflow_key
-            || $record->workflow_seen_at !== null) {
+            || $record->workflow_seen_at !== null
+            || ($this->visibility->hasGlobalBusinessView($user) && ! $this->visibility->allowsRecordWrite($user, $record))) {
             return false;
         }
 

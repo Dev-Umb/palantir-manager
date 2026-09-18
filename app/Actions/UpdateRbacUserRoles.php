@@ -14,6 +14,13 @@ class UpdateRbacUserRoles
     public function handle(User $target, array $roleIds, User $actor): void
     {
         DB::transaction(function () use ($target, $roleIds, $actor): void {
+            $names = Role::query()->whereKey($roleIds)->pluck('name');
+            if ($names->contains('business_manager_view') && $names->intersect(['admin', 'finance'])->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'roles' => '业务管理查看仅允许维护本人数据，不能与管理员或财务角色同时分配。',
+                ]);
+            }
+
             $lockedUser = User::query()->lockForUpdate()->findOrFail($target->id);
             $adminRole = Role::query()->where('name', 'admin')->lockForUpdate()->firstOrFail();
             $removesAdmin = $lockedUser->roles()->whereKey($adminRole->id)->exists()

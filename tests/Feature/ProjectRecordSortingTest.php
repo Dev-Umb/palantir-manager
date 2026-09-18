@@ -22,12 +22,14 @@ class ProjectRecordSortingTest extends TestCase
         app(SyncXycMetadata::class)->handle();
     }
 
-    public function test_projects_default_to_name_ascending_with_stable_ids(): void
+    public function test_projects_default_to_statement_order_then_recent_unordered_records(): void
     {
         $admin = $this->userWithRole('admin');
         $this->project('00000000-0000-4000-8000-000000000004', 'BETA', 'Beta Project', 900, $admin);
-        $this->project('00000000-0000-4000-8000-000000000002', 'ALPHA-2', 'Alpha Project', 300, $admin);
-        $this->project('00000000-0000-4000-8000-000000000001', 'ALPHA-1', 'Alpha Project', 100, $admin);
+        $second = $this->project('00000000-0000-4000-8000-000000000002', 'ALPHA-2', 'Alpha Project', 300, $admin);
+        $first = $this->project('00000000-0000-4000-8000-000000000001', 'ALPHA-1', 'Alpha Project', 100, $admin);
+        $second->update(['payload' => [...$second->payload, '_statement_order' => 10]]);
+        $first->update(['payload' => [...$first->payload, '_statement_order' => 2]]);
 
         $this->actingAs($admin)
             ->get('/objects/project')
@@ -40,7 +42,7 @@ class ProjectRecordSortingTest extends TestCase
                 ]));
     }
 
-    public function test_manual_project_sort_keeps_names_grouped_and_sorts_within_each_group(): void
+    public function test_manual_project_sort_uses_the_selected_field_across_names(): void
     {
         $admin = $this->userWithRole('admin');
         $this->project('00000000-0000-4000-8000-000000000001', 'ALPHA-LOW', 'Alpha Project', 100, $admin);
@@ -53,9 +55,9 @@ class ProjectRecordSortingTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('records.data', fn ($records): bool => collect($records)->pluck('code')->all() === [
+                    'BETA-HIGHEST',
                     'ALPHA-HIGH',
                     'ALPHA-LOW',
-                    'BETA-HIGHEST',
                     'GAMMA',
                 ]));
     }
