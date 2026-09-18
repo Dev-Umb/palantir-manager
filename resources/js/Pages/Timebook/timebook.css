@@ -24,8 +24,26 @@
 .timebook-modal > section { background: white; color: #172033; border-radius: 12px; padding: 24px; width: min(720px, 100%); max-height: 85vh; overflow-y: auto; overflow-wrap: anywhere; }
 .timebook-modal article { border-bottom: 1px solid #e2e8f0; padding: 10px 0; }
 @media (max-width: 700px) {
+    .timebook { gap: 12px; }
     .timebook-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .timebook-totals section { padding: 12px; min-width: 0; overflow-wrap: anywhere; }
+    .timebook-totals strong { font-size: 23px; }
     .timebook-form { grid-template-columns: 1fr; }
     .timebook .timebook-section { padding: 14px; }
     .timebook button { min-height: 44px; }
+    .timebook input, .timebook select { min-height: 44px; font-size: 16px; max-width: 100%; }
+    .timebook-actions > button { flex: 1 1 auto; }
+    .timebook-table { overflow: visible; }
+    .timebook table, .timebook tbody { display: block; }
+    .timebook thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .timebook tbody tr { display: grid; grid-template-columns: minmax(0, 1fr); margin-bottom: 12px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 9px; }
+    .timebook td { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 10px; align-items: start; min-width: 0; max-width: none; padding: 8px 0; }
+    .timebook td[data-label]::before { content: attr(data-label); color: #526173; font-size: 13px; }
+    .timebook td[colspan] { display: block; }
+    .timebook td.timebook-actions { display: flex; min-width: 0; margin: 0; padding-top: 12px; border-bottom: 0; }
+    .timebook td.timebook-actions::before { flex: 0 0 100%; }
+    .timebook td button { max-width: 100%; overflow-wrap: anywhere; }
+    .timebook-modal { z-index: 110; padding: 12px; }
+    .timebook-modal > section { padding: 16px; max-height: calc(100dvh - 24px); overscroll-behavior: contain; }
+    .timebook-modal button { min-height: 44px; }
 }

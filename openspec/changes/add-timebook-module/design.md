@@ -1,5 +1,8 @@
 # Design
 
+## Mobile presentation
+At widths up to 700px, render existing ledger/summary table rows as vertically readable cards using the same DOM and handlers. Preserve every column via visible field labels, all permission-gated actions, empty states and paging; retain desktop tables above 700px. Inputs use 16px text and 44px touch targets. Existing mobile navigation is reused; settings forms stay single-column and touch-friendly. No API, schema, permission or business-rule changes.
+
 ## Dedicated operator follow-up
 User subsequently requested visible user settings including both own login email and password changes. This supersedes the password-only settings restriction: reuse the existing settings page, current-password verification and unique-email validation, add settings navigation and allow settings.email. Preserve all business and AI restrictions and do not change the account's credentials during deployment.
 User requested one dedicated management account and approved retaining own password changes. Use an explicit timebook_operator role as a restrictive access profile; do not infer this restriction for other timebook users. Filter effective permissions centrally and restrict authenticated web routes before rendering. Reuse existing password page and RBAC grants, without schema or dependency changes. Business navigation has only timebook and AI; password link remains outside business navigation. Credentials are generated only at provisioning, never committed. This follows the user's approved two-entry scope and does not change existing accounts.

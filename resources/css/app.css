@@ -1723,6 +1723,13 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
 .account-form label > span { font-size: 13px; font-weight: 600; }
 .account-form input { width: 100%; min-width: 0; }
 .account-form .form-error { margin: 0; }
+@media (max-width: 700px) {
+    .account-settings { min-width: 0; overflow-wrap: anywhere; }
+    .account-settings .surface { padding: 16px; }
+    .account-form input { min-height: 44px; font-size: 16px; }
+    .account-form button { min-height: 44px; }
+    .account-form button[type="submit"] { width: 100%; }
+}
 .password-reset-panel { grid-column: 1 / -1; width: 100%; padding-top: 16px; border-top: 1px solid var(--line); }
 .password-reminder { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 16px; padding: 12px 14px; border: 1px solid #e9cc88; border-radius: var(--radius); color: #735011; background: #fff8e8; font-size: 13px; }
 .password-reminder a { color: inherit; text-decoration: underline; font-weight: 650; white-space: nowrap; }

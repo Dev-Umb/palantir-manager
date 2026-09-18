@@ -22,6 +22,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('工日簿独立页面', () => {
+    it('preserves every field and action label when mobile CSS presents rows as cards', () => {
+        const { container } = render(<Index initial={initial()} urls={urls} />);
+        expect([...container.querySelectorAll('tbody td[data-label]')].map((cell) => cell.dataset.label))
+            .toEqual(['日期', '姓名', '工日（天）', '加班（小时）', '工作项目', '备注', '操作']);
+        expect(screen.getByRole('button', { name: '修改', exact: true })).toBeVisible();
+        expect(screen.getByRole('button', { name: '留痕' })).toBeVisible();
+        expect(screen.getByRole('button', { name: '删除', exact: true })).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: '人员汇总' }));
+        expect([...container.querySelectorAll('tbody td[data-label]')].map((cell) => cell.dataset.label))
+            .toEqual(['姓名', '累计工日（天）', '加班（小时）', '记录数', '首次日期', '最近日期']);
+    });
+
     it('keeps read queries visible but hides unauthorized write export and audit controls', () => {
         auth.permissions = ['timebook.view'];
         render(<Index initial={initial()} urls={urls} />);
