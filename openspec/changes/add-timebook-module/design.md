@@ -1,5 +1,8 @@
 # Design
 
+## Embedded mobile browser navigation compatibility
+Use native same-tab anchors for mobile primary and More navigation, retaining desktop Inertia links. This avoids mobile embedded-browser navigation relying on intercepted SPA clicks/chunk loading; authorization stays server-side and forced layout remains in browser storage. Fixed mobile navigation is centered with margins rather than a transform. Validate real touch navigation after scrolling with forced layout, and preserve desktop links and return action. The exact iPhone/WeChat failure is not inferred from Chrome success.
+
 ## Manual mobile layout
 User requested a sidebar-bottom switch to mobile layout. Persist only this browser's display preference in localStorage; keep the same page and React state during switching. Reuse existing responsive rules against the app container, constrained to 430px only when explicitly selected. Default layout remains automatic. Offer a return-to-desktop button in mobile More. No role, route, permission or data changes. Existing fields/actions stay at their current entry points.
 

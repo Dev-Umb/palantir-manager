@@ -3,7 +3,7 @@
 #app { container: app-layout / inline-size; }
 html[data-mobile-layout="true"] #app { max-width: 430px; margin-inline: auto; }
 html[data-mobile-layout="true"] .mobile-nav,
-html[data-mobile-layout="true"] .mobile-more-backdrop { left: 50%; right: auto; width: min(430px, 100%); transform: translateX(-50%); }
+html[data-mobile-layout="true"] .mobile-more-backdrop { left: 0; right: 0; width: min(430px, 100%); margin-inline: auto; }
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';

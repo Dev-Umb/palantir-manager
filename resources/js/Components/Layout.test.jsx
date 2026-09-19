@@ -7,7 +7,7 @@ import Layout from './Layout';
 const profile = vi.hoisted(() => ({ password_only: false, settings_url: '/settings' }));
 
 vi.mock('@inertiajs/react', () => ({
-    Link: ({ href, children, ...props }) => <a href={href} {...props}>{children}</a>,
+    Link: ({ href, children, ...props }) => <a href={href} data-inertia-link="true" {...props}>{children}</a>,
     router: { post: vi.fn() },
     usePage: () => ({
         url: '/objects/drawing',
@@ -51,6 +51,17 @@ vi.mock('@inertiajs/react', () => ({
 }));
 
 describe('Layout workflow task navigation', () => {
+    it('uses native document navigation on mobile while retaining desktop Inertia links', () => {
+        const { container } = render(<Layout title="工日簿"><div>内容</div></Layout>);
+        const mobile = screen.getByRole('navigation', { name: '移动端主导航' });
+        const ai = within(mobile).getByRole('link', { name: 'AI 数据助手' });
+        expect(ai.getAttribute('href')).toBe('/ai');
+        expect(ai.hasAttribute('data-inertia-link')).toBe(false);
+        expect(container.querySelector('.desktop-rail a[href="/ai"]').getAttribute('data-inertia-link')).toBe('true');
+        fireEvent.click(screen.getByRole('button', { name: '更多业务入口' }));
+        const more = screen.getByRole('dialog', { name: '更多业务入口' });
+        expect(within(more).getByRole('link', { name: '用户与权限' }).hasAttribute('data-inertia-link')).toBe(false);
+    });
     beforeEach(() => {
         const stored = new Map();
         vi.stubGlobal('localStorage', { getItem: (key) => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) });

@@ -229,13 +229,13 @@ function MobileNavigation({
                                 const active = isNavItemActive(currentUrl, item);
 
                                 return (
-                                    <Link key={item.href} href={item.href} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
+                                    <a key={item.href} href={item.href} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
                                         <Icon size={18} />
                                         <span>{businessText(item.label)}</span>
                                         {item.key === 'notifications' && notificationUnreadCount > 0 && (
                                             <b>{notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}</b>
                                         )}
-                                    </Link>
+                                    </a>
                                 );
                             })}
                         </nav>
@@ -257,7 +257,7 @@ function MobileNavigation({
                     const active = isNavItemActive(currentUrl, item);
 
                     return (
-                        <Link key={item.href} href={item.href} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
+                        <a key={item.href} href={item.href} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
                             <Icon size={19} />
                             <span>{itemLabel}</span>
                             {item.key === 'notifications' && notificationUnreadCount > 0 && (
@@ -265,7 +265,7 @@ function MobileNavigation({
                                     {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
                                 </b>
                             )}
-                        </Link>
+                        </a>
                     );
                 })}
                 <button
