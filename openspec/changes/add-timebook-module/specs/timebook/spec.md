@@ -1,5 +1,14 @@
 ## ADDED Requirements
 
+### Requirement: User-selected mobile presentation
+The shared layout SHALL provide a sidebar-bottom mobile switch and a return action in the mobile menu. The preference SHALL persist in this browser without changing authorization or discarding the current unsaved form.
+#### Scenario: Desktop user chooses mobile
+- **WHEN** the user activates the mobile switch on a desktop screen
+- **THEN** the existing mobile navigation and narrow layout appear, current form values remain, and refresh retains the choice
+#### Scenario: Return to automatic layout
+- **WHEN** the user chooses the return action
+- **THEN** automatic responsive layout resumes with unchanged data and permissions
+
 ### Requirement: Dedicated operator isolation
 The explicit timebook_operator role MUST limit effective permissions to the seven timebook permissions and ai.harness.view, even when combined with another role. Its authenticated routes MUST allow only timebook, AI conversation/query, own email/password settings and logout. Other accounts MUST retain existing behavior.
 #### Scenario: Dedicated account navigation and direct access

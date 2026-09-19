@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+#app { container: app-layout / inline-size; }
+html[data-mobile-layout="true"] #app { max-width: 430px; margin-inline: auto; }
+html[data-mobile-layout="true"] .mobile-nav,
+html[data-mobile-layout="true"] .mobile-more-backdrop { left: 50%; right: auto; width: min(430px, 100%); transform: translateX(-50%); }
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
@@ -1199,7 +1204,7 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
 .ai-report-reader iframe { display: block; width: 100%; height: 100%; min-height: 0; border: 0; background: #fff; }
 .ai-report-reader-modal { position: fixed; inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; }
 .ai-report-reader-modal::backdrop { background: rgba(21, 27, 34, .3); }
-@media (max-width: 1100px) {
+@container app-layout (max-width: 1100px) {
     .ai-reading-layout.has-report { grid-template-columns: minmax(0, 1fr); }
     .ai-report-reader-heading { padding-inline: 14px; }
 }
@@ -1549,14 +1554,14 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
     font-size: 11px;
     line-height: 1.5;
 }
-@media (min-width: 981px) and (max-width: 1180px) {
+@container app-layout (min-width: 981px) and (max-width: 1180px) {
     .object-list-primary { flex-wrap: wrap; }
     .object-list-primary .object-search { flex: 1 0 100%; max-width: none; }
     .cockpit-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .cockpit-project-amount-cards { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 980px) {
+@container app-layout (max-width: 980px) {
     .app-shell, .auth-panel, .workspace-grid, .split { grid-template-columns: 1fr; }
     .rail { min-height: auto; }
     .kpi-grid, .board-grid, .role-grid, .form-grid, .detail-grid, .line-item-fields, .notification-risk-grid, .object-list-controls { grid-template-columns: 1fr; }
@@ -1602,7 +1607,7 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
     .embedded-manager-fields { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 760px) {
+@container app-layout (max-width: 760px) {
     .project-contact-row { grid-template-columns: 1fr 38px; }
     .project-contact-row label { grid-column: 1 / -1; }
     .project-contact-row .icon-link { grid-column: 2; grid-row: 1; }
@@ -1723,7 +1728,7 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
 .account-form label > span { font-size: 13px; font-weight: 600; }
 .account-form input { width: 100%; min-width: 0; }
 .account-form .form-error { margin: 0; }
-@media (max-width: 700px) {
+@container app-layout (max-width: 700px) {
     .account-settings { min-width: 0; overflow-wrap: anywhere; }
     .account-settings .surface { padding: 16px; }
     .account-form input { min-height: 44px; font-size: 16px; }
@@ -1779,7 +1784,7 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
 .project-contract-attachment > .attachment-tray { margin-top: 8px; }
 .attachment-list:has(> .attachment-tray) { display: grid; gap: 8px; width: 100%; }
 .detail-grid > div:has(.attachment-tray) { grid-column: 1 / -1; }
-@media (max-width: 640px) {
+@container app-layout (max-width: 640px) {
     .attachment-preview-backdrop { padding: 0; }
     .attachment-preview-panel { width: 100%; height: 100dvh; border: 0; border-radius: 0; padding-bottom: env(safe-area-inset-bottom); }
     .attachment-preview-head { padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top)); }
@@ -1795,7 +1800,7 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
 }
 
 .attachment-preview-panel.attachment-list-panel { width: min(960px, 100%); height: auto; max-height: calc(100dvh - 48px); }
-@media (max-width: 640px) {
+@container app-layout (max-width: 640px) {
     .attachment-preview-backdrop:has(.attachment-list-panel) { align-items: flex-end; }
     .attachment-preview-panel.attachment-list-panel { width: 100%; max-height: 90dvh; border-radius: 14px 14px 0 0; }
 }

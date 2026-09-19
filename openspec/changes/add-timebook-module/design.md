@@ -1,5 +1,8 @@
 # Design
 
+## Manual mobile layout
+User requested a sidebar-bottom switch to mobile layout. Persist only this browser's display preference in localStorage; keep the same page and React state during switching. Reuse existing responsive rules against the app container, constrained to 430px only when explicitly selected. Default layout remains automatic. Offer a return-to-desktop button in mobile More. No role, route, permission or data changes. Existing fields/actions stay at their current entry points.
+
 ## Mobile presentation
 At widths up to 700px, render existing ledger/summary table rows as vertically readable cards using the same DOM and handlers. Preserve every column via visible field labels, all permission-gated actions, empty states and paging; retain desktop tables above 700px. Inputs use 16px text and 44px touch targets. Existing mobile navigation is reused; settings forms stay single-column and touch-friendly. No API, schema, permission or business-rule changes.
 

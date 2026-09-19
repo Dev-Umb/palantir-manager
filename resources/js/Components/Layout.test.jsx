@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Layout from './Layout';
 
 const profile = vi.hoisted(() => ({ password_only: false, settings_url: '/settings' }));
@@ -51,7 +51,26 @@ vi.mock('@inertiajs/react', () => ({
 }));
 
 describe('Layout workflow task navigation', () => {
-    afterEach(() => { cleanup(); profile.password_only = false; });
+    beforeEach(() => {
+        const stored = new Map();
+        vi.stubGlobal('localStorage', { getItem: (key) => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) });
+    });
+    afterEach(() => { cleanup(); vi.unstubAllGlobals(); profile.password_only = false; });
+
+    it('switches layout without clearing input, remembers it, and offers a return action', () => {
+        const first = render(<Layout title="工日簿"><input aria-label="未保存姓名" defaultValue="张三" /></Layout>);
+        fireEvent.click(screen.getByRole('button', { name: '切换移动版' }));
+        expect(document.documentElement.dataset.mobileLayout).toBe('true');
+        expect(screen.getByLabelText('未保存姓名').value).toBe('张三');
+        expect(window.localStorage.getItem('palantir.mobile-layout')).toBe('true');
+        first.unmount();
+        render(<Layout title="工日簿"><div>内容</div></Layout>);
+        expect(document.documentElement.dataset.mobileLayout).toBe('true');
+        fireEvent.click(screen.getByRole('button', { name: '更多业务入口' }));
+        fireEvent.click(screen.getByRole('button', { name: '切回桌面版' }));
+        expect(document.documentElement.dataset.mobileLayout).toBe('false');
+        expect(window.localStorage.getItem('palantir.mobile-layout')).toBe('false');
+    });
 
     it('keeps own password access for dedicated operators after the initial password change', () => {
         profile.password_only = true;

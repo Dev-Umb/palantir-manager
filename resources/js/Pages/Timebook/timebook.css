@@ -23,7 +23,7 @@
 .timebook-modal { position: fixed; inset: 0; z-index: 100; background: #17203380; display: grid; place-items: center; padding: 16px; }
 .timebook-modal > section { background: white; color: #172033; border-radius: 12px; padding: 24px; width: min(720px, 100%); max-height: 85vh; overflow-y: auto; overflow-wrap: anywhere; }
 .timebook-modal article { border-bottom: 1px solid #e2e8f0; padding: 10px 0; }
-@media (max-width: 700px) {
+@container app-layout (max-width: 700px) {
     .timebook { gap: 12px; }
     .timebook-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .timebook-totals section { padding: 12px; min-width: 0; overflow-wrap: anywhere; }

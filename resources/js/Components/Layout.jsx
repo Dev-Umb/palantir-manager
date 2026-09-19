@@ -23,6 +23,14 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
     const passwordChangeRequired = auth.user?.is_password_changed === false || auth.password_only;
     const visibleNav = (nav || []).filter((item) => item.visible);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [forcedMobile, setForcedMobile] = useState(() => {
+        try { return window.localStorage.getItem('palantir.mobile-layout') === 'true'; } catch { return false; }
+    });
+    useEffect(() => {
+        document.documentElement.dataset.mobileLayout = String(forcedMobile);
+        try { window.localStorage.setItem('palantir.mobile-layout', String(forcedMobile)); } catch { /* Browser storage may be disabled. */ }
+        return () => { delete document.documentElement.dataset.mobileLayout; };
+    }, [forcedMobile]);
     const preferredMobileKeys = ['dashboard', 'notifications', 'ontology'];
     const mobilePrimary = preferredMobileKeys
         .map((key) => visibleNav.find((item) => item.key === key))
@@ -131,6 +139,9 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                             <small>{(auth.roles || []).map((role) => role.label).join('、') || '未分配角色'}</small>
                         </div>
                     </div>
+                    <button className="ghost-button" type="button" onClick={() => setForcedMobile(true)}>
+                        切换移动版
+                    </button>
                     <button className="ghost-button" type="button" onClick={logout}>
                         <LogOut size={15} /> 退出
                     </button>
@@ -147,6 +158,7 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                 onMenuToggle={() => setMobileMenuOpen((current) => !current)}
                 onMenuClose={() => setMobileMenuOpen(false)}
                 onLogout={logout}
+                onDesktop={forcedMobile ? () => { setForcedMobile(false); setMobileMenuOpen(false); } : null}
             />
             <main className={`workspace ${immersive ? 'workspace-immersive' : ''}`} style={immersive && passwordChangeRequired ? { gridTemplateRows: `${!hideHeader ? 'auto ' : ''}auto minmax(0, 1fr)` } : undefined}>
                 {passwordChangeRequired && (
@@ -184,6 +196,7 @@ function MobileNavigation({
     onMenuToggle,
     onMenuClose,
     onLogout,
+    onDesktop,
 }) {
     const panelRef = useRef(null);
     useDialogFocus(menuOpen, panelRef);
@@ -226,6 +239,7 @@ function MobileNavigation({
                                 );
                             })}
                         </nav>
+                        {onDesktop && <button type="button" className="mobile-more-logout" onClick={onDesktop}>切回桌面版</button>}
                         <button type="button" className="mobile-more-logout" onClick={onLogout}>
                             <LogOut size={17} /> 退出
                         </button>
