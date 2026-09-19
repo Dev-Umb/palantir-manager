@@ -4,9 +4,11 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import inertia from '@inertiajs/vite';
 import { pdfAssets } from './scripts/pdf-assets.mjs';
+import { safariMarkdown } from './scripts/safari-markdown.mjs';
 
 export default defineConfig({
     plugins: [
+        safariMarkdown(),
         pdfAssets(),
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.jsx'],
@@ -17,6 +19,7 @@ export default defineConfig({
         tailwindcss(),
     ],
     build: {
+        target: ['chrome111', 'edge111', 'firefox114', 'safari16.2', 'ios16.2'],
         rolldownOptions: {
             output: {
                 assetFileNames: (asset) => asset.names?.includes('pdf.worker.min.mjs')
