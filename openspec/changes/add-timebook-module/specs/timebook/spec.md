@@ -1,5 +1,14 @@
 ## ADDED Requirements
 
+### Requirement: Permission-specific AI starter prompts
+The AI empty state SHALL show “XX累计工时及明细”, “查询所有人本月累计工时”, and “查询所有人X月X日到X月X日累计工时” when the account has both timebook.view and timebook.ai.query. Other accounts SHALL retain existing starter prompts. This presentation SHALL NOT alter authorization or calculation rules.
+#### Scenario: Fill without sending
+- **WHEN** an eligible account clicks any timebook starter prompt
+- **THEN** its exact text replaces the composer draft and the composer receives focus, without submitting a message or creating a run
+#### Scenario: Missing permission
+- **WHEN** either required timebook permission is absent
+- **THEN** timebook starter prompts are absent and existing business starter prompts remain
+
 ### Requirement: User-selected mobile presentation
 The shared layout SHALL provide a sidebar-bottom mobile switch and a return action in the mobile menu. The preference SHALL persist in this browser without changing authorization or discarding the current unsaved form.
 #### Scenario: Desktop user chooses mobile

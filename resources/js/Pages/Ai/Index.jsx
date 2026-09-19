@@ -1,5 +1,5 @@
 import './ContractIntake.css';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import {
     Bot,
     Check,
@@ -28,6 +28,8 @@ const HtmlReportReader = lazy(() => import('./Artifacts').then((module) => ({ de
 const ContractIntake = lazy(() => import('./ContractIntake'));
 
 export default function AiIndex({ conversations: initialConversations, canUploadContracts = false }) {
+    const permissions = usePage().props.auth?.permissions || [];
+    const canQueryTimebook = permissions.includes('timebook.view') && permissions.includes('timebook.ai.query');
     const [contractUploadOpen, setContractUploadOpen] = useState(false);
     const [conversations, setConversations] = useState(initialConversations || []);
     const [conversationId, setConversationId] = useState(null);
@@ -293,7 +295,7 @@ export default function AiIndex({ conversations: initialConversations, canUpload
                 <div className={`ai-reading-layout ${selectedReport ? 'has-report' : ''}`}>
                     <main className="ai-thread-view">
                         <div className="ai-thread-scroll" ref={scrollRef} onScroll={handleThreadScroll}>
-                            {runs.length === 0 ? <AiEmptyState onPrompt={setMessage} /> : runs.map((run) => (
+                            {runs.length === 0 ? <AiEmptyState canQueryTimebook={canQueryTimebook} onPrompt={(prompt) => { setMessage(prompt); composerRef.current?.focus(); }} /> : runs.map((run) => (
                                 <RunTurn
                                     key={run.id}
                                     run={run}
@@ -479,8 +481,10 @@ function Sources({ items }) {
     );
 }
 
-function AiEmptyState({ onPrompt }) {
-    const prompts = ['我的项目当前未回款合计多少', '当前未回款最多的 5 个项目', '帮我上传并识别项目合同'];
+function AiEmptyState({ onPrompt, canQueryTimebook }) {
+    const prompts = canQueryTimebook
+        ? ['XX累计工时及明细', '查询所有人本月累计工时', '查询所有人X月X日到X月X日累计工时']
+        : ['我的项目当前未回款合计多少', '当前未回款最多的 5 个项目', '帮我上传并识别项目合同'];
     return (
         <div className="ai-v2-empty">
             <div className="ai-empty-mark"><Bot size={22} /></div>

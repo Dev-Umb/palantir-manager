@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AiIndex from './Index';
 import { HtmlArtifact, HtmlReportReader, htmlDocument } from './Artifacts';
 
+const auth = vi.hoisted(() => ({ permissions: [] }));
+beforeEach(() => { window.HTMLElement.prototype.scrollIntoView = vi.fn(); });
+afterEach(() => { cleanup(); auth.permissions = []; vi.unstubAllGlobals(); });
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
+    usePage: () => ({ props: { auth } }),
 }));
 
 vi.mock('../../Components/Layout', () => ({
@@ -20,6 +24,32 @@ vi.mock('../../echo', () => ({
 }));
 
 describe('AI assistant layout', () => {
+    it('fills and focuses each timebook prompt without sending, and keeps it editable', () => {
+        auth.permissions = ['timebook.view', 'timebook.ai.query', 'ai.harness.view'];
+        vi.stubGlobal('fetch', vi.fn());
+        render(<AiIndex conversations={[]} />);
+        const composer = screen.getByRole('textbox');
+        expect(screen.queryByRole('button', { name: '我的项目当前未回款合计多少' })).toBeNull();
+        for (const prompt of ['XX累计工时及明细', '查询所有人本月累计工时', '查询所有人X月X日到X月X日累计工时']) {
+            fireEvent.click(screen.getByRole('button', { name: prompt }));
+            expect(composer.value).toBe(prompt);
+            expect(document.activeElement).toBe(composer);
+        }
+        fireEvent.change(composer, { target: { value: '张三累计工时及明细' } });
+        expect(composer.value).toBe('张三累计工时及明细');
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it.each([{ permissions: [] }, { permissions: ['timebook.view'] }, { permissions: ['timebook.ai.query'] }])('preserves business prompts with incomplete timebook permissions: $permissions', ({ permissions }) => {
+        auth.permissions = permissions;
+        vi.stubGlobal('fetch', vi.fn());
+        render(<AiIndex conversations={[]} />);
+        expect(screen.queryByRole('button', { name: 'XX累计工时及明细' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: '我的项目当前未回款合计多少' }));
+        expect(screen.getByRole('textbox').value).toBe('我的项目当前未回款合计多少');
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
     it('hides only the outer page title and keeps the conversation toolbar title', () => {
         window.HTMLElement.prototype.scrollIntoView = vi.fn();
         render(<AiIndex conversations={[]} />);
