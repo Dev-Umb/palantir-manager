@@ -19,7 +19,9 @@
 .timebook table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .timebook th, .timebook td { padding: 11px; border-bottom: 1px solid #e2e8f0; text-align: left; min-width: 100px; vertical-align: top; max-width: 320px; overflow-wrap: anywhere; }
 .timebook th { white-space: nowrap; background: #f1f5f9; }
-.timebook td.timebook-actions { min-width: 220px; }
+.timebook td[data-label$="日期"] { white-space: nowrap; }
+.timebook td.timebook-action-cell { min-width: 220px; }
+.timebook-action-cell > .timebook-actions { margin: 0; }
 .timebook-modal { position: fixed; inset: 0; z-index: 100; background: #17203380; display: grid; place-items: center; padding: 16px; }
 .timebook-modal > section { background: white; color: #172033; border-radius: 12px; padding: 24px; width: min(720px, 100%); max-height: 85vh; overflow-y: auto; overflow-wrap: anywhere; }
 .timebook-modal article { border-bottom: 1px solid #e2e8f0; padding: 10px 0; }
@@ -40,8 +42,8 @@
     .timebook td { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 10px; align-items: start; min-width: 0; max-width: none; padding: 8px 0; }
     .timebook td[data-label]::before { content: attr(data-label); color: #526173; font-size: 13px; }
     .timebook td[colspan] { display: block; }
-    .timebook td.timebook-actions { display: flex; min-width: 0; margin: 0; padding-top: 12px; border-bottom: 0; }
-    .timebook td.timebook-actions::before { flex: 0 0 100%; }
+    .timebook td.timebook-action-cell { display: block; min-width: 0; padding-top: 12px; border-bottom: 0; }
+    .timebook td.timebook-action-cell::before { display: block; margin-bottom: 10px; }
     .timebook td button { max-width: 100%; overflow-wrap: anywhere; }
     .timebook-modal { z-index: 110; padding: 12px; }
     .timebook-modal > section { padding: 16px; max-height: calc(100dvh - 24px); overscroll-behavior: contain; }

@@ -29,6 +29,9 @@ describe('工日簿独立页面', () => {
         expect(screen.getByRole('button', { name: '修改', exact: true })).toBeVisible();
         expect(screen.getByRole('button', { name: '留痕' })).toBeVisible();
         expect(screen.getByRole('button', { name: '删除', exact: true })).toBeVisible();
+        const actions = container.querySelector('td[data-label="操作"]');
+        expect(actions).not.toHaveClass('timebook-actions');
+        expect(actions.querySelector(':scope > .timebook-actions').children).toHaveLength(3);
         fireEvent.click(screen.getByRole('button', { name: '人员汇总' }));
         expect([...container.querySelectorAll('tbody td[data-label]')].map((cell) => cell.dataset.label))
             .toEqual(['姓名', '累计工日（天）', '加班（小时）', '记录数', '首次日期', '最近日期']);
