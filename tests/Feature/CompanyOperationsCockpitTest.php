@@ -98,7 +98,9 @@ class CompanyOperationsCockpitTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('cockpit.meta.scope', '我的可见范围')
                 ->has('cockpit.kpis', 0)
-                ->where('cockpit.panels', [])
+                ->where('cockpit.panels.cash_flow.series.0.value', null)
+                ->where('cockpit.panels.cash_flow.series.0.coverage', ['valid' => 0, 'total' => 0])
+                ->missing('cockpit.panels.project_amounts')
                 ->where('cockpit.project_progress', null)
                 ->has('cockpit.project_progresses', 0)
                 ->has('recentProjects', 0));

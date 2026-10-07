@@ -30,9 +30,14 @@ class _QuotationCardState extends State<QuotationCard> {
     super.initState();
     artifact = widget.artifact;
     values = {...mapOf(artifact['data'])};
+    values['tax_rate'] ??= '13';
+    values['shipping'] ??= '含运费';
     values['items'] = maps(values['items'])
         .map((item) => <String, dynamic>{...item})
         .toList();
+    if ((values['items'] as List).isEmpty) {
+      values['items'] = <Map<String, dynamic>>[{}];
+    }
   }
 
   Widget field(Map<String, dynamic> target, String key, String label) =>
@@ -61,10 +66,11 @@ class _QuotationCardState extends State<QuotationCard> {
           'name': '报价单.docx',
           'mime': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         });
-        if (mounted)
+        if (mounted) {
           setState(
             () => feedback = saved == true ? '报价单已保存到所选位置' : '已取消保存，可重新下载',
           );
+        }
       } else {
         final payload = {
           ...values,
@@ -84,11 +90,12 @@ class _QuotationCardState extends State<QuotationCard> {
               .toList(),
         };
         final response = await widget.api.send(endpoint, payload);
-        if (mounted)
+        if (mounted) {
           setState(() {
             artifact = mapOf(response['artifact']);
             widget.artifact.addAll(artifact);
           });
+        }
       }
     } catch (e) {
       if (mounted) setState(() => feedback = '$e');
@@ -98,41 +105,53 @@ class _QuotationCardState extends State<QuotationCard> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      const Text('固定模板报价单', style: TextStyle(fontWeight: FontWeight.bold)),
-      for (final pair in [
-        ['title', '报价标题'],
-        ['date', '报价日期（YYYY-MM-DD）'],
-        ['contact', '联系人'],
-        ['phone', '联系电话'],
-      ])
-        field(values, pair[0], pair[1]),
-      for (final item in (values['items'] as List<Map<String, dynamic>>)) ...[
-        field(item, 'name', '物资名称'),
-        field(item, 'price', '综合单价'),
-        field(item, 'unit', '计价单位（吨、套等）'),
-        ExpansionTile(
-          title: const Text('材料费、加工费（可选）'),
-          children: [
-            field(item, 'material_price', '材料费'),
-            field(item, 'processing_price', '加工费'),
-          ],
+  Widget build(BuildContext context) => Material(
+    color: Colors.transparent,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('固定模板报价单', style: TextStyle(fontWeight: FontWeight.bold)),
+        for (final pair in [
+          ['title', '报价标题'],
+          ['date', '报价日期（YYYY-MM-DD）'],
+          ['contact', '联系人'],
+          ['phone', '联系电话'],
+        ])
+          field(values, pair[0], pair[1]),
+        for (final item in (values['items'] as List<Map<String, dynamic>>)) ...[
+          field(item, 'name', '物资名称'),
+          field(item, 'price', '综合单价'),
+          field(item, 'unit', '计价单位（吨、套等）'),
+          ExpansionTile(
+            title: const Text('材料费、加工费（可选）'),
+            children: [
+              field(item, 'material_price', '材料费'),
+              field(item, 'processing_price', '加工费'),
+            ],
+          ),
+        ],
+        if (!generated && (values['items'] as List).length < 3)
+          TextButton(
+            onPressed: busy
+                ? null
+                : () => setState(
+                    () => (values['items'] as List).add(<String, dynamic>{}),
+                  ),
+            child: const Text('添加产品'),
+          ),
+        field(values, 'tax_rate', '税率（模板固定13%）'),
+        field(values, 'shipping', '运费口径（模板固定含运费）'),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 10),
+          child: Text('保留原模板排版与公章，导出文字全部为黑色。请核对单价和单位后生成。'),
+        ),
+        if (feedback != null) Text(feedback!),
+        if (busy) const LinearProgressIndicator(),
+        FilledButton(
+          onPressed: busy ? null : act,
+          child: Text(generated ? '下载盖章报价单 DOCX' : '确认并生成盖章报价单'),
         ),
       ],
-      field(values, 'tax_rate', '税率（模板固定13%）'),
-      field(values, 'shipping', '运费口径（模板固定含运费）'),
-      const Padding(
-        padding: EdgeInsets.symmetric(vertical: 10),
-        child: Text('保留原模板排版与公章，导出文字全部为黑色。请核对单价和单位后生成。'),
-      ),
-      if (feedback != null) Text(feedback!),
-      if (busy) const LinearProgressIndicator(),
-      FilledButton(
-        onPressed: busy ? null : act,
-        child: Text(generated ? '下载盖章报价单 DOCX' : '确认并生成盖章报价单'),
-      ),
-    ],
+    ),
   );
 }

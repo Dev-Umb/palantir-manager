@@ -86,7 +86,7 @@ class BuildCompanyOperationsDashboard
             $cockpit['panels']['tender_pipeline'] = $tender['panel'];
         }
 
-        $cashFlow = $this->cashFlowPanel($records->get('contract'));
+        $cashFlow = $this->cashFlowPanel($contracts);
         if ($cashFlow !== null) {
             $cockpit['panels']['cash_flow'] = $cashFlow;
         }

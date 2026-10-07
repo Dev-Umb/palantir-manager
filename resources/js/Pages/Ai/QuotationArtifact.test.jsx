@@ -24,8 +24,8 @@ it('submits zero price and no invented split, then shows owner download in the s
     const download = await screen.findByRole('link', { name: '下载盖章报价单 DOCX' });
     expect(download.getAttribute('href')).toBe('/ai/runs/run-1/quotations/quote-1/download');
     expect(download.hasAttribute('download')).toBe(true);
-    expect(screen.getByRole('link', { name: '下载盖章报价单 PDF' }).getAttribute('href')).toBe('/ai/runs/run-1/quotations/quote-1/download?format=pdf');
-    expect(screen.getByText('报价文件：quotation.docx / quotation.pdf')).not.toBeNull();
+    expect(screen.queryByRole('link', { name: '下载盖章报价单 PDF' })).toBeNull();
+    expect(screen.getByText('报价文件：quotation.docx')).not.toBeNull();
     expect(screen.getByLabelText('已生成报价文件').compareDocumentPosition(screen.getByLabelText('报价标题')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const body = JSON.parse(fetch.mock.calls[0][1].body);
     expect(body.items[0]).toMatchObject({ price: '0', material_price: null, processing_price: null });

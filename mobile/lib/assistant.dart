@@ -301,9 +301,14 @@ class _AssistantPageState extends State<AssistantPage> {
                             textOf(m['content'] ?? m['answer']),
                             style: const TextStyle(height: 1.65),
                           ),
-                          for (final artifact in maps(m['artifacts']))
+                          for (final artifact
+                              in ((m['artifacts'] as List?) ?? [])
+                                  .whereType<Map<String, dynamic>>())
                             if (artifact['type'] == 'quotation_docx')
                               QuotationCard(
+                                key: ValueKey(
+                                  '${m['run_id']}-${artifact['id']}',
+                                ),
                                 api: widget.api,
                                 runId: '${m['run_id']}',
                                 artifact: artifact,

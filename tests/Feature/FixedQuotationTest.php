@@ -179,7 +179,7 @@ class FixedQuotationTest extends TestCase
         $this->assertFalse($denied['ok']);
     }
 
-    public function test_downloads_black_copy_and_pdf_without_changing_legacy_frozen_file(): void
+    public function test_downloads_black_docx_without_changing_legacy_frozen_file(): void
     {
         $user = $this->salesperson();
         $run = $this->quotationRun($user);
@@ -194,24 +194,17 @@ class FixedQuotationTest extends TestCase
         foreach ($xml->query('//w:rPr/w:color') as $color) {
             $this->assertSame('000000', $color->getAttributeNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'val'));
         }
-        $pdf = $this->mock(FixedQuotationPdf::class);
-        $pdf->shouldReceive('convert')->once()->with($black)->andReturn("%PDF-1.7\nexample\n%%EOF");
-        $download = $this->get($this->path($run).'/download?format=pdf')->assertOk()->assertDownload('quotation.pdf')->assertHeader('content-type', 'application/pdf');
-        $this->assertStringStartsWith('%PDF-', $download->streamedContent());
         $this->assertSame($hash, $run->refresh()->artifacts[0]['data']['document_sha256']);
         $this->assertSame($bytes, Storage::disk('local')->get($storagePath));
-        $this->get($this->path($run).'/download?format=exe')->assertStatus(302);
+        $this->get($this->path($run).'/download?format=exe')->assertDownload('quotation.docx');
         $this->actingAs($this->salesperson('admin'))->get($this->path($run).'/download?format=pdf')->assertNotFound();
     }
 
-    public function test_pdf_failure_preserves_docx_and_converter_cleans_temporary_files(): void
+    public function test_docx_download_and_archived_converter_clean_temporary_files(): void
     {
         $user = $this->salesperson();
         $run = $this->quotationRun($user);
         $this->actingAs($user)->postJson($this->path($run), $this->input())->assertOk();
-        $pdf = $this->mock(FixedQuotationPdf::class);
-        $pdf->shouldReceive('convert')->once()->andThrow(new \RuntimeException('Conversion failed'));
-        $this->get($this->path($run).'/download?format=pdf')->assertStatus(503);
         $this->get($this->path($run).'/download')->assertOk()->assertDownload('quotation.docx');
         $directory = null;
         Process::fake(function ($process) use (&$directory) {

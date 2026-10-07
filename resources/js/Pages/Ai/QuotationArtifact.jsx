@@ -55,9 +55,8 @@ export default function QuotationArtifact({ artifact, runId, canAct = true }) {
         <section className="ai-artifact ai-form-artifact" aria-label="固定模板报价单">
             <div className="ai-artifact-heading"><strong>固定模板报价单</strong><span>{generated ? '已生成' : '待核对'}</span></div>
             {generated && <div className="ai-choice-body" aria-label="已生成报价文件">
-                <strong>报价文件：quotation.docx / quotation.pdf</strong>
+                <strong>报价文件：quotation.docx</strong>
                 <a href={`${endpoint}/download`} download style={{ display: 'inline-flex', width: 'fit-content', padding: '10px 16px', borderRadius: '6px', background: 'var(--steel)', color: '#fff', textDecoration: 'none', fontWeight: 650 }}>下载盖章报价单 DOCX</a>
-                <a href={`${endpoint}/download?format=pdf`} download style={{ display: 'inline-flex', width: 'fit-content', padding: '10px 16px', borderRadius: '6px', background: 'var(--steel)', color: '#fff', textDecoration: 'none', fontWeight: 650 }}>下载盖章报价单 PDF</a>
                 <small>点击下载到本机；也可从个人历史对话重新下载。</small>
             </div>}
             <form className="ai-form-body" onSubmit={generate} noValidate>
