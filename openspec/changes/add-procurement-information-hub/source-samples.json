@@ -1,0 +1,287 @@
+{
+  "checked_at": "2026-09-10T07:19:01+00:00",
+  "note": "公开页面可获取性抽样；不是结构化字段、AI分析或全量覆盖验收。",
+  "sources": [
+    {
+      "source": "中铁鲁班商务网",
+      "url": "https://www.crecgec.com/",
+      "samples": [
+        {
+          "url": "https://eproport.crecgec.com/assets/tmp/redirect.html?redirectPage=%2Fnotice%2Fnotice-detail%3FprojectId%3DEpu4CmAAwccJyXoujg6d_de4_QiLRxldyaA%26tenantId%3D2&indexnumber=0",
+          "title": "中铁一局集团有限公司罗定市环市南路消防救援站建设项目主体工程施工劳务招标",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        },
+        {
+          "url": "https://eproport.crecgec.com/assets/tmp/redirect.html?redirectPage=%2Fnotice%2Fnotice-detail%3FprojectId%3DEpuUrAFAuKieKhWMyPw3ueOH6xYoG73EJHJ%26tenantId%3D1&indexnumber=0",
+          "title": "中铁建工集团有限公司北京基础设施建设分公司国道G325线鹤山桃源至址山段改建工程第2标段片石采购竞争性谈判采购",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        },
+        {
+          "url": "https://eproport.crecgec.com/assets/tmp/redirect.html?redirectPage=%2Fnotice%2Fnotice-detail%3FprojectId%3DEpuWvb7dMZyMmI2kB0HdZeMC282c8Jgxkd_%26tenantId%3D1&indexnumber=0",
+          "title": "中铁北京工程局集团昭乌达路与南二环互通立交工程项目防撞墙预埋件采购竞争性谈判",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        },
+        {
+          "url": "https://eproport.crecgec.com/assets/tmp/redirect.html?redirectPage=%2Fnotice%2Fnotice-detail%3FprojectId%3DEpulgEpzrPQOGhoixjnIeBxsEbSdxI7xlRB%26tenantId%3D1&indexnumber=0",
+          "title": "中铁电气化局集团有限公司城铁公司北京地铁12号线工程合建柳芳110千伏轨道交通共建变电站总承包项目混凝土及高强灌浆料包件三次采购",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        },
+        {
+          "url": "https://eproport.crecgec.com/assets/tmp/redirect.html?redirectPage=%2Fnotice%2Fnotice-detail%3FprojectId%3DEpuSkNjIqaOEBQ65-4fnKg7bSsNno0Fxaad%26tenantId%3D1&indexnumber=0",
+          "title": "中铁大桥局集团有限公司第一工程分公司新建郑州南站及相关工程NZSG-03标项目经理部发泡剂采购竞价",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        },
+        {
+          "url": "https://eproport.crecgec.com/assets/tmp/redirect.html?redirectPage=%2Fnotice%2Fnotice-detail%3FprojectId%3DEpuUyladtGa-0WnmJpxURjkeg5yvbDBQwUn%26tenantId%3D1&indexnumber=0",
+          "title": "中铁大桥局集团有限公司第七分公司汉南长江大桥及接线工程HNTJ-3标段项目经理部钢制防撞护栏采购竞价",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        },
+        {
+          "url": "https://eproport.crecgec.com/assets/tmp/redirect.html?redirectPage=%2Fnotice%2Fnoticexj-detail%3FprojectId%3DEpuC3Mv0EkzPX_x_vBFUo9_ZLoZxENr18rO%26tenantId%3D1&indexnumber=0",
+          "title": "中铁四局七公司哈密市伊吾县机场路项目围挡询价采购",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        },
+        {
+          "url": "https://eproport.crecgec.com/assets/tmp/redirect.html?redirectPage=%2Fnotice%2Fnoticexj-detail%3FprojectId%3DEpuCWjaOV3FiKtUtKpE7Hj3JxfCx6GtzwhB%26tenantId%3D1&indexnumber=0",
+          "title": "中铁三局集团电务工程有限公司钦港项目电缆附件询价采购（二次寻源）",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        },
+        {
+          "url": "https://eproport.crecgec.com/#/publicity/publicity-detail?id=885897117242101760&projectId=EpuhX3zI34h8JyBQYKy5fGqiehcRmXv6lws&tenantId=1&publicityType=bidCandidatePub",
+          "title": "中铁建工集团有限公司援老挝琅勃拉邦和平中学升级改造项目货运出口代理服务框架协议采购中标候选人公示",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        },
+        {
+          "url": "https://eproport.crecgec.com/#/publicity/publicity-detail?id=2097867356491825153&projectId=EpuSWzeEuESx6kQIpktbhxyZEdpF6UDpfBj&tenantId=2&publicityType=bidCandidatePub",
+          "title": "中铁七局集团有限公司富辰八路大桥项目工程总承包（EPC）路基及附属工程中标候选人公示",
+          "status": "unavailable",
+          "reason": "来源地址不在批准的公开域名范围内。"
+        }
+      ],
+      "status": "incomplete"
+    },
+    {
+      "source": "中国化学电子招投标",
+      "url": "https://bid.cncecyc.com/cms/index.htm",
+      "samples": [
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1hw/593782.htm",
+          "title": "西北分公司-中国化学九化建-西北分公司兰州新区绿色甲醇项目-主材-商混材料采购方案-公开依法必招项目公告",
+          "status": "fetched",
+          "content_hash": "316f29f2ced192849a379b50d21bf2e69cee6d96e7360508bb18ee6d11b0b4b4",
+          "characters": 4739,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1hw/593781.htm",
+          "title": "中国化学工程重型机械化有限公司-中化学建设(海南)有限公司-海南陵水黎安国际教育创新试验区北京语言大学中外合作办学教学实践中心项目生活区集装箱房采购(第2次招标)-公开自愿招标项目公告",
+          "status": "fetched",
+          "content_hash": "531c3655662fc4fda6dc8fc9473eb7f05768087df4e37743ea2813f21fc7bb61",
+          "characters": 5193,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1hw/593718.htm",
+          "title": "中化二建集团有限公司-市政分公司-文水县市政基础项目（子夏大街）-路面材料公开招标-公开自愿招标项目公告",
+          "status": "fetched",
+          "content_hash": "10c7af90e59e34650bc3762bdaf480d9e10e486ff527eeaaa58b576c9af4168e",
+          "characters": 5073,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1hw/593697.htm",
+          "title": "中化二建集团有限公司-华东分公司-多氟多新材料股份年产10GWh锂电池改扩建项目-混凝土公开招标-项目变更公告",
+          "status": "fetched",
+          "content_hash": "440bf6dcb63a79ec4e90da7f8806662428c62c98c09291737f0e85895d2c37c2",
+          "characters": 1870,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": false,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1hw/593682.htm",
+          "title": "中国化学工程重型机械化有限公司-中化学建工-文脉项目-塑料管采购-公开自愿招标项目公告",
+          "status": "fetched",
+          "content_hash": "65a96361e77a236778472dc59efc3d8416597d6faaeacc683d7600d8fe510bca",
+          "characters": 5617,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1hw/593680.htm",
+          "title": "中国化学工程重型机械化有限公司-中化学建工-文脉项目-预制混凝土管、井采购-公开自愿招标项目公告",
+          "status": "fetched",
+          "content_hash": "2c301da887fd0313dae40ddb56c5cc6cd26a2ab35131dcabcfe5da1fe269bc49",
+          "characters": 5646,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1gc/593710.htm",
+          "title": "十三化建-广东分公司-烟台万华河海项目-管道安装十一标段-公开自愿招标项目变更公告",
+          "status": "fetched",
+          "content_hash": "4a476680fa01ca7f2980bc67deef3eda05411653c1d508cac9a35aa99d8e3c54",
+          "characters": 1758,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": false,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1gc/593486.htm",
+          "title": "重机公司-中国化学工程重型机械化有限公司-开发建设公司-江西S306项目-路面工程专业分包-公开自愿招标项目公告",
+          "status": "fetched",
+          "content_hash": "a53467f53a867e780dfa169ff10e176829854f6b6e4f3b96e6ceb4fc4135bb30",
+          "characters": 5813,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1gc/593306.htm",
+          "title": "七化建-贾家高级中学-防水防腐保温工程和消防设施工程专业分包-公开自愿招标项目变更公告",
+          "status": "fetched",
+          "content_hash": "40787434b88b6e64e72226c2f3a05d87ce383fcfcf8a195111cf9a257c5b3144",
+          "characters": 1859,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": false,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://bid.cncecyc.com/cms/channel/ywgg1fw/593623.htm",
+          "title": "赢海复兴工程公司-专利服务外包-公开自愿招标项目变更公告",
+          "status": "fetched",
+          "content_hash": "7d2d386dac4e5dd57a65beb6b183d1ba557afa0cd8d36000ee36329db05fec72",
+          "characters": 1580,
+          "excerpt": "中国化学工程集团有限公司\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\n\n\n\n \n\n \n \n \n \n 您好！欢迎来到中国化学电子招标投标交易平台 V1.0\n\n \n\n \n 帮助中心\n\n |\n 客服电话:400-0351-029\n\n \n \n \n\n \n\n \n\n \n 中国化学电子招投投标交易平台\n\n \n \n \n\n \n \n \n \n 全部信息\n \n \n 全部信息\n\n 招标公告\n\n 政策法规\n\n 帮助中心\n\n \n \n\n \n\n \n\n \n \n \n\n 搜索\n\n \n\n \n\n \n \n \n \n \n \n \n 首页\n \n \n \n\n \n\n \n \n \n 业务公告\n \n \n \n \n\n \n \n \n \n 招标公告\n \n\n\n \n \n \n \n 中标候选人公示\n \n\n\n \n \n \n \n 中标结果公告\n \n\n\n \n \n \n \n 询比采购\n \n\n\n \n \n \n \n 谈判采购\n \n\n \n\n \n\n \n \n \n “核心层”公示\n \n \n \n \n \n\n \n\n \n \n \n 公司概况\n \n \n \n \n \n\n \n\n \n \n \n 帮助中心\n \n \n \n \n\n \n \n \n \n 评标专家指南\n \n\n\n \n \n \n \n 投标人指南\n \n\n\n \n \n \n \n 通知公告\n \n\n\n \n \n \n \n 相关下载\n \n\n \n\n \n\n \n \n \n CA办理\n \n \n \n \n \n\n \n\n \n \n\n\n\n\n\r\n\r\n\r\n \r\n \r\n \r\n 您当前位置 :\r\n ",
+          "has_price_text": false,
+          "has_quantity_text": false
+        }
+      ],
+      "status": "sampled"
+    },
+    {
+      "source": "安徽建工招采平台",
+      "url": "https://cg.aceg.com.cn/",
+      "samples": [
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260910/1eb58920-1243-4f4d-acf6-58f52e7235bb.html",
+          "title": "【报名进行中】[安徽建工建工投资]宿迁至遂平高速公路亳州段项目环境保护技术服务（二次）标段1招标公告",
+          "status": "fetched",
+          "content_hash": "c1d4f1dda245d881e5ee6902be85b642ebbe494c7e6a8c62d5f927d26acfcda7",
+          "characters": 4167,
+          "excerpt": "[安徽建工建工投资]宿迁至遂平高速公路亳州段项目环境保护技术服务（二次）标段1招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名进行中】[安徽建工建工投资]宿迁至遂平高速公路亳州段项目环境保护技术服务（二次）标段1招标公告\n\r\n \r\n 【信息时间： 2026-09-10 11:14:43】\n\r\n 【发布单位： 安徽建工建工投资】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n  第一章  采购公告安徽建工集团投资管理公司 受 安徽建工集团宿遂高速公路有限公司 委托， 现对“宿迁至遂平高速公路亳州段项目环境保护技术服务（二次） ”进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称： 宿迁至遂平高速公路亳州段项目环境保护技术服务（二次）。\n采购编号：ACEG-202609130001001\n二、采购人： 安徽建工集团投资管理公司。\n三、采购内容：\n1、项目概况：宿遂高速亳州段项目位于亳州市蒙城县、利辛县境内，起于宿遂高速淮北段，终点与阜阳段无缝衔接，路线全长78.977km，总投资118.77亿元。项目特许经营期为402个月，建设期48个月（含",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260910/ac61da66-0215-4a32-979b-975229938257.html",
+          "title": "【报名进行中】[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段安全梯笼及作业平台防护采购（二次）标段1招标公告",
+          "status": "fetched",
+          "content_hash": "27daa3e5337e898e684a67ccaa2325b571c9213d29cd8742daec51cf47a73da1",
+          "characters": 3885,
+          "excerpt": "[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段安全梯笼及作业平台防护采购（二次）标段1招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名进行中】[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段安全梯笼及作业平台防护采购（二次）标段1招标公告\n\r\n \r\n 【信息时间： 2026-09-10 10:41:09】\n\r\n 【发布单位： 安徽建工建工建投】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n 安徽建工建设投资集团有限公司工程管理部受安徽建工建设投资集团有限公司委托，现对“﹝S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）路基路面01标段安全梯笼及作业平台防护采购（二次）﹞”进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称：  S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）路基路面01标段安全梯笼及作业平台防护采购（二次） 。\n采购编号： ACEG-202609426001001   。\n二、采购人：安徽建工建设投资集团有限",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260909/b2a89c87-fa0a-4b4c-bb91-9521637e6554.html",
+          "title": "【报名进行中】[安徽建工建工智能制造]建工智能制造建机、长丰公司（云定制）安徽建工集团智能绿色制造（长丰）产业园二期项目长钢柱长钢梁下料焊接生产线采购1标段招标公告",
+          "status": "fetched",
+          "content_hash": "a061697ae73bfd8b48fb941c8c083e86092d1af292657e20d94f7091ae339400",
+          "characters": 3340,
+          "excerpt": "[安徽建工建工智能制造]建工智能制造建机、长丰公司（云定制）安徽建工集团智能绿色制造（长丰）产业园二期项目长钢柱长钢梁下料焊接生产线采购1标段招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名进行中】[安徽建工建工智能制造]建工智能制造建机、长丰公司（云定制）安徽建工集团智能绿色制造（长丰）产业园二期项目长钢柱长钢梁下料焊接生产线采购1标段招标公告\n\r\n \r\n 【信息时间： 2026-09-09 16:27:32】\n\r\n 【发布单位： 安徽建工建工智能制造】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n 安徽建工智能制造集团有限公司受安徽建工云定制房屋科技有限公司委托，现对安徽建工集团智能绿色制造（长丰）产业园二期项目长钢柱长钢梁下料焊接生产线进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称： 安徽建工集团智能绿色制造（长丰）产业园二期项目长钢柱长钢梁下料焊接生产线。\n采购编号： ACEG-202609428001001 。\n二、采购人： 安徽建工云定制房屋科技有限公司。\n三、采购内容：\n1、项目概况：安徽建工集团智能绿色制造（长丰）产",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260908/9aac219c-e71b-4a45-a2fd-0ed14a16c4e9.html",
+          "title": "【报名进行中】[安徽建工建工建投]建工建投第二公路公司S68旌德至绩溪高速公路项目路基路面三标爆破工程项目招标标段1招标公告",
+          "status": "fetched",
+          "content_hash": "3cc92adbfdcfeda487641965de14b9b9277e46adebae87cee4f644b9d01d47e2",
+          "characters": 3747,
+          "excerpt": "[安徽建工建工建投]建工建投第二公路公司S68旌德至绩溪高速公路项目路基路面三标爆破工程项目招标标段1招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名进行中】[安徽建工建工建投]建工建投第二公路公司S68旌德至绩溪高速公路项目路基路面三标爆破工程项目招标标段1招标公告\n\r\n \r\n 【信息时间： 2026-09-08 17:46:04】\n\r\n 【发布单位： 安徽建工建工建投】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n  \n安徽建工建设投资集团有限公司工程管理部受安徽建工建设投资集团有限公司委托，现对“﹝S68旌德至绩溪高速公路03标段项目爆破工程﹞”进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称： S68旌德至绩溪高速公路03标段项目爆破工程项目招标 。\n采购编号： ACEG-202609297001001 。\n二、采购人：安徽建工建设投资集团有限公司。\n三、采购内容：\n1、项目概况： 本标段桩号：K24.492-K34+092，路线长9.6km ，全线拟采用双向四车道高速公路技术标准建设，路基宽度27米，设计速度为120公里/小",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260908/121b11aa-8e5c-48dc-97d3-a640ce94deee.html",
+          "title": "【报名进行中】[安徽建工建工建投]建工建投第二市政公司重庆市垫江至丰都至武隆高速公路TJ 02合同段项目高填深挖路基边坡监测（第二批）技术咨询服务招标标段1招标公告",
+          "status": "fetched",
+          "content_hash": "3e0bbb03212cbddfe1d1b79a891806883a6ce7b34f6012e5939c07fb075db6c0",
+          "characters": 4507,
+          "excerpt": "[安徽建工建工建投]建工建投第二市政公司重庆市垫江至丰都至武隆高速公路TJ 02合同段项目高填深挖路基边坡监测（第二批）技术咨询服务招标标段1招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名进行中】[安徽建工建工建投]建工建投第二市政公司重庆市垫江至丰都至武隆高速公路TJ 02合同段项目高填深挖路基边坡监测（第二批）技术咨询服务招标标段1招标公告\n\r\n \r\n 【信息时间： 2026-09-08 16:20:31】\n\r\n 【发布单位： 安徽建工建工建投】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n 安徽建工建设投资集团有限公司工程管理部受安徽建工建设投资集团有限公司委托，现对“﹝重庆市垫江至丰都至武隆高速公路TJ02合同段项目高填深挖路基边坡监测（第二批）技术咨询服务招标﹞”进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称： 重庆市垫江至丰都至武隆高速公路TJ02合同段项目 。\n采购编号：ACEG-202609365001。\n二、采购人：安徽建工建设投资集团有限公司。\n三、采购内容：\n1、项目概况： 重庆市垫江至垫江至武隆高速公路（后",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260907/e9fa0fb8-f1d6-438f-a441-9a85588343a1.html",
+          "title": "【报名进行中】[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段桩基及土方施工标段1招标公告",
+          "status": "fetched",
+          "content_hash": "e7850a131d6245760ae2ebb5915a4921b0db6ea6bc2928500595ddeed5930015",
+          "characters": 3862,
+          "excerpt": "[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段桩基及土方施工标段1招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名进行中】[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段桩基及土方施工标段1招标公告\n\r\n \r\n 【信息时间： 2026-09-07 20:40:20】\n\r\n 【发布单位： 安徽建工建工建投】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n 安徽建工建设投资集团有限公司工程管理部受安徽建工建设投资集团有限公司委托，现对“﹝ S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段项目桩基及土方施工（二次）﹞”进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称： S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）路基路面01标段项目桩基及土方施工（二次）   。\n采购编号： ACEG-202609219001001  。\n二、采购人：安徽建工建设投资集团有限公司。\n三、采购内容：\n1、项目概况： S27呼和",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260907/4884d9b2-171d-4777-828f-008384ce309c.html",
+          "title": "【报名进行中】[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段配电箱、配电柜采购标段1招标公告",
+          "status": "fetched",
+          "content_hash": "97c0adb9f6b12082d0697f45138c0d04d420220ad57f440810f534728c811b7f",
+          "characters": 3518,
+          "excerpt": "[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段配电箱、配电柜采购标段1招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名进行中】[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段配电箱、配电柜采购标段1招标公告\n\r\n \r\n 【信息时间： 2026-09-07 20:24:52】\n\r\n 【发布单位： 安徽建工建工建投】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n 安徽建工建设投资集团有限公司工程管理部受安徽建工建设投资集团有限公司委托，现对“﹝ S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）路基路面01标段配电箱、配电柜采购﹞”进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称： S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）路基路面01标段配电箱、配电柜采购 。\n采购编号：  ACEG-202609231001001  。\n二、采购人：安徽建工建设投资集团有限公司。\n三、采购内容：\n1、项目概况： S27呼和浩特至鄂尔多斯",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260904/168f008b-dcd5-43a6-9e6c-872dede7c104.html",
+          "title": "【报名已结束】[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段粉煤灰采购标段1招标公告",
+          "status": "fetched",
+          "content_hash": "39eb9d229308665fd5bc464e5ce5bbd9b3f1acb15611445e3ebd98e00c6fde46",
+          "characters": 4332,
+          "excerpt": "[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段粉煤灰采购标段1招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名已结束】[安徽建工建工建投]建工建投建筑工程公司S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目路基路面01标段粉煤灰采购标段1招标公告\n\r\n \r\n 【信息时间： 2026-09-04 17:36:26】\n\r\n 【发布单位： 安徽建工建工建投】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n 安徽建工建设投资集团有限公司工程管理部受安徽建工建设投资集团有限公司委托，现对“﹝ S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）路基路面01标段项目粉煤灰﹞”进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称： S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）路基路面01标段项目粉煤灰采购  。\n采购编号：   ACEG-202609122001    。\n二、采购人：安徽建工建设投资集团有限公司。\n三、采购内容：\n1、项目概况： S27呼和浩特至鄂尔多斯高速公路（呼和浩特段）项目",
+          "has_price_text": true,
+          "has_quantity_text": false
+        },
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260904/ff7815dc-9f16-48ba-91eb-911e05a2f686.html",
+          "title": "【报名进行中】[安徽建工建工建投]建工建投西藏新瑞公司西藏空港智慧物流枢纽中心建设项目3#-4#楼劳务施工标段1招标公告",
+          "status": "fetched",
+          "content_hash": "d7c46f728a9077f55cbd7d8e12aa6122810612cfc86bc8eba4ba810f0cc1d9f3",
+          "characters": 3475,
+          "excerpt": "[安徽建工建工建投]建工建投西藏新瑞公司西藏空港智慧物流枢纽中心建设项目3#-4#楼劳务施工标段1招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名进行中】[安徽建工建工建投]建工建投西藏新瑞公司西藏空港智慧物流枢纽中心建设项目3#-4#楼劳务施工标段1招标公告\n\r\n \r\n 【信息时间： 2026-09-04 17:26:44】\n\r\n 【发布单位： 安徽建工建工建投】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n 西藏新瑞建设发展有限公司现对“西藏空港智慧物流枢纽中心建设项目EPC ”进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称：西藏空港智慧物流枢纽中心建设项目EPC 。\n采购编号： ACEG-202608372001001 。\n二、采购人： 西藏新瑞建设发展有限公司。\n三、采购内容：\n1、项目概况：西藏空港智慧物流枢纽中心建设项目EPC位于西藏自治区山南市贡嘎县甲竹林镇，总建筑面积35758.38平方米，地上计容面积56150.69平方米，地下不计容面积773.43平方米，本次新建建筑包括:1#综合服务用房、2#配套用房、3#出口",
+          "has_price_text": true,
+          "has_quantity_text": true
+        },
+        {
+          "url": "https://cg.aceg.com.cn/zbcg/001001/20260904/6d046a8f-df5a-4ac9-bc39-d0667a9932d2.html",
+          "title": "【报名已结束】[安徽建工建工投资]鄱阳至万年高速公路新建工程项目杆管线迁改咨询服务标段1招标公告",
+          "status": "fetched",
+          "content_hash": "4a38886b63dd48305984ba8ffa8f1e5db49344951d3f12dbcfdfbce1e1d3226b",
+          "characters": 4104,
+          "excerpt": "[安徽建工建工投资]鄱阳至万年高速公路新建工程项目杆管线迁改咨询服务标段1招标公告\r\n\r\n\r\n \r\n\r\n\r\n \r\n \n\r\n \r\n \r\n \r\n\r\n \r\n \r\n \r\n 当前位置 :\r\n \n\r\n 首页>\n招标采购\n招标公告\n\r\n \r\n \r\n \r\n 招标公告\r\n \r\n 补疑澄清\r\n \r\n 结果公示\r\n \n \r\n \r\n 【报名已结束】[安徽建工建工投资]鄱阳至万年高速公路新建工程项目杆管线迁改咨询服务标段1招标公告\n\r\n \r\n 【信息时间： 2026-09-04 16:50:46】\n\r\n 【发布单位： 安徽建工建工投资】\n\r\n 阅读次数：次\n\r\n 【字号 ： 大 中\r\n 小 】\n\r\n 【我要打印】\n\r\n \r\n \r\n 采购公告安徽建工集团投资管理公司 受 安徽建工集团（江西）鄱万高速公路有限公司 委托，现对 鄱阳至万年高速公路新建工程项目杆管线迁改咨询服务 进行采购，欢迎具备条件的投标人参加投标。\n一、项目名称：  鄱阳至万年高速公路新建工程项目杆管线迁改咨询服务  \n采购编号： ACEG-202609218001001    \n二、采购人：  安徽建工集团投资管理公司  \n三、采购内容：\n1、项目概况：鄱阳至万年高速公路新建工程(以下简称本项目)起点位于上饶市万年县境内，顺接既有的上万高速终点，与杭长高速相交;终于上饶市鄱阳县境内，与规划的彭东高速公路相接。项目位于上饶市的万年、鄱阳，景德镇",
+          "has_price_text": true,
+          "has_quantity_text": false
+        }
+      ],
+      "status": "sampled"
+    }
+  ]
+}

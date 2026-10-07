@@ -25,7 +25,7 @@ class PrepareObjectRecordUpdateTool implements Tool
 
     public function description(): Stringable|string
     {
-        return 'Prepare a user-confirmed patch for an existing customer, customer_contact, or material record. The record UUID must come from a prior query. This tool never updates the record.';
+        return 'Prepare a user-confirmed patch for an existing customer or customer_contact record. The record UUID must come from a prior query. This tool never updates the record.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -66,11 +66,6 @@ class PrepareObjectRecordUpdateTool implements Tool
                 'address' => $schema->string()->nullable(),
                 'level' => $schema->string()->nullable(),
                 'cooperation_history' => $schema->string()->nullable(),
-                'spec' => $schema->string()->nullable(),
-                'length_mm' => $schema->number()->nullable(),
-                'width_mm' => $schema->number()->nullable(),
-                'unit_weight_type' => $schema->string()->nullable(),
-                'unit_weight' => $schema->number()->nullable(),
                 'remark' => $schema->string()->nullable(),
             ])->required()->description('Patch only. Include changed ordinary fields and omit all other fields.'),
         ];

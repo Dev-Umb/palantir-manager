@@ -6,8 +6,12 @@ use App\Ai\AiFailureClassifier;
 use App\Ai\AiRunEventPublisher;
 use App\Ai\AiToolEventProjector;
 use App\Ai\XycDataAgent;
+use App\Integrations\Feishu\FeishuRunAuthorization;
 use App\Jobs\RunAiHarness;
 use App\Models\AiRun;
+use App\Models\BusinessObject;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use GuzzleHttp\Psr7\Response as PsrResponse;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -129,9 +133,14 @@ class AiRunRecoveryTest extends TestCase
 
     private function createRun(array $overrides = []): AiRun
     {
-        app(\App\Actions\SyncXycMetadata::class)->handle();
+        BusinessObject::firstOrCreate(['key' => 'project'], ['label' => '项目', 'group' => '业务', 'code_prefix' => 'P', 'title_field' => 'name', 'fields' => [], 'roles' => ['business']]);
         $user = User::factory()->create();
-        $user->roles()->attach(\App\Models\Role::where('name', 'admin')->firstOrFail());
+        $role = Role::firstOrCreate(['name' => 'business'], ['label' => '业务员']);
+        $permission = Permission::firstOrCreate(['key' => 'ai.harness.view'], ['label' => 'AI 查看', 'module' => 'ai', 'action' => 'view']);
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
+        $projectPermission = Permission::firstOrCreate(['key' => 'object.project.view'], ['label' => '项目查看', 'module' => 'project', 'action' => 'view']);
+        $role->permissions()->syncWithoutDetaching([$projectPermission->id]);
+        $user->roles()->attach($role);
         $conversationId = app(ConversationStore::class)->storeConversation($user->id, 'AI recovery test');
 
         return AiRun::create([
@@ -143,7 +152,7 @@ class AiRunRecoveryTest extends TestCase
             'attempt_number' => 1,
             'status' => 'queued',
             'input' => '帮我准备一张表单',
-            'context_snapshot' => [],
+            'context_snapshot' => ['actor' => ['permissions' => ['ai.harness.view', 'object.project.view']]],
             'artifacts' => [],
             'sources' => [],
             'provenance' => [],
@@ -197,7 +206,7 @@ class AiRunRecoveryTest extends TestCase
             app(AiRunEventPublisher::class),
             app(AiToolEventProjector::class),
             app(AiFailureClassifier::class),
-            app(\App\Integrations\Feishu\FeishuRunAuthorization::class),
+            app(FeishuRunAuthorization::class),
         );
     }
 }

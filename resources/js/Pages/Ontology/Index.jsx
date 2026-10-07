@@ -1,4 +1,5 @@
 import AttachmentTray from '../../Components/AttachmentTray';
+import ProjectOtherAttachments from '../../Components/ProjectOtherAttachments';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Plus, RefreshCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -28,14 +29,17 @@ import { scopedRelationOptions } from '../../Components/objectGridRows';
 import { businessText } from '../../businessLanguage';
 import { formatObjectNumber } from '../../Components/objectNumberFormatting';
 
+const ProjectSummaryList = lazy(() => import('../../Components/ProjectSummaryList'));
+const ContractGroups = lazy(() => import('../../Components/ContractGroups'));
 const ObjectGrid = lazy(() => import('../../Components/ObjectGrid'));
 export const PAGE_SIZE_OPTIONS = Array.from({ length: 10 }, (_, index) => (index + 1) * 10);
 
-export default function Index({ objects = [], contactObject = null, currentObject, records, subtotal = null, can, relationOptions, selectedRecordId, selectedRecord: selectedRecordProp = null, businessUsers = [] }) {
+export default function Index({ objects = [], contactObject = null, currentObject, records, contractGroups = null, subtotal = null, can, relationOptions, selectedRecordId, selectedRecord: selectedRecordProp = null, businessUsers = [] }) {
     const { auth } = usePage().props;
     const params = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search);
     const mode = params.get('mode');
     const [tableRecords, setTableRecords] = useState(records.data);
+    const [projectView, setProjectView] = useState('summary');
     const [contactModal, setContactModal] = useState(null);
     const selectedRecord = tableRecords.find((record) => record.id === selectedRecordId) || selectedRecordProp;
     const closeHref = objectListHref(currentObject.key, params);
@@ -205,14 +209,19 @@ export default function Index({ objects = [], contactObject = null, currentObjec
                         </div>
                         {currentObject.key === 'contract' && (
                             <p className="notice form-notice contract-readonly-notice" role="status">
-                                合同数据由项目主表维护并同步到此处；本表仅供查询、查看附件和导出。
+                                合同数据由项目主表维护并同步到此处；本表仅供查询、查看附件和导出。分组按项目表顺序排列，排序选项用于组内合同明细。
                             </p>
                         )}
+                        {currentObject.key === 'project' && <div className="mb-3 flex items-center justify-between gap-3">
+                            <span className="text-sm text-slate-500">{projectView === 'summary' ? '项目摘要 · 金额单位：万元 · 备注显示前10个字' : '完整字段与原表格操作'} </span>
+                            <button type="button" className="secondary-button small-action" onClick={() => setProjectView(value => value === 'summary' ? 'table' : 'summary')}>{projectView === 'summary' ? '完整表格' : '项目摘要'}</button>
+                        </div>}
                         <Suspense fallback={<div className="table-loading">列表加载中...</div>}>
-                            <ObjectGrid
+                            {currentObject.key === 'contract' && contractGroups ? <ContractGroups groups={contractGroups} subtotal={subtotal} fields={orderedFields} listHref={recordListHrefForObject(currentObject.key, params)} /> : currentObject.key === 'project' && projectView === 'summary' ? <ProjectSummaryList records={tableRecords} fields={currentObject.fields} can={can} offset={Math.max(0, (records.from || 1) - 1)} listHref={recordListHrefForObject(currentObject.key, params)} subtotal={subtotal} /> : <ObjectGrid
                                 key={storageKey}
                                 object={currentObject}
                                 records={tableRecords}
+                                rowOffset={Math.max(0, (records.from || 1) - 1)}
                                 subtotal={subtotal}
                                 fields={orderedFields}
                                 can={can}
@@ -227,9 +236,9 @@ export default function Index({ objects = [], contactObject = null, currentObjec
                                 onContactOpen={openContactList}
                                 onContactCreate={openContactCreate}
                                 canCreateContact={Boolean(contactCan.create && contactObject)}
-                            />
+                            />}
                         </Suspense>
-                        <ObjectPagination records={records} />
+                        <ObjectPagination records={contractGroups || records} grouped={!!contractGroups} />
                     </div>
             </div>
             {mode === 'create' && can.create && (
@@ -408,7 +417,7 @@ function ObjectListControls({ objectKey, params, records, fields = [], relationO
                 <label>
                     <span className="sr-only">排序</span>
                     <select name="sort" aria-label="排序字段" defaultValue={params.get('sort') || ''}>
-                        <option value="">{objectKey === 'project' ? '默认（项目名称）' : '默认（最近更新）'}</option>
+                        <option value="">{objectKey === 'contract' ? '默认（项目顺序）' : objectKey === 'project' ? '默认（项目名称）' : '默认（最近更新）'}</option>
                         {sortable.map((field) => <option value={field.key} key={field.key}>{field.label}</option>)}
                     </select>
                 </label>
@@ -540,7 +549,7 @@ function clearFilterUrl(objectKey, params) {
     return `/objects/${objectKey}${next.toString() ? `?${next}` : ''}`;
 }
 
-function ObjectPagination({ records }) {
+function ObjectPagination({ records, grouped = false }) {
     if (!records.last_page || records.last_page <= 1) return null;
 
     return (
@@ -548,7 +557,7 @@ function ObjectPagination({ records }) {
             {records.prev_page_url ? (
                 <Link className="small-action" href={records.prev_page_url} preserveScroll>上一页</Link>
             ) : <span className="disabled">上一页</span>}
-            <span>第 {records.current_page} / {records.last_page} 页，共 {records.total} 条</span>
+            <span>第 {records.current_page} / {records.last_page} 页，共 {records.total} {grouped ? '组' : '条'}</span>
             {records.next_page_url ? (
                 <Link className="small-action" href={records.next_page_url} preserveScroll>下一页</Link>
             ) : <span className="disabled">下一页</span>}
@@ -723,7 +732,7 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
     const customerProfileFieldKeys = new Set(['customer_id', 'customer_contact_ids', 'customer_address', 'customer_level', 'customer_nature']);
     const formFields = objectKey === 'customer'
         ? fields.filter((field) => field.key !== 'cooperation_history')
-        : fields.filter((field) => !(objectKey === 'project' && canManageCustomers && customerProfileFieldKeys.has(field.key)));
+        : fields.filter((field) => !(objectKey === 'project' && ((canManageCustomers && customerProfileFieldKeys.has(field.key)) || field.key === 'other_attachments')));
     const [contactClearNotice, setContactClearNotice] = useState('');
     const scopedOptions = scopedRelationOptions(relationOptions, payload, recordDisplay);
     const selectedTeam = scopedOptions.team_id?.items?.find((item) => item.id === payload.team_id);
@@ -768,7 +777,11 @@ function RecordForm({ objectKey, record = null, fields, payload, setPayload, pro
             processing={processing}
             submitLabel={submitLabel}
             relationOptions={scopedOptions}
+            attachmentPreviews={record?.attachment_previews || {}}
         >
+            {objectKey === 'project' && fields.some((field) => field.key === 'other_attachments' && !field.readonly) && (
+                <ProjectOtherAttachments record={record} payload={payload} onChange={setField} errors={errors} />
+            )}
             {objectKey === 'customer' && (
                 <CustomerProjectHistory projects={record?.cooperation_projects || []} />
             )}

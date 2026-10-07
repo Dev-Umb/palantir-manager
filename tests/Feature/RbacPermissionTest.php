@@ -21,7 +21,7 @@ class RbacPermissionTest extends TestCase
         $this->actingAs($basic);
         $this->get('/objects')->assertForbidden();
         $this->get('/admin/rbac')->assertForbidden();
-        $this->get('/procurement/approvals')->assertForbidden();
+        $this->get('/procurement/approvals')->assertNotFound();
 
         $businessA = $this->userWithRole('business', 'a');
         $businessB = $this->userWithRole('business', 'b');

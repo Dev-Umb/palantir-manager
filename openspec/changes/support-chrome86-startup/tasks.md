@@ -1,0 +1,10 @@
+- [x] Propose and review user-authorized minimal scope
+- [x] Strict OpenSpec validation before apply
+- [x] Reproduce missing API startup failure and implement compatibility
+- [x] Verify CSS theme fallback is scoped to missing support and preserves modern CSS (tests)
+- [x] Verify startup failure and successful cleanup (9 focused tests)
+- [x] Focused tests, production build, and final quality gates
+- [x] Record browser simulation limitations and unchanged production state
+- [x] Explicit approval obtained, predeployment tests passed, two-file production publish completed with backup and unchanged build manifest
+- [x] Production login HTTP/browser checks and exact production resource legacy API simulation passed
+- [ ] Verify the actual remote 360 browser after release

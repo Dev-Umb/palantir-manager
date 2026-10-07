@@ -15,6 +15,34 @@ class FullChainDemoSeederTest extends TestCase
 {
     use RefreshDatabase;
 
+    private array $createdFixtures = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $directory = base_path('output/pdf');
+        if (! is_dir($directory)) {
+            mkdir($directory, 0777, true);
+        }
+        foreach (['processing-letter' => 3, 'contract' => 3, 'statement' => 10] as $kind => $count) {
+            foreach (range(1, $count) as $index) {
+                $path = $directory.'/'.sprintf('demo-%s-%02d.pdf', $kind, $index);
+                if (! file_exists($path)) {
+                    file_put_contents($path, "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF");
+                    $this->createdFixtures[] = $path;
+                }
+            }
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        foreach ($this->createdFixtures as $path) {
+            unlink($path);
+        }
+        parent::tearDown();
+    }
+
     public function test_seeder_creates_an_idempotent_full_chain_scenario_matrix_without_hidden_workflow_records(): void
     {
         Storage::fake('local');
@@ -97,6 +125,7 @@ class FullChainDemoSeederTest extends TestCase
             ->where('type', ProjectNotification::TYPE_PROCESSING_LETTER)
             ->active()
             ->exists());
+        $this->assertEmpty($this->scenarioProject('letter_due')->payload['last_payment_date'] ?? null);
         $this->assertSame(
             [ProjectNotification::TYPE_SIGNATURE],
             ProjectNotification::query()

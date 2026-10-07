@@ -5,6 +5,7 @@ const attachmentFields = [
     ['processing_letter_attachments', 'existing_processing_letter_attachments', '加工函附件'],
     ['contract_attachments', 'existing_contract_attachments', '合同附件'],
     ['statement_attachments', 'existing_statement_attachments', '对账单附件'],
+    ['other_attachments', 'existing_other_attachments', '其他附件（承诺书等）'],
 ];
 
 export function emptyProjectContract() {
@@ -19,6 +20,7 @@ export function emptyProjectContract() {
         processing_letter_attachments: [],
         contract_attachments: [],
         statement_attachments: [],
+        other_attachments: [],
     };
 }
 
@@ -35,15 +37,19 @@ export function projectContractsForEdit(records = []) {
         contract_qty: record.payload?.contract_qty ?? '',
         remark: record.payload?.remark || '',
         attachment_previews: record.attachment_previews || {},
+        attachment_tokens: record.attachment_tokens || {},
+        removed_attachments: {},
         existing_processing_letter_attachments: record.payload?.processing_letter_attachments || [],
         existing_contract_attachments: record.payload?.contract_attachments || [],
         existing_statement_attachments: record.payload?.statement_attachments || [],
+        existing_other_attachments: record.payload?.other_attachments || [],
     }));
 }
 
 export function projectContractSubmission(contracts = []) {
     return contracts.map((contract) => ({
         ...(contract.id ? { id: contract.id } : {}),
+        ...(Object.values(contract.removed_attachments || {}).some((items) => items.length) ? { removed_attachments: contract.removed_attachments } : {}),
         status: contract.status || '未签署',
         ctype: contract.ctype || '',
         amount: contract.amount,
@@ -54,6 +60,7 @@ export function projectContractSubmission(contracts = []) {
         processing_letter_attachments: contract.processing_letter_attachments || [],
         contract_attachments: contract.contract_attachments || [],
         statement_attachments: contract.statement_attachments || [],
+        other_attachments: contract.other_attachments || [],
     }));
 }
 
@@ -62,6 +69,14 @@ export default function ProjectContractEditor({ contracts, onChange, deletedCont
         onChange(contracts.map((contract, contractIndex) => contractIndex === index
             ? { ...contract, [key]: value }
             : contract));
+    }
+
+    function toggleAttachment(index, field, token) {
+        const removed = contracts[index].removed_attachments || {};
+        const selected = removed[field] || [];
+        const undo = selected.includes(token);
+        if (!undo && !window.confirm('移除此附件？保存项目后生效，其他附件和合同保持不变。')) return;
+        update(index, 'removed_attachments', { ...removed, [field]: undo ? selected.filter((value) => value !== token) : [...selected, token] });
     }
 
     function remove(index) {
@@ -80,7 +95,7 @@ export default function ProjectContractEditor({ contracts, onChange, deletedCont
             <div className="project-contract-editor-head">
                 <div>
                     <strong>合同明细</strong>
-                    <span>合同表将按此处保存结果同步，历史附件只追加、不覆盖。</span>
+                    <span>合同随项目保存；附件可逐个移除，保存前可撤销。</span>
                 </div>
                 <button type="button" className="secondary-button small-action" onClick={() => onChange([...contracts, emptyProjectContract()])}>
                     <Plus size={14} /> 添加合同
@@ -115,8 +130,8 @@ export default function ProjectContractEditor({ contracts, onChange, deletedCont
                             </select>
                         </label>
                         <label>
-                            <span>合同金额<b>*</b></span>
-                            <input type="number" step="0.01" value={contract.amount} onChange={(event) => update(index, 'amount', event.target.value)} required />
+                            <span>合同金额</span>
+                            <input type="number" step="0.01" value={contract.amount} placeholder="未确认可留空，先上传合同原件" onChange={(event) => update(index, 'amount', event.target.value)} />
                         </label>
                         <label>
                             <span>合同数量</span>
@@ -141,17 +156,32 @@ export default function ProjectContractEditor({ contracts, onChange, deletedCont
                                     <div className="attachment-list">
                                         {contract[existingField].map((url, attachmentIndex) => (
                                             <a key={`${url}-${attachmentIndex}`} href={url} target="_blank" rel="noreferrer">
-                                                历史附件 {attachmentIndex + 1}
+                                                原文件名未记录
                                             </a>
                                         ))}
                                     </div>
                                 )}
+                                <div className="attachment-list">
+                                    {(contract[existingField] || []).map((url, attachmentIndex) => {
+                                        const token = contract.attachment_tokens?.[field]?.[attachmentIndex];
+                                        const removed = (contract.removed_attachments?.[field] || []).includes(token);
+                                        return <div key={`${url}-action`}>
+                                            <span>{contract.attachment_previews?.[field]?.[attachmentIndex]?.name || '原文件名未记录'}{removed ? ' · 待移除，保存后生效' : ''}</span>
+                                            {token && <button type="button" className="icon-link" onClick={() => toggleAttachment(index, field, token)} aria-label={`${removed ? '撤销移除' : '移除'}${label}${attachmentIndex + 1}`}>{removed ? '撤销' : '移除'}</button>}
+                                            {!token && <small>当前服务暂不支持单附件移除</small>}
+                                        </div>;
+                                    })}
+                                    {(contract[field] || []).map((file, fileIndex) => <div key={`pending-${fileIndex}`}>
+                                        <span>{file.name} · 待保存</span>
+                                        <button type="button" className="icon-link" aria-label={`移除待上传${label}${fileIndex + 1}`} onClick={() => update(index, field, contract[field].filter((_, selectedIndex) => selectedIndex !== fileIndex))}>移除</button>
+                                    </div>)}
+                                </div>
                                 {(contract[field] || []).length > 0 && <small>本次新增 {contract[field].length} 个附件</small>}
                                 <input
                                     type="file"
                                     multiple
                                     accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={(event) => update(index, field, Array.from(event.target.files || []))}
+                                    onChange={(event) => { update(index, field, [...(contract[field] || []), ...Array.from(event.target.files || [])]); event.target.value = ''; }}
                                 />
                                 {errors[`contracts.${index}.${field}`] && <p className="form-error">{errors[`contracts.${index}.${field}`]}</p>}
                             </div>
@@ -177,7 +207,7 @@ export function ProjectContractsDetail({ contracts = [] }) {
                 <article className="project-contract-detail-card" key={contract.id}>
                     <div><strong>{contract.code}</strong><span>{contract.payload?.status || '未签署'} · {contract.payload?.ctype || '未分类'}</span></div>
                     <dl>
-                        <div><dt>合同金额</dt><dd>{contract.payload?.amount ?? '未填写'}</dd></div>
+                        <div><dt>合同金额</dt><dd>{contract.payload?.amount ?? '待确认'}</dd></div>
                         <div><dt>合同数量</dt><dd>{contract.payload?.contract_qty ?? '未填写'}</dd></div>
                         <div><dt>签订日期</dt><dd>{contract.payload?.signed_date || '未填写'}</dd></div>
                         <div><dt>合同催要记录</dt><dd>{contract.payload?.contract_chase_record || '未填写'}</dd></div>
@@ -186,7 +216,7 @@ export function ProjectContractsDetail({ contracts = [] }) {
                     {attachmentFields.map(([field, , label]) => (contract.payload?.[field] || []).length > 0 && (
                         <div className="attachment-list" key={field}>
                             <span>{label}</span>
-                            {contract.attachment_previews?.[field]?.length > 0 ? <AttachmentTray files={contract.attachment_previews[field]} label={label} /> : contract.payload[field].map((url, index) => <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer">附件 {index + 1}</a>)}
+                            {contract.attachment_previews?.[field]?.length > 0 ? <AttachmentTray files={contract.attachment_previews[field]} label={label} /> : contract.payload[field].map((url, index) => <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer">原文件名未记录</a>)}
                         </div>
                     ))}
                 </article>

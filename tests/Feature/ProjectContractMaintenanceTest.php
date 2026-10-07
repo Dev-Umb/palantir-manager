@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\Role;
+use App\Models\StoredAttachment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -217,6 +218,50 @@ class ProjectContractMaintenanceTest extends TestCase
                 ->has('selectedRecord.contracts', 1)
                 ->where('selectedRecord.contracts.0.id', $contract->id)
                 ->where('selectedRecord.contracts.0.payload.contract_attachments.0', "/attachments/{$contract->id}/contract_attachments/0"));
+    }
+
+    public function test_managed_contract_attachment_download_uses_original_name_and_project_visibility(): void
+    {
+        $owner = $this->userWithRole('business', '负责业务员');
+        $other = $this->userWithRole('business', '其他业务员');
+        $project = $this->project($owner);
+        $path = 'attachments/managed-contract.pdf';
+        Storage::disk('local')->put($path, "%PDF-1.4\nmanaged");
+        StoredAttachment::create([
+            'logical_path' => $path,
+            'disk' => 'local',
+            'object_key' => $path,
+            'original_name' => '鑫源昌正式合同.pdf',
+            'mime_type' => 'application/pdf',
+            'size' => Storage::disk('local')->size($path),
+            'sha256' => hash('sha256', Storage::disk('local')->get($path)),
+            'status' => StoredAttachment::STATUS_ATTACHED,
+        ]);
+        $contract = $this->object('contract')->records()->create([
+            'code' => 'HT-DOWNLOAD',
+            'title' => 'HT-DOWNLOAD',
+            'created_by' => $owner->id,
+            'payload' => [
+                'contract_no' => 'HT-DOWNLOAD',
+                'project_id' => $project->id,
+                'project_no' => 'PRJ-TEST',
+                'status' => '已签署',
+                'amount' => 1,
+                'contract_attachments' => [$path],
+            ],
+        ]);
+
+        $download = $this->actingAs($owner)
+            ->get("/attachments/{$contract->id}/contract_attachments/0")
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $this->assertStringContainsString(
+            "filename*=utf-8''%E9%91%AB%E6%BA%90%E6%98%8C%E6%AD%A3%E5%BC%8F%E5%90%88%E5%90%8C.pdf",
+            (string) $download->headers->get('Content-Disposition'),
+        );
+        $this->actingAs($other)
+            ->get("/attachments/{$contract->id}/contract_attachments/0")
+            ->assertForbidden();
     }
 
     /** @return array<string, mixed> */

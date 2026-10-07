@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Actions\SyncObjectReferenceNames;
+use App\Support\ObjectRelations;
+use App\Support\ReferenceGraphLock;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -39,6 +42,31 @@ class ObjectRecord extends Model
         }
 
         return parent::resolveRouteBinding($value, $field);
+    }
+
+    public function save(array $options = []): bool
+    {
+        $sync = app(SyncObjectReferenceNames::class);
+        $object = BusinessObject::find($this->business_object_id);
+        if (! $object || ! $sync->supports($object)) {
+            return parent::save($options);
+        }
+
+        return $this->getConnection()->transaction(function () use ($options, $sync, $object): bool {
+            app(ReferenceGraphLock::class)->acquire();
+            $this->payload = $sync->normalize($object, $this->payload ?? [])['payload'];
+            $identityChanged = $this->isDirty(['title', 'code'])
+                || ($this->payload['project_no'] ?? null) !== ($this->getOriginal('payload')['project_no'] ?? null);
+            $saved = parent::save($options);
+            if ($saved) {
+                app(ObjectRelations::class)->forgetLabels();
+            }
+            if ($saved && $identityChanged) {
+                $sync->syncDependents($this);
+            }
+
+            return $saved;
+        });
     }
 
     protected function casts(): array

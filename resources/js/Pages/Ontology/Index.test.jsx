@@ -72,6 +72,7 @@ vi.mock('../../Components/Layout', () => ({
 }));
 
 vi.mock('../../Components/ObjectGrid', () => ({
+    objectRecordHref: (record) => `/objects/project?record=${record.id}&mode=detail`,
     default: ({ object, records, fields, savedColumnWidths, columnOrderLocked, onColumnOrderChange, onColumnWidthsChange, onContactOpen, onContactCreate, canCreateContact, exportUrl }) => (
         <div>
             <div data-testid="grid-order">{fields.map((field) => field.key).join('|')}</div>
@@ -234,7 +235,7 @@ describe('Ontology multi-condition filters', () => {
         expect(within(dialog).getByRole('button', { name: '应用筛选' })).toBeInTheDocument();
     });
 
-    it('keeps the existing default sorting label for non-project objects', () => {
+    it('uses project grouping as the contract default sorting', () => {
         window.history.replaceState({}, '', '/objects/contract');
         render(<Index
             objects={[{ id: 4, key: 'contract', label: '合同表', group: '业务与合同' }]}
@@ -246,7 +247,7 @@ describe('Ontology multi-condition filters', () => {
 
         const selector = screen.getByRole('combobox', { name: '排序字段' });
 
-        expect(within(selector).getByRole('option', { name: '默认（最近更新）' })).toBeInTheDocument();
+        expect(within(selector).getByRole('option', { name: '默认（项目顺序）' })).toBeInTheDocument();
         expect(within(selector).queryByRole('option', { name: '默认（项目名称）' })).not.toBeInTheDocument();
     });
 
@@ -358,6 +359,7 @@ describe('Ontology personal field order', () => {
             />,
         );
 
+        fireEvent.click(screen.getByRole('button', { name: '完整表格' }));
         expect(await screen.findByTestId('grid-order')).toHaveTextContent('name|position|phone|note');
         expect(screen.getByTestId('grid-order-locked')).toHaveTextContent('true');
 

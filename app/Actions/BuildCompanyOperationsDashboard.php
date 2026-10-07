@@ -18,11 +18,7 @@ class BuildCompanyOperationsDashboard
     private const OBJECT_KEYS = [
         'project',
         'contract',
-        'receivable',
-        'invoice',
         'tender',
-        'work_order',
-        'shipment',
     ];
 
     private const PROJECT_STATUSES = ['投标中', '已中标', '已拿到加工函', '合同签署', '已完成'];
@@ -30,8 +26,6 @@ class BuildCompanyOperationsDashboard
     private const ACTIVE_PROJECT_STATUSES = ['投标中', '已中标', '已拿到加工函', '合同签署'];
 
     private const TENDER_STATUSES = ['跟踪中', '已报名', '已购标书', '制作中', '已递交', '已中标', '未中标', '已放弃'];
-
-    private const WORK_ORDER_STATUSES = ['未开始', '生产中', '异常暂停', '已完成'];
 
     private const KPI_ORDER = ['occurred_amount', 'collection_rate', 'tender_win_rate', 'current_debt'];
 
@@ -92,11 +86,7 @@ class BuildCompanyOperationsDashboard
             $cockpit['panels']['tender_pipeline'] = $tender['panel'];
         }
 
-        $cashFlow = $this->cashFlowPanel(
-            $records->get('contract'),
-            $records->get('receivable'),
-            $records->get('invoice'),
-        );
+        $cashFlow = $this->cashFlowPanel($records->get('contract'));
         if ($cashFlow !== null) {
             $cockpit['panels']['cash_flow'] = $cashFlow;
         }
@@ -104,14 +94,6 @@ class BuildCompanyOperationsDashboard
         if ($records->get('project') instanceof Collection) {
             $cockpit['panels']['project_status'] = $this->projectStatusPanel($records->get('project'));
             $cockpit['panels']['project_amounts'] = $this->projectAmountPanel($records->get('project'), $asOf);
-        }
-
-        $productionDelivery = $this->productionDeliveryPanel(
-            $records->get('work_order'),
-            $records->get('shipment'),
-        );
-        if ($productionDelivery !== null) {
-            $cockpit['panels']['production_delivery'] = $productionDelivery;
         }
 
         $cockpit['kpis'] = collect($cockpit['kpis'])
@@ -263,39 +245,16 @@ class BuildCompanyOperationsDashboard
         ];
     }
 
-    /**
-     * @param  Collection<int, ObjectRecord>|null  $contracts
-     * @param  Collection<int, ObjectRecord>|null  $receivables
-     * @param  Collection<int, ObjectRecord>|null  $invoices
-     * @return array<string, mixed>|null
-     */
-    private function cashFlowPanel(?Collection $contracts, ?Collection $receivables, ?Collection $invoices): ?array
+    /** @return array<string, mixed>|null */
+    private function cashFlowPanel(?Collection $contracts): ?array
     {
-        if ($contracts === null && $receivables === null && $invoices === null) {
+        if ($contracts === null) {
             return null;
         }
 
-        $series = [];
-        if ($contracts !== null) {
-            $series[] = $this->amountSeries('contract', '合同金额', $contracts, 'amount');
-        }
-        if ($receivables !== null) {
-            $series[] = $this->amountSeries('occurred', '实际发生', $receivables, 'occurred_amount');
-            $series[] = $this->amountSeries('reconciled', '已对账', $receivables, 'reconciled_amount');
-        }
-        if ($invoices !== null) {
-            $issuedInvoices = $invoices->filter(
-                fn (ObjectRecord $invoice): bool => ($invoice->payload['status'] ?? null) === '已开票',
-            )->values();
-            $series[] = $this->amountSeries('invoiced', '已开票', $issuedInvoices, 'amount', $invoices->count());
-        }
-        if ($receivables !== null) {
-            $series[] = $this->amountSeries('paid', '已回款', $receivables, 'paid_amount');
-        }
-
         return [
-            'series' => $series,
-            'url' => $receivables !== null ? '/objects/project' : ($contracts !== null ? '/objects/contract' : null),
+            'series' => [$this->amountSeries('contract', '合同金额', $contracts, 'amount')],
+            'url' => '/objects/contract',
         ];
     }
 
@@ -472,104 +431,6 @@ class BuildCompanyOperationsDashboard
         return $ownerId !== false && $ownerId > 0 ? $ownerId : null;
     }
 
-    /**
-     * @param  Collection<int, ObjectRecord>|null  $workOrders
-     * @param  Collection<int, ObjectRecord>|null  $shipments
-     * @return array<string, mixed>|null
-     */
-    private function productionDeliveryPanel(?Collection $workOrders, ?Collection $shipments): ?array
-    {
-        if ($workOrders === null && $shipments === null) {
-            return null;
-        }
-
-        $panel = [];
-        if ($workOrders !== null) {
-            $productionValues = $workOrders
-                ->map(fn (ObjectRecord $record): ?float => $this->nonNegativeNumber($record->payload['production_qty_ton'] ?? null))
-                ->filter(fn (?float $value): bool => $value !== null);
-            $plannedValues = $workOrders
-                ->map(fn (ObjectRecord $record): ?float => $this->nonNegativeNumber($record->payload['weight'] ?? null))
-                ->filter(fn (?float $value): bool => $value !== null);
-
-            $panel['production'] = [
-                'total_ton' => $productionValues->isNotEmpty() ? $productionValues->sum() : null,
-                'planned_ton' => $plannedValues->isNotEmpty() ? $plannedValues->sum() : null,
-                'coverage' => ['valid' => $productionValues->count(), 'total' => $workOrders->count()],
-                'statuses' => collect(self::WORK_ORDER_STATUSES)
-                    ->map(fn (string $status): array => [
-                        'status' => $status,
-                        'count' => $workOrders->where('payload.status', $status)->count(),
-                    ])
-                    ->values(),
-                'url' => null,
-            ];
-        }
-
-        if ($shipments !== null) {
-            $panel['shipment'] = $this->shipmentSummary($shipments);
-        }
-
-        return $panel;
-    }
-
-    /**
-     * @param  Collection<int, ObjectRecord>  $shipments
-     * @return array<string, mixed>
-     */
-    private function shipmentSummary(Collection $shipments): array
-    {
-        $totalTon = 0.0;
-        $validQuantityCount = 0;
-        $invalidQuantityCount = 0;
-        $datedCount = 0;
-        $undatedTon = 0.0;
-        $monthly = collect();
-
-        foreach ($shipments as $shipment) {
-            $quantity = $this->nonNegativeNumber($shipment->payload['qty_ton'] ?? null);
-            if ($quantity === null) {
-                $invalidQuantityCount++;
-
-                continue;
-            }
-
-            $validQuantityCount++;
-            $totalTon += $quantity;
-            $date = $this->date($shipment->payload['ship_date'] ?? null);
-            if ($date === null) {
-                $undatedTon += $quantity;
-
-                continue;
-            }
-
-            $datedCount++;
-            $month = $date->format('Y-m');
-            $monthly->put($month, (float) $monthly->get($month, 0) + $quantity);
-        }
-
-        return [
-            'total_ton' => $validQuantityCount > 0 ? $totalTon : null,
-            'coverage' => ['valid' => $validQuantityCount, 'total' => $shipments->count()],
-            'trend_coverage' => ['valid' => $datedCount, 'total' => $validQuantityCount],
-            'invalid_quantity_count' => $invalidQuantityCount,
-            'undated_ton' => $undatedTon,
-            'monthly' => $monthly
-                ->sortKeys()
-                ->map(fn (float $ton, string $month): array => [
-                    'month' => $month,
-                    'label' => CarbonImmutable::createFromFormat('!Y-m', $month)->format('Y年n月'),
-                    'ton' => $ton,
-                ])
-                ->values(),
-            'url' => null,
-        ];
-    }
-
-    /**
-     * @param  Collection<int, ObjectRecord>  $projects
-     * @return array<string, mixed>|null
-     */
     /**
      * @param  Collection<int, ObjectRecord>  $projects
      * @return array<int, array<string, mixed>>

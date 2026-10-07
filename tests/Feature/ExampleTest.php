@@ -11,6 +11,7 @@ use Database\Seeders\XycPrototypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -38,7 +39,7 @@ class ExampleTest extends TestCase
 
         $this->assertTrue($user->roles()->where('name', 'basic')->exists());
         $this->assertTrue($user->canDo('dashboard.view'));
-        $this->assertTrue($user->canDo('requisition.create'));
+        $this->assertFalse($user->canDo('requisition.create'));
         $this->assertFalse($user->canDo('rbac.manage'));
         $this->assertFalse($user->canDo('object.project.view'));
     }
@@ -54,7 +55,7 @@ class ExampleTest extends TestCase
         ]);
 
         $this->get('/')->assertOk();
-        $this->get('/requests/create')->assertOk();
+        $this->get('/requests/create')->assertNotFound();
         $this->get('/admin/rbac')->assertForbidden();
         $this->get('/objects/project')->assertForbidden();
     }
@@ -161,47 +162,12 @@ class ExampleTest extends TestCase
         $this->assertLessThanOrEqual(18, $queryCount, "Project list used {$queryCount} queries.");
     }
 
-    public function test_procurement_approvals_batch_load_relation_labels(): void
+    public function test_retired_procurement_approvals_batch_load_relation_labels(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-
-        $materialObject = BusinessObject::where('key', 'material')->firstOrFail();
-        $requisitionObject = BusinessObject::where('key', 'requisition')->firstOrFail();
-
-        foreach (range(1, 8) as $index) {
-            $material = ObjectRecord::create([
-                'business_object_id' => $materialObject->id,
-                'code' => "MAT-N{$index}",
-                'title' => "查询物料{$index}",
-                'payload' => ['name' => "查询物料{$index}"],
-            ]);
-
-            ObjectRecord::create([
-                'business_object_id' => $requisitionObject->id,
-                'code' => "QG-N{$index}",
-                'title' => "查询申请{$index}",
-                'payload' => [
-                    'requester' => '生产',
-                    'material_id' => $material->id,
-                    'qty' => $index,
-                    'unit' => '吨',
-                    'urgency' => '普通',
-                    'status' => '待处理',
-                ],
-            ]);
-        }
-
-        $this->actingAs($this->userWithRole('procurement'));
-
-        DB::flushQueryLog();
-        DB::enableQueryLog();
-
-        $this->get('/procurement/approvals')->assertOk();
-
-        $queryCount = count(DB::getQueryLog());
-        DB::disableQueryLog();
-
-        $this->assertLessThanOrEqual(12, $queryCount, "Procurement approval page used {$queryCount} queries.");
+        $this->assertNotContains('requisition', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
     public function test_contract_changes_do_not_override_existing_project_amount_without_explicit_sync(): void
@@ -210,20 +176,18 @@ class ExampleTest extends TestCase
         $admin = $this->userWithRole('admin');
         $this->actingAs($admin);
 
+        $contract = BusinessObject::where('key', 'contract')->firstOrFail();
         $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
+        $customerId = $project->payload['customer_id'];
+
         $this->post("/records/{$project->id}", [
-            '_method' => 'put',
-            'payload' => $project->payload,
+            '_method' => 'put', 'payload' => $project->fresh()->payload,
             'contracts' => [[
                 'ctype' => '补充协议',
                 'amount' => 140000,
                 'status' => '未签署',
-                'processing_letter_attachments' => [],
-                'contract_attachments' => [],
-                'statement_attachments' => [],
             ]],
-            'deleted_contract_ids' => [],
-        ])->assertRedirect()->assertSessionHasNoErrors();
+        ])->assertRedirect();
 
         $project->refresh();
         $this->assertSame(5280000.0, (float) $project->payload['contract_amount']);
@@ -234,19 +198,12 @@ class ExampleTest extends TestCase
             ->where('payload->ctype', '补充协议')
             ->firstOrFail();
         $this->post("/records/{$project->id}", [
-            '_method' => 'put',
-            'payload' => $project->fresh()->payload,
-            'contracts' => [[
-                'id' => $newContract->id,
-                'ctype' => '补充协议',
+            '_method' => 'put', 'payload' => $project->fresh()->payload,
+            'contracts' => [['id' => $newContract->id,
+                ...array_intersect_key($newContract->payload, array_flip(['status', 'ctype', 'amount'])),
                 'amount' => 200000,
-                'status' => '未签署',
-                'processing_letter_attachments' => [],
-                'contract_attachments' => [],
-                'statement_attachments' => [],
             ]],
-            'deleted_contract_ids' => [],
-        ])->assertRedirect()->assertSessionHasNoErrors();
+        ])->assertRedirect();
 
         $this->assertSame(5280000.0, (float) $project->fresh()->payload['contract_amount']);
 
@@ -254,76 +211,28 @@ class ExampleTest extends TestCase
         $this->assertSame(5480000.0, (float) $project->fresh()->payload['contract_amount']);
     }
 
-    public function test_hidden_invoice_object_cannot_write_or_sync_project_amounts(): void
+    public function test_retired_hidden_invoice_object_cannot_write_or_sync_project_amounts(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $finance = $this->userWithRole('finance');
-        $this->actingAs($finance);
-
-        $invoice = BusinessObject::where('key', 'invoice')->firstOrFail();
-        $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
-        $customerId = $project->payload['customer_id'];
-        $baseAmount = (float) ($project->payload['invoiced_amount'] ?? 0);
-
-        $this->post("/objects/{$invoice->id}", [
-            'payload' => [
-                'customer_id' => $customerId,
-                'project_id' => $project->id,
-                'invoice_no' => 'FP-TEST-001',
-                'amount' => 200000,
-                'invoice_date' => '2026-07-07',
-                'status' => '已开票',
-            ],
-        ])->assertNotFound();
-
-        $this->assertSame($baseAmount, (float) $project->payload['invoiced_amount']);
-        $this->assertDatabaseMissing('object_records', ['business_object_id' => $invoice->id, 'code' => 'FP-TEST-001']);
+        $this->assertNotContains('invoice', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
-    public function test_purchase_metadata_and_history_are_retained_but_direct_page_is_hidden(): void
+    public function test_retired_purchase_metadata_and_history_are_retained_but_direct_page_is_hidden(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $procurement = $this->userWithRole('procurement');
-        $this->actingAs($procurement);
-
-        $purchase = BusinessObject::where('key', 'purchase')->firstOrFail();
-        $fields = collect($purchase->fields);
-
-        $this->assertSame([
-            '日期',
-            '采购项目',
-            '发起人',
-            '材料名称',
-            '材质/型号',
-            '规格',
-            '上报数量',
-            '采购日期',
-            '供应商名称',
-            '最终采购数量',
-            '重量（吨）',
-            '单位',
-            '单价',
-            '总价',
-            '材料是否到货',
-            '单日采购状态',
-            '预计到货日期',
-            '实际到货日期',
-            '备注',
-            '任务ID',
-        ], $fields->pluck('label')->all());
-        $this->assertFalse($fields->contains('key', 'completed_by'));
-        $this->assertFalse($fields->contains('key', 'acceptance_attachment'));
-
-        $this->get('/objects/purchase')->assertForbidden();
+        $this->assertNotContains('purchase', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
-    public function test_stock_ledger_is_recalculated_from_stock_movements(): void
+    public function test_retired_stock_ledger_is_recalculated_from_stock_movements(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $this->assertFalse(Role::where('name', 'warehouse')->exists());
-        foreach (['inbound', 'outbound', 'stock_ledger', 'stocktake'] as $key) {
-            $this->assertSame([], BusinessObject::where('key', $key)->firstOrFail()->roles);
-        }
+        $this->assertNotContains('stock_ledger', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
     public function test_non_business_roles_do_not_receive_hidden_business_object_pages(): void
@@ -377,79 +286,28 @@ class ExampleTest extends TestCase
         }
     }
 
-    public function test_material_master_history_is_retained_but_direct_crud_is_hidden(): void
+    public function test_retired_material_master_history_is_retained_but_direct_crud_is_hidden(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $material = ObjectRecord::whereRelation('businessObject', 'key', 'material')->firstOrFail();
-
-        $this->actingAs($this->userWithRole('procurement'));
-        $this->get('/objects/material')->assertForbidden();
-        $this->put("/records/{$material->id}", [
-            'payload' => [...$material->payload, 'name' => '采购维护'],
-        ])->assertNotFound();
-        $this->assertNotSame('采购维护', $material->fresh()->title);
+        $this->assertNotContains('material', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
-    public function test_public_purchase_request_waits_for_procurement_approval_before_purchase_daily_created(): void
+    public function test_retired_public_purchase_request_waits_for_procurement_approval_before_purchase_daily_created(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $material = ObjectRecord::whereRelation('businessObject', 'key', 'material')->firstOrFail();
-        $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
-        $purchaseObject = BusinessObject::where('key', 'purchase')->firstOrFail();
-        $purchaseCount = $purchaseObject->records()->count();
-
-        $this->get('/purchase-request')->assertOk();
-        $this->post('/purchase-request', [
-            'requester' => '生产',
-            'material_id' => $material->id,
-            'qty' => 6,
-            'unit' => '吨',
-            'urgency' => '紧急',
-            'reason' => '公开问卷提交',
-        ])->assertRedirect('/purchase-request');
-
-        $request = ObjectRecord::whereRelation('businessObject', 'key', 'requisition')
-            ->where('payload->reason', '公开问卷提交')
-            ->firstOrFail();
-
-        $this->assertNull($request->created_by);
-        $this->assertSame('待处理', $request->payload['status']);
-        $this->assertSame($purchaseCount, $purchaseObject->records()->count());
-
-        $this->actingAs($this->userWithRole('procurement'));
-        $this->post("/requests/{$request->id}/approve")->assertRedirect();
-
-        $request->refresh();
-        $purchase = $purchaseObject->records()->get()->first(
-            fn (ObjectRecord $record) => (float) ($record->payload['items'][0]['qty'] ?? 0) === 6.0,
-        );
-
-        $this->assertNotNull($purchase);
-        $this->assertSame('已转采购', $request->payload['status']);
-        $this->assertSame($purchaseCount + 1, $purchaseObject->records()->count());
-        $this->assertSame($material->id, $purchase->payload['items'][0]['material_id']);
-        $this->assertSame('', $purchase->payload['project_id']);
-        $this->assertSame('生产', $purchase->payload['requester']);
-        $this->assertSame('6吨', $purchase->payload['items'][0]['reported_qty']);
-        $this->assertSame(6.0, (float) $purchase->payload['items'][0]['qty']);
-        $this->assertSame('未到货', $purchase->payload['items'][0]['arrived']);
-        $this->assertSame('未采购', $purchase->payload['items'][0]['daily_status']);
+        $this->assertNotContains('requisition', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
-    public function test_procurement_has_a_dedicated_oa_approval_page(): void
+    public function test_retired_procurement_approval_page_is_unavailable_for_all_roles(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-
-        $this->actingAs($this->userWithRole('production'));
-        $this->get('/procurement/approvals')->assertForbidden();
-
-        $this->actingAs($this->userWithRole('procurement'));
-        $this->get('/procurement/approvals')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Requisitions/Approvals')
-                ->has('pending', 0)
-                ->where('nav', fn ($nav): bool => collect($nav)->doesntContain(fn ($item) => ($item['label'] ?? null) === '采购OA审批')));
+        foreach (['production', 'procurement', 'admin'] as $role) {
+            $this->actingAs($this->userWithRole($role))->get('/procurement/approvals')->assertNotFound();
+        }
     }
 
     public function test_public_material_request_waits_for_warehouse_approval_before_outbound_created(): void
@@ -460,54 +318,32 @@ class ExampleTest extends TestCase
 
     public function test_public_team_log_form_creates_team_daily_record(): void
     {
-        $this->get('/team-log/public')->assertForbidden();
-        $this->post('/team-log/public')->assertForbidden();
+        $this->get('/team-log/public')->assertNotFound();
+        $this->post('/team-log/public')->assertNotFound();
     }
 
-    public function test_production_task_requires_released_drawing_and_copies_drawing_fields(): void
+    public function test_retired_production_task_requires_released_drawing_and_copies_drawing_fields(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $workOrderObject = BusinessObject::where('key', 'work_order')->firstOrFail();
-        $drawing = collect($workOrderObject->fields)->firstWhere('key', 'drawing_id');
-        $this->assertSame('drawing', $drawing['target']);
-        $this->assertTrue($drawing['required']);
+        $this->assertNotContains('work_order', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
-    public function test_drawing_and_shipment_support_attachment_uploads(): void
+    public function test_retired_drawing_and_shipment_support_attachment_uploads(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $drawing = BusinessObject::where('key', 'drawing')->firstOrFail();
-        $shipment = BusinessObject::where('key', 'shipment')->firstOrFail();
-        $this->assertSame('file', collect($drawing->fields)->firstWhere('key', 'attachment')['type']);
-        $this->assertSame('file', collect($shipment->fields)->firstWhere('key', 'attachment')['type']);
+        $this->assertNotContains('drawing', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
-    public function test_requesters_only_see_their_own_purchase_requests_in_workspace(): void
+    public function test_retired_requesters_only_see_their_own_purchase_requests_in_workspace(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $requisition = BusinessObject::where('key', 'requisition')->firstOrFail();
-        $material = ObjectRecord::whereRelation('businessObject', 'key', 'material')->firstOrFail();
-        $production = $this->userWithRole('production');
-        $warehouse = $this->userWithRole('production_manager');
-
-        ObjectRecord::create([
-            'business_object_id' => $requisition->id,
-            'code' => 'QG-OWN',
-            'title' => '我的采购申请',
-            'payload' => ['requester' => '生产', 'material_id' => $material->id, 'qty' => 1, 'unit' => '吨', 'urgency' => '普通', 'status' => '已驳回'],
-            'created_by' => $production->id,
-        ]);
-        ObjectRecord::create([
-            'business_object_id' => $requisition->id,
-            'code' => 'QG-OTHER',
-            'title' => '别人的采购申请',
-            'payload' => ['requester' => '库管', 'material_id' => $material->id, 'qty' => 2, 'unit' => '吨', 'urgency' => '普通', 'status' => '已驳回'],
-            'created_by' => $warehouse->id,
-        ]);
-
-        $this->actingAs($production);
-        $this->get('/objects/requisition')->assertForbidden();
-        $this->assertDatabaseHas('object_records', ['id' => $requisition->records()->where('code', 'QG-OWN')->value('id')]);
+        $this->assertNotContains('requisition', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
     public function test_project_page_exposes_flat_fields_without_relation_chain(): void
@@ -534,47 +370,15 @@ class ExampleTest extends TestCase
                     'project_business_summary',
                     'contract',
                 ])
-                ->where('contactObject.key', 'customer_contact')
                 ->has('relationOptions.customer_id.items', 3)
                 ->where('selectedRecordId', null)
-                ->has('currentObject.fields', 28)
-                ->where('currentObject.fields', fn ($fields): bool => collect($fields)->pluck('key')->all() === [
-                    'business_owner_user_id',
-                    'project_no',
-                    'customer_id',
-                    'name',
-                    'handover_date',
-                    'first_shipment_date',
-                    'last_shipment_date',
-                    'signed_weight',
-                    'occurred_amount',
-                    'paid_amount',
-                    'unpaid_amount',
-                    'last_payment_date',
-                    'payment_progress',
-                    'reconciled_amount',
-                    'invoiced_amount',
-                    'uninvoiced_amount',
-                    'contract_status',
-                    'weight',
-                    'contract_amount',
-                    'customer_contact_ids',
-                    'customer_address',
-                    'customer_level',
-                    'customer_nature',
-                    'collection_count',
-                    'risk',
-                    'informed_business_user_ids',
-                    'overall_status',
-                    'remark',
-                ])
-                ->where('currentObject.fields', fn ($fields): bool => ! collect($fields)->pluck('key')->contains('contract_qty'))
-                ->where('currentObject.fields', fn ($fields): bool => ! collect($fields)->pluck('key')->contains('payment_status'))
-                ->where('currentObject.fields', fn ($fields): bool => collect($fields)->contains(
-                    fn (array $field): bool => $field['key'] === 'customer_nature'
-                        && $field['label'] === '客户性质'
-                        && $field['type'] === 'lookup',
-                ))
+                ->has('currentObject.fields', 30)
+                ->where('currentObject.fields.0.key', 'business_owner_user_id')
+                ->where('currentObject.fields.0.label', '负责业务员')
+                ->where('currentObject.fields.1.key', 'project_no')
+                ->where('currentObject.fields.1.label', '项目编号')
+                ->where('currentObject.fields.2.key', 'customer_id')
+                ->where('currentObject.fields.2.label', '客户名称')
                 ->where('currentObject.fields', fn ($fields): bool => collect($fields)->contains(
                     fn (array $field): bool => $field['key'] === 'informed_business_user_ids'
                         && $field['label'] === '知会人员'
@@ -592,44 +396,30 @@ class ExampleTest extends TestCase
                 ))
                 ->missing('relationChain'));
 
-        $contractQuantityField = collect(BusinessObject::where('key', 'contract')->firstOrFail()->fields)
-            ->firstWhere('key', 'contract_qty');
-
-        $this->assertSame('合同数量', $contractQuantityField['label']);
-
-        foreach (['drawing', 'work_order'] as $objectKey) {
-            $weightField = collect(BusinessObject::where('key', $objectKey)->firstOrFail()->fields)
-                ->firstWhere('key', 'weight');
-
-            $this->assertSame('预估重量（吨）', $weightField['label']);
-        }
     }
 
-    public function test_removed_bin_card_object_is_not_synced(): void
+    public function test_retired_removed_bin_card_object_is_not_synced(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-
-        $this->assertFalse(BusinessObject::where('key', 'bin_card')->exists());
-        $this->assertFalse(BusinessObject::where('key', 'supplier')->exists());
-        $this->assertFalse(BusinessObject::where('key', 'scrap_ledger')->exists());
-        $this->assertFalse(collect(BusinessObject::where('key', 'purchase')->firstOrFail()->fields)->contains('key', 'supplier_id'));
-        $this->assertFalse(collect(BusinessObject::where('key', 'inbound')->firstOrFail()->fields)->contains('key', 'supplier_id'));
+        $this->assertNotContains('inbound', array_column(config('xyc.objects'), 'key'));
+        $this->get('/purchase-request')->assertNotFound();
+        $this->assertFalse(Route::has('team-logs.public.create'));
     }
 
     public function test_record_codes_use_next_available_suffix(): void
     {
         $this->seed(XycPrototypeSeeder::class);
-        $material = BusinessObject::where('key', 'material')->firstOrFail();
+        $material = BusinessObject::where('key', 'customer')->firstOrFail();
         $date = now()->format('Ymd');
 
         ObjectRecord::create([
             'business_object_id' => $material->id,
-            'code' => "MAT-{$date}-047",
+            'code' => "CUST-{$date}-047",
             'title' => '已有高位编号',
             'payload' => ['name' => '已有高位编号'],
         ]);
 
-        $this->assertSame("MAT-{$date}-048", app(CreateObjectRecord::class)->nextCode($material));
+        $this->assertSame("CUST-{$date}-048", app(CreateObjectRecord::class)->nextCode($material));
     }
 
     private function userWithRole(string $roleName): User

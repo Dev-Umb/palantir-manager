@@ -26,3 +26,12 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local evidence, build artifacts and editor integrations
+/outputs/
+/public/quotation-build/
+/.agents/
+/.claude/
+/.mcp.json
+/CLAUDE.md
+/boost.json

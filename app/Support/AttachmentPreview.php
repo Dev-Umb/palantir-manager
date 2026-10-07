@@ -11,7 +11,11 @@ use Illuminate\Support\Facades\Storage;
 
 class AttachmentPreview
 {
-    public const FIELDS = ['processing_letter_attachments', 'contract_attachments', 'attachment'];
+    public const PROJECT_FIELD = 'unassigned_processing_letter_attachments';
+
+    public const PROJECT_FIELDS = [self::PROJECT_FIELD, 'other_attachments'];
+
+    public const FIELDS = ['processing_letter_attachments', 'contract_attachments', 'statement_attachments', 'other_attachments', 'attachment'];
 
     private const MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 
@@ -41,7 +45,8 @@ class AttachmentPreview
         abort_unless($object && $user->canDo("object.{$object->key}.view"), 403);
         abort_unless($this->visibility->allowsRecord($user, $record), 403);
         if ($preview) {
-            abort_unless($object->key === 'contract' && in_array($field, self::FIELDS, true), 404);
+            abort_unless(($object->key === 'contract' && in_array($field, self::FIELDS, true))
+                || ($object->key === 'project' && in_array($field, self::PROJECT_FIELDS, true)), 404);
         }
 
         $definition = collect($object->fields ?? [])->first(fn (array $candidate): bool => ($candidate['key'] ?? null) === $field
@@ -112,7 +117,7 @@ class AttachmentPreview
             $label = $entry['label'].' '.(($entry['index'] ?? 0) + 1);
             $result[$entry['field']][] = [
                 'index' => $entry['index'],
-                'name' => $this->names[$entry['path']] ?? $label.($extension ? '.'.$extension : ''),
+                'name' => $this->names[$entry['path']] ?? basename($entry['path']),
                 'label' => $label,
                 'kind' => $extension === 'pdf' ? 'pdf' : (in_array($extension, ['jpg', 'jpeg', 'png'], true) ? 'image' : 'file'),
                 'info_url' => route('attachments.preview', $parameters, false),
@@ -127,12 +132,12 @@ class AttachmentPreview
     /** @return array<int, array{field: string, index: int|null, path: string, label: string}> */
     private function entries(ObjectRecord $record): array
     {
-        if ($record->businessObject?->key !== 'contract') {
+        if (! in_array($record->businessObject?->key, ['contract', 'project'], true)) {
             return [];
         }
         $entries = [];
         foreach ($record->businessObject->fields ?? [] as $field) {
-            if (! in_array($field['key'] ?? null, self::FIELDS, true)
+            if (! in_array($field['key'] ?? null, $record->businessObject->key === 'project' ? self::PROJECT_FIELDS : self::FIELDS, true)
                 || ! in_array($field['type'] ?? null, ['file', 'files'], true)
                 || ($field['scope'] ?? null) === 'item') {
                 continue;

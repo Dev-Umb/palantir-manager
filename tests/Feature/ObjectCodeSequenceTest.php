@@ -73,7 +73,7 @@ class ObjectCodeSequenceTest extends TestCase
     private function sequenceObject(): BusinessObject
     {
         return BusinessObject::create([
-            'key' => 'sequence_test',
+            'key' => 'customer',
             'label' => '编号测试',
             'group' => '测试',
             'code_prefix' => 'SEQ',

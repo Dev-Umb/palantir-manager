@@ -42,33 +42,8 @@ class CompanyOperationsCockpitTest extends TestCase
         }
 
         $this->record('contract', ['amount' => 5800000, 'status' => '已签署']);
-        $receivable = $this->record('receivable', [
-            'contract_amount' => 5800000,
-            'occurred_amount' => 5000000,
-            'reconciled_amount' => 3600000,
-            'paid_amount' => 2900000,
-        ]);
-        $this->record('invoice', ['amount' => 3600000, 'status' => '已开票']);
-
         foreach (['已递交', '已递交', '已中标', '已中标', '已中标', '未中标', '未中标', '未中标'] as $status) {
             $this->record('tender', ['status' => $status, 'budget_amount' => 1000000]);
-        }
-
-        $this->record('work_order', ['status' => '生产中', 'production_qty_ton' => 600, 'weight' => 900]);
-        $this->record('work_order', ['status' => '已完成', 'production_qty_ton' => 520, 'weight' => 780]);
-
-        foreach ([
-            [80, '2026-03-08'],
-            [105, '2026-04-08'],
-            [120, '2026-05-08'],
-            [95, '2026-06-08'],
-            [140, '2026-07-08'],
-            [150, '2026-08-03'],
-            [30, null],
-            [-5, '2026-08-04'],
-            ['无法解析', '2026-08-04'],
-        ] as [$quantity, $date]) {
-            $this->record('shipment', ['qty_ton' => $quantity, 'ship_date' => $date]);
         }
 
         $timestampsBefore = $this->recordTimestamps();
@@ -96,34 +71,26 @@ class CompanyOperationsCockpitTest extends TestCase
                 ->where('cockpit.kpis.3.hint', '1 个项目待跟进')
                 ->where('cockpit.panels.cash_flow.series.0.label', '合同金额')
                 ->where('cockpit.panels.cash_flow.series.0.value', fn (mixed $value): bool => (float) $value === 5800000.0)
-                ->where('cockpit.panels.cash_flow.series.1.value', fn (mixed $value): bool => (float) $value === 5000000.0)
                 ->where('cockpit.panels.project_amounts.company.0.value', fn (mixed $value): bool => (float) $value === 4200000.0)
                 ->where('cockpit.panels.project_amounts.company.2.value', fn (mixed $value): bool => (float) $value === 1300000.0)
                 ->where('cockpit.panels.project_status.active_total', 4)
                 ->where('cockpit.panels.project_status.completed_count', 1)
                 ->where('cockpit.panels.project_status.unmaintained_count', 1)
                 ->where('cockpit.panels.tender_pipeline.records_count', 8)
-                ->where('cockpit.panels.production_delivery.production.total_ton', fn (mixed $value): bool => (float) $value === 1120.0)
-                ->where('cockpit.panels.production_delivery.shipment.total_ton', fn (mixed $value): bool => (float) $value === 720.0)
-                ->where('cockpit.panels.production_delivery.shipment.trend_coverage', ['valid' => 6, 'total' => 7])
-                ->where('cockpit.panels.production_delivery.shipment.invalid_quantity_count', 2)
-                ->where('cockpit.panels.production_delivery.shipment.undated_ton', fn (mixed $value): bool => (float) $value === 30.0)
-                ->has('cockpit.panels.production_delivery.shipment.monthly', 6)
-                ->where('cockpit.panels.production_delivery.shipment.monthly.5.ton', fn (mixed $value): bool => (float) $value === 150.0)
+                ->missing('cockpit.panels.production_delivery')
+                ->has('cockpit.panels.cash_flow.series', 1)
                 ->has('cockpit.project_progresses', 6));
 
         $this->assertSame($recordCountBefore, ObjectRecord::count());
         $this->assertSame($objectCountBefore, BusinessObject::count());
         $this->assertSame($auditCountBefore, AuditLog::count());
         $this->assertSame($timestampsBefore, $this->recordTimestamps());
-        $this->assertModelExists($receivable);
     }
 
     public function test_dashboard_only_user_receives_a_safe_empty_cockpit(): void
     {
         $basic = $this->userWithRole('basic');
         $this->record('project', ['name' => '不可见项目', 'overall_status' => '投标中']);
-        $this->record('receivable', ['occurred_amount' => 9999999, 'paid_amount' => 9999999]);
 
         $this->actingAs($basic)
             ->get('/')
@@ -157,11 +124,6 @@ class CompanyOperationsCockpitTest extends TestCase
             'paid_amount' => 900000,
             'unpaid_amount' => 0,
         ], $other);
-        $this->record('receivable', [
-            'occurred_amount' => 5000000,
-            'paid_amount' => 5000000,
-        ], $other);
-
         $this->actingAs($owner)
             ->get('/')
             ->assertOk()

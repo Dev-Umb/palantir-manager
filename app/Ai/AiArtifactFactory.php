@@ -26,6 +26,7 @@ class AiArtifactFactory
             'prepare_object_record_update',
             'present_user_choice',
             'present_user_form',
+            'prepare_fixed_quotation',
         ], true)
             && is_array($payload['artifact'] ?? null)) {
             return [

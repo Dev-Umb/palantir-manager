@@ -12,7 +12,7 @@ use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 
-#[Description('Validate and prepare an update proposal for an existing customer, customer contact, or material record. This tool never commits the update or approves its own proposal.')]
+#[Description('Validate and prepare an update proposal for an existing customer or customer contact record. This tool never commits the update or approves its own proposal.')]
 class PrepareObjectRecordUpdateTool extends Tool
 {
     public function __construct(private BuildAiUpdateProposal $proposals) {}
@@ -58,11 +58,6 @@ class PrepareObjectRecordUpdateTool extends Tool
                 'address' => $schema->string()->nullable(),
                 'level' => $schema->string()->nullable(),
                 'cooperation_history' => $schema->string()->nullable(),
-                'spec' => $schema->string()->nullable(),
-                'length_mm' => $schema->number()->nullable(),
-                'width_mm' => $schema->number()->nullable(),
-                'unit_weight_type' => $schema->string()->nullable(),
-                'unit_weight' => $schema->number()->nullable(),
                 'remark' => $schema->string()->nullable(),
             ])->required(),
         ];

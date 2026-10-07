@@ -1804,3 +1804,17 @@ button:not(:where(.ghost-button, .icon-danger, .icon-success, .icon-warning, .co
     .attachment-preview-backdrop:has(.attachment-list-panel) { align-items: flex-end; }
     .attachment-preview-panel.attachment-list-panel { width: 100%; max-height: 90dvh; border-radius: 14px 14px 0 0; }
 }
+
+@media (min-width: 981px) {
+    .desktop-rail {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        align-self: start;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        overflow: hidden;
+    }
+    .desktop-rail .nav-list { min-height: 0; overflow-y: auto; }
+}

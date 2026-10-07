@@ -27,7 +27,7 @@ class XycDataAccess
             return [];
         }
 
-        $objects = BusinessObject::orderBy('sort_order')->get()
+        $objects = BusinessObject::whereIn('key', array_column(config('xyc.objects'), 'key'))->orderBy('sort_order')->get()
             ->filter(fn (BusinessObject $object) => $user->canDo("object.{$object->key}.view"))
             ->values()
             ->map(fn (BusinessObject $object) => [
@@ -193,7 +193,7 @@ class XycDataAccess
 
     private function objectForUser(User $user, string $key): ?BusinessObject
     {
-        if ($key === '') {
+        if (! in_array($key, array_column(config('xyc.objects'), 'key'), true)) {
             return null;
         }
 
@@ -214,10 +214,6 @@ class XycDataAccess
     {
         $query = $object->records()->with('businessObject');
         $this->projectVisibility->scopeRecords($query, $object, $user);
-
-        if ($object->key === 'requisition' && ! $user->canDo('object.requisition.update')) {
-            $query->where('created_by', $user->id);
-        }
 
         $project = BusinessObject::where('key', 'project')->first();
         foreach ($object->fields as $field) {

@@ -381,6 +381,7 @@ export function RunTurn({ run, onRetry, onQuickReply, onProposalAction, onOpenRe
                         <Suspense key={artifact.id} fallback={<div className="ai-waiting">正在加载结果视图</div>}>
                             <Artifact
                                 artifact={artifact}
+                                runId={run.id}
                                 onOpenReport={onOpenReport}
                                 onQuickReply={onQuickReply}
                                 onProposalAction={onProposalAction}

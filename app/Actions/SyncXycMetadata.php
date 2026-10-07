@@ -99,10 +99,7 @@ class SyncXycMetadata
         $this->syncRolePermissions($permissionByKey);
         $this->retireRoles();
         $this->syncRenamedPayloadFields();
-        $this->syncPurchaseTaskIds();
-        $this->syncDrawingStatuses();
         $this->syncProjectReferencePayloads();
-        $this->syncShipmentStages();
         $this->syncBusinessContractWorkspace();
     }
 
@@ -199,7 +196,7 @@ class SyncXycMetadata
             ->mapWithKeys(fn ($record) => [$record->id => $record->code])
             ->all();
 
-        BusinessObject::all()
+        BusinessObject::whereIn('key', array_column(config('xyc.objects'), 'key'))->get()
             ->filter(function (BusinessObject $object) {
                 $fields = collect($object->fields ?? [])->keyBy('key');
 
@@ -228,16 +225,6 @@ class SyncXycMetadata
                 'signed_qty' => 'signed_weight',
                 'arrears' => 'unpaid_amount',
             ],
-            'receivable' => [
-                'signed_qty' => 'signed_weight',
-                'actual_amount' => 'occurred_amount',
-                'actual_amount_updated_at' => 'occurred_amount_updated_at',
-                'unpaid' => 'unpaid_amount',
-                'invoice_amount' => 'invoiced_amount',
-            ],
-            'purchase' => [
-                'tonnage' => 'weight_ton',
-            ],
         ];
 
         BusinessObject::whereIn('key', array_keys($aliases))->get()->each(function (BusinessObject $object) use ($aliases) {
@@ -256,66 +243,6 @@ class SyncXycMetadata
                 }
             });
         });
-    }
-
-    private function syncDrawingStatuses(): void
-    {
-        $drawing = BusinessObject::where('key', 'drawing')->first();
-        if (! $drawing) {
-            return;
-        }
-
-        $drawing->records()
-            ->where('payload->design_status', '已完成')
-            ->each(function ($record): void {
-                $record->update(['payload' => [
-                    ...($record->payload ?? []),
-                    'design_status' => '已下放',
-                ]]);
-            });
-    }
-
-    private function syncPurchaseTaskIds(): void
-    {
-        $purchase = BusinessObject::where('key', 'purchase')->first();
-        if (! $purchase) {
-            return;
-        }
-
-        $purchase->records()->each(function ($record): void {
-            if (($record->payload['task_id'] ?? null) === $record->code) {
-                return;
-            }
-
-            $record->update(['payload' => [
-                ...($record->payload ?? []),
-                'task_id' => $record->code,
-            ]]);
-        });
-    }
-
-    private function syncShipmentStages(): void
-    {
-        $shipment = BusinessObject::where('key', 'shipment')->first();
-        $project = BusinessObject::where('key', 'project')->first();
-        if (! $shipment || ! $project) {
-            return;
-        }
-
-        $projectIds = $shipment->records()
-            ->whereNotNull('payload->ship_date')
-            ->where('payload->ship_date', '!=', '')
-            ->get()
-            ->pluck('payload.project_id')
-            ->filter()
-            ->unique();
-
-        $project->records()
-            ->whereIn('id', $projectIds)
-            ->where('payload->stage', '成品发货')
-            ->each(fn ($record) => $record->update([
-                'payload' => [...($record->payload ?? []), 'stage' => '发货签收'],
-            ]));
     }
 
     private function syncBusinessContractWorkspace(): void
@@ -375,28 +302,7 @@ class SyncXycMetadata
     /** @param Collection<int, string> $configuredKeys */
     private function pruneRemovedObjects(Collection $configuredKeys): void
     {
-        $removed = BusinessObject::whereNotIn('key', $configuredKeys)
-            ->withCount('records')
-            ->orderBy('key')
-            ->get();
-
-        if ($removed->isEmpty()) {
-            return;
-        }
-
-        AuditLog::create([
-            'user_id' => null,
-            'action' => 'metadata.objects.prune',
-            'subject_type' => 'metadata',
-            'subject_id' => null,
-            'payload' => [
-                'objects' => $removed->map(fn (BusinessObject $object) => [
-                    'key' => $object->key,
-                    'records_count' => $object->records_count,
-                ])->values()->all(),
-            ],
-        ]);
-
-        BusinessObject::whereIn('id', $removed->pluck('id'))->delete();
+        BusinessObject::whereNotIn('key', $configuredKeys)->get()
+            ->each(fn (BusinessObject $object) => $object->update(['read_only' => true, 'roles' => []]));
     }
 }

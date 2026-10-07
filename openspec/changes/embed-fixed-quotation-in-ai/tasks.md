@@ -1,0 +1,12 @@
+- [x] Review revised scope and inspect original files.
+- [x] Implement exact-template generation and fidelity tests.
+- [x] Integrate AI tool, existing artifact and owner-scoped endpoints.
+- [x] Implement compact confirmation/download card and interaction tests.
+- [x] Render and inspect source/output fidelity.
+- [x] Run focused tests, strict OpenSpec and quality gate.
+- [x] Deploy scoped update; verify actual AI conversation/history restoration and transaction-rollback generation/download.
+
+- [x] Export black text while preserving fonts, geometry and original seal.
+- [x] Preserve legacy frozen bytes and serve black download copies; verify actual online DOCX.
+- [x] Implement owner-scoped PDF download and failure fallback; pass local quality gate and rendered PDF inspection.
+- [ ] Obtain approval for the new server conversion runtime, configure exact fonts, deploy PDF and verify online downloads.

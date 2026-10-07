@@ -23,19 +23,19 @@ class ProjectCollectionProgressTest extends TestCase
     {
         $finance = app(SyncProjectFinance::class);
 
-        $normal = $finance->normalizePayload([
+        $normal = $finance->withCalculatedPaymentProgress([
             'contract_amount' => 1000,
             'occurred_amount' => 200,
             'paid_amount' => 50,
             'invoiced_amount' => 25,
         ]);
-        $withoutOccurredAmount = $finance->normalizePayload([
+        $withoutOccurredAmount = $finance->withCalculatedPaymentProgress([
             'contract_amount' => 1000,
             'occurred_amount' => 0,
             'paid_amount' => 50,
             'invoiced_amount' => 25,
         ]);
-        $overCollected = $finance->normalizePayload([
+        $overCollected = $finance->withCalculatedPaymentProgress([
             'contract_amount' => 1000,
             'occurred_amount' => 100,
             'paid_amount' => 120,
@@ -43,8 +43,8 @@ class ProjectCollectionProgressTest extends TestCase
 
         $this->assertSame(25.0, $normal['payment_progress']);
         $this->assertNull($withoutOccurredAmount['payment_progress']);
-        $this->assertSame(950.0, $withoutOccurredAmount['unpaid_amount']);
-        $this->assertSame(975.0, $withoutOccurredAmount['uninvoiced_amount']);
+        $this->assertArrayNotHasKey('unpaid_amount', $withoutOccurredAmount);
+        $this->assertArrayNotHasKey('uninvoiced_amount', $withoutOccurredAmount);
         $this->assertSame(120.0, $overCollected['payment_progress']);
     }
 

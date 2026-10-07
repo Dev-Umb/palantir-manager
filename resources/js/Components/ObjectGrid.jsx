@@ -24,7 +24,8 @@ export default function ObjectGrid({
     object,
     records,
     subtotal = null,
-    fields,
+    fields: suppliedFields,
+    rowOffset = 0,
     can,
     selectedRecordId,
     recordListHref = null,
@@ -38,6 +39,8 @@ export default function ObjectGrid({
     onContactCreate,
     canCreateContact = false,
 }) {
+    const fields = useMemo(() => contractTableFields(object.key, suppliedFields), [object.key, suppliedFields]);
+    const sequenceById = useMemo(() => viewSequenceById(records, rowOffset), [records, rowOffset]);
     const [visibleFieldCount, setVisibleFieldCount] = useState(fields.length);
     const [saveState, setSaveState] = useState({
         status: 'idle',
@@ -122,8 +125,10 @@ export default function ObjectGrid({
                 },
                 cellRenderer: (params) => {
                     if (params.data?.__subtotal) {
-                        return <SubtotalCell field={field} value={params.value} showLabel={field.key === subtotalLabelField} />;
+                        return <SubtotalCell field={field} value={object.key === 'contract' && field.key === 'amount' && params.value != null ? Number(params.value) / 10000 : params.value} showLabel={field.key === subtotalLabelField} />;
                     }
+
+                    if (object.key === 'contract' && field.key === 'amount') return formatContractTableAmount(params.value);
 
                     return object.key === 'customer' && field.key === 'cooperation_history'
                         ? <CooperationHistoryCell projects={params.data?.__record?.cooperation_projects || []} />
@@ -160,6 +165,15 @@ export default function ObjectGrid({
             });
         }
 
+        if (object.key === 'contract') {
+            dataColumns.unshift({
+                colId: 'view_sequence', headerName: '序号', width: 80, minWidth: 72,
+                pinned: 'left', lockPosition: 'left', suppressMovable: true,
+                sortable: false, filter: false, editable: false,
+                valueGetter: (params) => params.data?.__subtotal ? null : sequenceById.get(params.data?.__record?.id),
+            });
+        }
+
         return [...dataColumns, {
             colId: 'actions',
             headerName: '操作',
@@ -176,7 +190,7 @@ export default function ObjectGrid({
                 ? <GridActions object={object} record={params.data.__record} can={can} onDelete={destroyRecord} recordListHref={recordListHref} />
                 : null,
         }];
-    }, [can, canCreateContact, destroyRecord, fields, object, onContactCreate, onContactOpen, recordListHref, relationOptions, rowData, savedColumnWidths, subtotal, subtotalLabelField]);
+    }, [can, canCreateContact, destroyRecord, fields, object, onContactCreate, onContactOpen, recordListHref, relationOptions, rowData, savedColumnWidths, sequenceById, subtotal, subtotalLabelField]);
 
     const saveColumnOrder = useCallback((event) => {
         if (event.finished === false) return;
@@ -456,13 +470,7 @@ function GridActions({ object, record, can, onDelete, recordListHref }) {
     const canUpdate = can.update && record.can_update !== false;
     const canDelete = can.delete && record.can_delete !== false;
     const detailObjectKey = object.key === 'project_business_summary' ? 'project' : object.key;
-    function approve() {
-        router.post(`/requests/${record.id}/approve`, {}, { preserveScroll: true });
-    }
 
-    function reject() {
-        router.post(`/requests/${record.id}/reject`, {}, { preserveScroll: true });
-    }
 
     function destroy() {
         const label = [record.code, record.title].filter(Boolean).join(' · ');
@@ -499,16 +507,6 @@ function GridActions({ object, record, can, onDelete, recordListHref }) {
                         <Link key="edit" href={objectRecordHref(object.key, record.id, 'edit', recordListHref)} preserveScroll aria-label={`编辑 ${record.code}`}>
                             <Pencil size={14} /> 编辑
                         </Link>
-                    ),
-                    object.key === 'requisition' && can.update && record.payload?.status === '待处理' && (
-                        <button key="approve" type="button" onClick={approve} aria-label={`通过 ${record.code}`}>
-                            <Check size={14} /> 通过
-                        </button>
-                    ),
-                    object.key === 'requisition' && can.update && record.payload?.status === '待处理' && (
-                        <button key="reject" type="button" className="danger" onClick={reject} aria-label={`驳回 ${record.code}`}>
-                            <XCircle size={14} /> 驳回
-                        </button>
                     ),
                     canDelete && (
                         <button key="delete" type="button" className="danger" onClick={destroy} aria-label={`删除 ${record.code}`}>
@@ -724,4 +722,19 @@ function csrfToken() {
 
 function firstResponseError(data, fallback) {
     return Object.values(data?.errors || {}).flat()[0] || data?.message || fallback;
+}
+
+export function contractTableFields(objectKey, fields) {
+    if (objectKey !== 'contract') return fields;
+    return fields.filter((field) => field.key !== 'contract_no' && field.system !== 'code')
+        .map((field) => field.key === 'amount' ? { ...field, label: '合同金额（万元）' } : field);
+}
+
+export function formatContractTableAmount(value) {
+    if (value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) return value;
+    return (Number(value) / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function viewSequenceById(records, offset = 0) {
+    return new Map(records.map((record, index) => [record.id, offset + index + 1]));
 }

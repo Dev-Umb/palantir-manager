@@ -43,7 +43,7 @@ class SyncProjectContractAmount
         $signed = $contracts->filter(
             fn (ObjectRecord $contract): bool => ($contract->payload['status'] ?? '未签署') === '已签署',
         )->count();
-        $hasProcessingLetter = $contracts->contains(
+        $hasProcessingLetter = ! empty($payload['unassigned_processing_letter_attachments']) || $contracts->contains(
             fn (ObjectRecord $contract): bool => in_array(
                 $contract->payload['status'] ?? '未签署',
                 ['已有加工函', '已签署'],
@@ -80,6 +80,7 @@ class SyncProjectContractAmount
             fn (ObjectRecord $contract): float => (float) ($contract->payload['amount'] ?? 0),
         ), 2);
         if ($contracts->isNotEmpty()
+            && $contracts->every(fn (ObjectRecord $contract): bool => is_numeric($contract->payload['amount'] ?? null))
             && ! is_numeric($payload['contract_amount'] ?? null)) {
             $payload['contract_amount'] = $contractTotal;
             $payload['contract_amount_source'] = 'contract_sync';

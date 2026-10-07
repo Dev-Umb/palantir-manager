@@ -1,0 +1,7 @@
+- [x] Inspect actual production logic and map approved scope
+- [x] Strict validation before implementation
+- [x] Add failing regression tests for search, contract order, and names
+- [x] Implement minimum compatible fix preserving scope and fields
+- [x] Focused tests, formatter, frontend tests and build
+- [x] Final quality gate and independent production-baseline patch
+- [ ] Production approval and online read-only acceptance

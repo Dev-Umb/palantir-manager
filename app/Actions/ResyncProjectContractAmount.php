@@ -7,6 +7,7 @@ use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ResyncProjectContractAmount
 {
@@ -19,10 +20,13 @@ class ResyncProjectContractAmount
                 ->lockForUpdate()
                 ->firstOrFail();
             $contractObject = BusinessObject::query()->where('key', 'contract')->firstOrFail();
-            $amount = round($contractObject->records()
+            $contracts = $contractObject->records()
                 ->where('payload->project_id', $lockedProject->id)
-                ->get(['payload'])
-                ->sum(fn (ObjectRecord $contract): float => (float) ($contract->payload['amount'] ?? 0)), 2);
+                ->get(['payload']);
+            if ($contracts->contains(fn (ObjectRecord $contract): bool => ! is_numeric($contract->payload['amount'] ?? null))) {
+                throw ValidationException::withMessages(['contract_amount' => '存在金额待确认的合同，请先补齐合同金额后再同步。']);
+            }
+            $amount = round($contracts->sum(fn (ObjectRecord $contract): float => (float) $contract->payload['amount']), 2);
             $payload = $lockedProject->payload ?? [];
             $before = $payload['contract_amount'] ?? null;
             $payload['contract_amount'] = $amount;

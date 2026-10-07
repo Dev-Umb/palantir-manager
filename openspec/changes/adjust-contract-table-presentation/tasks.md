@@ -1,0 +1,3 @@
+- [x] Implement table-only presentation
+- [x] Test target, retained behavior and boundaries
+- [x] Run quality gate and build

@@ -43,10 +43,13 @@ import {
     YAxis,
 } from 'recharts';
 
+import QuotationArtifact from './QuotationArtifact';
+
 const gridModules = [CellStyleModule, ClientSideRowModelModule, ColumnApiModule, NumberFilterModule, TextFilterModule];
 const chartColors = ['#2f6f9f', '#2f8f6b', '#b7791f', '#c2413d', '#667085', '#7a5aa6'];
 
-export default function Artifact({ artifact, onQuickReply, onProposalAction, onOpenReport, canAct = true }) {
+export default function Artifact({ artifact, runId, onQuickReply, onProposalAction, onOpenReport, canAct = true }) {
+    if (artifact.type === 'quotation_docx') return <QuotationArtifact artifact={artifact} runId={runId} canAct={canAct} />;
     if (artifact.type === 'table') return <TableArtifact artifact={artifact} />;
     if (artifact.type === 'chart') return <ChartArtifact artifact={artifact} />;
     if (artifact.type === 'html') return <HtmlArtifact artifact={artifact} onOpenReport={onOpenReport} />;

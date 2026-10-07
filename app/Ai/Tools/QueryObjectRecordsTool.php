@@ -26,16 +26,7 @@ class QueryObjectRecordsTool implements Tool
     public function handle(Request $request): Stringable|string
     {
         $input = $request->all();
-        $ignoredFields = $this->normalizeMaterialSelect($input);
         $result = app(XycDataAccess::class)->queryRecords($this->user, $input);
-
-        if (($result['ok'] ?? false) && $ignoredFields !== []) {
-            $result['warnings'] = [[
-                'type' => 'ignored_select_field',
-                'fields' => $ignoredFields,
-                'message' => '物料主档不含 unit 字段，已忽略该查询字段；采购数量单位应写入 requisition.unit。',
-            ]];
-        }
 
         return json_encode(
             $result,
@@ -46,7 +37,7 @@ class QueryObjectRecordsTool implements Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'object' => $schema->string()->required()->description('Business object key, for example project or material.'),
+            'object' => $schema->string()->required()->description('Business object key, for example project or customer.'),
             'select' => $schema->array()->items($schema->string())->nullable()->description('Fields to return. Always select only fields needed for the answer.'),
             'filters' => $schema->array()->items($schema->object([
                 'field' => $schema->string()->required(),
@@ -66,32 +57,5 @@ class QueryObjectRecordsTool implements Tool
             ])->nullable(),
             'limit' => $schema->integer()->nullable()->description('Maximum rows to return, capped at 200.'),
         ];
-    }
-
-    private function normalizeMaterialSelect(array &$input): array
-    {
-        if (($input['object'] ?? null) !== 'material' || ! is_array($input['select'] ?? null)) {
-            return [];
-        }
-
-        $ignoredFields = collect($input['select'])
-            ->filter(fn (mixed $field): bool => $field === 'unit')
-            ->values()
-            ->all();
-
-        if ($ignoredFields === []) {
-            return [];
-        }
-
-        $input['select'] = collect($input['select'])
-            ->reject(fn (mixed $field): bool => $field === 'unit')
-            ->values()
-            ->all();
-
-        if ($input['select'] === []) {
-            $input['select'] = ['id', 'name', 'spec'];
-        }
-
-        return $ignoredFields;
     }
 }

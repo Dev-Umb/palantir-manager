@@ -2,17 +2,18 @@ import ComboBox from './ComboBox';
 import CreatableComboBox from './CreatableComboBox';
 import LocalizedFileInput from './LocalizedFileInput';
 import MultiComboBox from './MultiComboBox';
+import AttachmentTray from './AttachmentTray';
 
-export function FieldControl({ field, value, onChange, relationOptions = {}, autoFocus = false }) {
+export function FieldControl({ field, value, onChange, relationOptions = {}, autoFocus = false, attachmentPreviews = {} }) {
     if (field.type === 'files') {
         const existing = Array.isArray(value) ? value.filter((item) => typeof item === 'string') : [];
         const pending = Array.isArray(value) ? value.filter((item) => typeof File !== 'undefined' && item instanceof File) : [];
 
         return (
             <div className="file-control multiple-file-control">
-                {existing.length > 0 && (
+                {attachmentPreviews[field.key]?.length > 0 ? <AttachmentTray files={attachmentPreviews[field.key]} label={field.label} /> : existing.length > 0 && (
                     <div className="attachment-list">
-                        {existing.map((url, index) => <a key={`${url}-${index}`} href={url} target="_blank" rel="noreferrer">附件 {index + 1}</a>)}
+                        {existing.map((url) => <a key={url} href={url} target="_blank" rel="noreferrer">原文件名未记录</a>)}
                     </div>
                 )}
                 {pending.length > 0 && <small>本次新增 {pending.length} 个附件，保存后叠加到历史附件。</small>}
@@ -181,7 +182,7 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
     return <input {...common} type="text" />;
 }
 
-export function SchemaForm({ fields, data, setData, submitLabel = '保存', processing, relationOptions = {}, children }) {
+export function SchemaForm({ fields, data, setData, submitLabel = '保存', processing, relationOptions = {}, attachmentPreviews = {}, children }) {
     const editable = fields.filter((field) => field.scope !== 'item'
         && !field.readonly
         && (!Array.isArray(field.editable_when_status) || field.editable_when_status.includes(data.status))
@@ -193,7 +194,7 @@ export function SchemaForm({ fields, data, setData, submitLabel = '保存', proc
                 ['file', 'files'].includes(field.type) ? (
                     <div key={field.key} className={`form-field ${fieldLayoutClass(field)}`}>
                         <span>{field.label}{field.required && <b>*</b>}</span>
-                        <FieldControl field={field} value={data[field.key]} onChange={(key, value) => setData(key, value)} relationOptions={relationOptions} />
+                        <FieldControl field={field} value={data[field.key]} onChange={(key, value) => setData(key, value)} relationOptions={relationOptions} attachmentPreviews={attachmentPreviews} />
                     </div>
                 ) : (
                     <label key={field.key} className={fieldLayoutClass(field)}>

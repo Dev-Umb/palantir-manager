@@ -5,7 +5,6 @@ import {
     CockpitEmpty,
     CockpitKpis,
     ProjectAmountPanel,
-    ProductionDeliveryPanel,
     ProjectProgressPanel,
     ProjectStatusPanel,
     TenderPipelinePanel,
@@ -40,7 +39,6 @@ export default function Dashboard({ cockpit = {}, recentProjects = [], notificat
                     <CashFlowPanel panel={panels.cash_flow} />
                     <TenderPipelinePanel panel={panels.tender_pipeline} />
                     <ProjectStatusPanel panel={panels.project_status} />
-                    <ProductionDeliveryPanel panel={panels.production_delivery} />
                 </div>
             ) : <CockpitEmpty />}
 

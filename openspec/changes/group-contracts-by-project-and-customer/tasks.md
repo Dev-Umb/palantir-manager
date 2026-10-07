@@ -1,0 +1,3 @@
+- [x] Implement grouped pagination and expandable view
+- [x] Verify permissions, pagination, missing values and retained exports
+- [x] Run strict validation, focused tests and quality gate

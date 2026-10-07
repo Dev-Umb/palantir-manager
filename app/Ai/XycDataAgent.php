@@ -4,6 +4,7 @@ namespace App\Ai;
 
 use App\Ai\Tools\GetObjectRecordTool;
 use App\Ai\Tools\ListVisibleObjectsTool;
+use App\Ai\Tools\PrepareFixedQuotationTool;
 use App\Ai\Tools\PresentUserChoiceTool;
 use App\Ai\Tools\PublishHtmlArtifactTool;
 use App\Ai\Tools\QueryObjectRecordsTool;
@@ -46,6 +47,11 @@ class XycDataAgent implements Agent, Conversational, HasTools
 用户需要确认口径或匹配多条记录时使用 present_user_choice；其余缺失信息简洁追问，不生成通用业务写入草稿。
 最终回答使用清晰中文 Markdown。需要报告时先查询再调用 publish_html_artifact，不输出原始 JSON 或脚本。
 
+- 用户说“做个报价单”或需要固定模板 Word 报价时，调用 prepare_fixed_quotation，在当前对话展示一张可补充核对的报价卡，不新增业务记录。用户给出的价格优先直接作为综合单价；不要求材料网价或拆价，不猜计价单位、项目名称、联系人电话。未知材料费和加工费传 null。卡片可补齐缺失信息，不要为报价另调用创建资料表单。
+- 报价标题、单位、价格、联系人和电话应使用用户明确输入或查询核实的资料；不要将模板样例人物/电话当成当前用户资料。未提供日期传 null，使用当天日期。多个产品分别列为明细，不计算用户没给数量的总额。
+- 原报价模板固定文字为“含税含运费，税率13%”。用户明确税率或运费不同时仍保留其要求到卡片，让用户解决冲突，不自动改黑色固定条款。用户点击“生成盖章报价单”前不得声称文档或盖章已完成。“13%”与“13％”、以及“含运送到价”与“含运费”按固定模板等义处理，不作为冲突重复追问。
+- 单页报价最多三条明细，超过时请用户分单，不得丢弃产品。
+
 报告呈现：
 - 根据用户问题选择展示形式：简单数字、状态或单条资料查询，直接用简短文字和关键数字回答，不重复罗列工具已返回的整张表格，不生成不必要的报告。
 - 用户要求报告、经营分析、回款分析、对比分析或多维汇总时，默认先完成必要的数据查询，再调用 publish_html_artifact 生成一份结构清晰的 HTML 报告；不需要用户额外说“HTML”。用户明确要求纯文字、表格或明细时优先遵从，不强制生成报告。
@@ -59,7 +65,6 @@ class XycDataAgent implements Agent, Conversational, HasTools
 业务员期间对比（在此场景优先使用以下口径）：
 - 用户说“近6个月”或“最近半年”时，默认使用 {$sixMonthStart} 至 {$asOf}（Asia/Taipei，截至本次查询时刻），报告明确展示起止日期。用户另给截止日期时重新计算，不能把未来的今日结束时间当作已知期末。
 - 管理员可在其授权范围内比较不同业务员。先读取可用对象与字段，按核实的 business_owner_user_id 业务负责人字段归属项目；不要把操作人、发货负责人或记录创建人擅自当成负责业务员。归属不明的项目单列“归属待确认”。普通业务员始终只能查询其授权项目，不为对比放宽权限。
-- 期间实际执行按真实业务事件日期筛选：例如 shipment.ship_date 的发货、team_log.work_date 的报工。项目在期初前已建立，只要期间有执行仍应纳入；不要按项目创建日期筛掉老项目，不要把当前阶段或计划交付日期当成期间完成事件。未注明实际完成的计划记录不能作为已执行。不同单位的数量分别统计，缺失日期单列，不能偷偷排除后宣称全量完整。
 - 期间实际回款必须来自带实际入账日期的逐笔回款流水，或口径一致且足以还原期间收款的历史账务证据。先检查现有对象是否提供这些证据；累计 paid_amount 与 last_payment_date 不能证明期间回款，不能因为最后回款日期在期间内就将累计金额全部计入。
 - 期末欠款与期间流量分开查询，保留期初之前项目尚未结清的余额。期末为本次查询时刻时，以 project.unpaid_amount 的当前台账未回款原值为依据，并说明更新时间和未回款口径；历史期末必须有对应财务快照或完整可还原账务。此场景不使用兼容 arrears 或合同金额减累计回款补算欠款。没有到期日期证据时只称未回款，不判定逾期。
 - 缺少逐笔回款流水、期末快照或日期金额时，对应指标写“无法核实（缺少相应数据）”，不写成 0、不补造历史金额；有依据的执行和当前余额仍可展示，并把数据不足的业务员/项目、统计覆盖范围、来源和更新时间列在报告内。
@@ -80,6 +85,7 @@ PROMPT;
                 ? [new QueryTimebookTool($this->user)] : []),
             new PresentUserChoiceTool,
             $this->htmlArtifacts,
+            new PrepareFixedQuotationTool($this->user),
         ];
     }
 

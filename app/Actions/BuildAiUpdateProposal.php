@@ -18,13 +18,11 @@ class BuildAiUpdateProposal
     public const UPDATABLE_OBJECTS = [
         'customer',
         'customer_contact',
-        'material',
     ];
 
     private const UPDATABLE_FIELDS = [
         'customer' => ['name', 'address', 'level', 'cooperation_history', 'remark'],
         'customer_contact' => ['name', 'phone'],
-        'material' => ['name', 'spec', 'length_mm', 'width_mm', 'unit_weight_type', 'unit_weight', 'remark'],
     ];
 
     public function __construct(private ProjectVisibility $projectVisibility) {}
@@ -36,7 +34,7 @@ class BuildAiUpdateProposal
     {
         if (! in_array($objectKey, self::UPDATABLE_OBJECTS, true)) {
             throw ValidationException::withMessages([
-                'object' => '第一版仅支持修改客户信息、客户联系人和物料资料。',
+                'object' => '仅支持修改客户信息和客户联系人。',
             ]);
         }
 
@@ -134,15 +132,6 @@ class BuildAiUpdateProposal
             'customer_contact' => [
                 'payload.name' => ['required', 'string', 'max:160'],
                 'payload.phone' => ['nullable', 'string', 'max:60'],
-            ],
-            'material' => [
-                'payload.name' => ['required', 'string', 'max:200'],
-                'payload.spec' => ['nullable', 'string', 'max:200'],
-                'payload.length_mm' => ['nullable', 'numeric', 'min:0'],
-                'payload.width_mm' => ['nullable', 'numeric', 'min:0'],
-                'payload.unit_weight_type' => ['nullable', Rule::in(['每平米', '每米', '每张', '每支'])],
-                'payload.unit_weight' => ['nullable', 'numeric', 'min:0'],
-                'payload.remark' => ['nullable', 'string', 'max:1000'],
             ],
             default => [],
         };

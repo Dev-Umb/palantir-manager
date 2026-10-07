@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Actions\AcknowledgeWorkflowTask;
+use App\Actions\SyncObjectReferenceNames;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\User;
@@ -20,10 +21,7 @@ class ObjectRelations
     private array $customerWritePermissions = [];
 
     private const INACTIVE_RELATION_TARGETS = [
-        'material',
         'customer_contact',
-        'production_team',
-        'team_member',
     ];
 
     /** @var array<string, array<string, string|null>|null> */
@@ -56,6 +54,12 @@ class ObjectRelations
         private AcknowledgeWorkflowTask $workflowTasks,
         private AttachmentPreview $attachmentPreview,
     ) {}
+
+    public function forgetLabels(): void
+    {
+        $this->labelCache = [];
+        $this->contactDetailsById = [];
+    }
 
     public function lockReferenceGraph(): void
     {
@@ -173,6 +177,7 @@ class ObjectRelations
                     $record->businessObject->key === 'project'
                         && ($field['key'] ?? null) === 'customer_id'
                         && ($field['target'] ?? null) === 'customer',
+                    in_array($record->businessObject->key, SyncObjectReferenceNames::OBJECT_KEYS, true),
                 ),
                 'multirelation' => $this->multirelationDisplayLabels(
                     $payload,
@@ -180,6 +185,7 @@ class ObjectRelations
                     $value,
                     $record->businessObject->key === 'project'
                         && ($field['key'] ?? null) === 'customer_contact_ids',
+                    in_array($record->businessObject->key, SyncObjectReferenceNames::OBJECT_KEYS, true),
                 ),
                 'account' => $this->accountLabel($value),
                 'multiaccount' => $this->accountLabels($value),
@@ -197,6 +203,22 @@ class ObjectRelations
             'created_at' => $record->created_at?->toISOString(),
             'is_new_task' => $this->workflowTasks->visibleTo($record, $user),
         ];
+
+        if (in_array($record->businessObject->key, ['contract', 'project'], true)) {
+            $formatted['attachment_tokens'] = [];
+            $attachmentKeys = $record->businessObject->key === 'project'
+                ? ['other_attachments']
+                : ['processing_letter_attachments', 'contract_attachments', 'statement_attachments', 'other_attachments'];
+            foreach ($attachmentKeys as $key) {
+                if (! array_key_exists($key, $payload) || ! in_array($key, array_column($record->businessObject->fields ?? [], 'key'), true)) {
+                    continue;
+                }
+                $formatted['attachment_tokens'][$key] = collect($record->payload[$key] ?? [])
+                    ->filter(fn (mixed $path): bool => is_string($path) && $path !== '')
+                    ->map(fn (string $path): string => hash('sha256', $path))
+                    ->values()->all();
+            }
+        }
 
         if ($record->businessObject->key === 'project' && $user) {
             $formatted['can_update'] = $this->projectVisibility->allowsProjectUpdate($user, $record);
@@ -238,24 +260,37 @@ class ObjectRelations
         array $field,
         mixed $value,
         bool $preferLiveLabel = false,
+        bool $useCurrentNames = false,
     ): string {
         if (! is_string($value) || $value === '') {
             return '';
         }
 
-        if ($preferLiveLabel) {
-            $liveLabel = $this->labelForId($value)['label'] ?? null;
-            if (is_string($liveLabel)) {
-                return $liveLabel;
+        $live = $this->labelForId($value);
+        if (($live['object_key'] ?? null) === ($field['target'] ?? null)) {
+            if ($preferLiveLabel) {
+                return $live['label'];
+            }
+            if ($useCurrentNames && in_array($field['target'] ?? null, SyncObjectReferenceNames::OBJECT_KEYS, true)) {
+                return $live['relation_label'];
             }
         }
 
         $snapshot = $payload['_snapshots'][$field['key']] ?? null;
         if (is_array($snapshot) && ($snapshot['id'] ?? null) === $value && is_string($snapshot['label'] ?? null)) {
+            if (($field['target'] ?? null) === 'project') {
+                $project = $this->labelForId($value);
+                foreach ([$project['code'] ?? null, $project['meta']['project_no'] ?? null] as $number) {
+                    if (is_string($number) && $number !== '' && str_starts_with($snapshot['label'], $number.' · ')) {
+                        return substr($snapshot['label'], strlen($number.' · '));
+                    }
+                }
+            }
+
             return $snapshot['label'];
         }
 
-        return $this->labelForId($value)['label'] ?? '关联记录不存在';
+        return ! $useCurrentNames && ($live['object_key'] ?? null) === ($field['target'] ?? null) ? $live['label'] : '关联记录不存在';
     }
 
     /** @return array<int, string> */
@@ -264,6 +299,7 @@ class ObjectRelations
         array $field,
         mixed $value,
         bool $includeCustomerContactPhone = false,
+        bool $useCurrentNames = false,
     ): array {
         $snapshots = collect($payload['_snapshots'][$field['key']] ?? [])
             ->filter(fn ($snapshot) => is_array($snapshot)
@@ -273,12 +309,12 @@ class ObjectRelations
 
         return collect(is_array($value) ? $value : [])
             ->filter(fn ($id) => is_string($id) && $id !== '')
-            ->map(function (string $id) use ($snapshots, $includeCustomerContactPhone): string {
+            ->map(function (string $id) use ($snapshots, $includeCustomerContactPhone, $field, $useCurrentNames): string {
                 $snapshot = $snapshots->get($id);
 
-                $fallbackLabel = is_array($snapshot)
-                    ? $snapshot['label']
-                    : ($this->labelForId($id)['label'] ?? '关联记录不存在');
+                $live = $this->labelForId($id);
+                $liveLabel = $useCurrentNames && in_array($field['target'] ?? null, SyncObjectReferenceNames::OBJECT_KEYS, true) && ($live['object_key'] ?? null) === ($field['target'] ?? null) ? ($live['relation_label'] ?? null) : null;
+                $fallbackLabel = $liveLabel ?? (is_array($snapshot) ? $snapshot['label'] : ((! $useCurrentNames && ($live['object_key'] ?? null) === ($field['target'] ?? null)) ? $live['label'] : '关联记录不存在'));
 
                 if (! $includeCustomerContactPhone) {
                     return $fallbackLabel;
@@ -298,13 +334,15 @@ class ObjectRelations
             ->all();
     }
 
-    public function relationDisplayValue(array $payload, array $field): string|array
+    public function relationDisplayValue(array $payload, array $field, ?BusinessObject $object = null): string|array
     {
         $value = $payload[$field['key']] ?? null;
 
+        $useCurrentNames = $object && in_array($object->key, SyncObjectReferenceNames::OBJECT_KEYS, true);
+
         return ($field['type'] ?? null) === 'multirelation'
-            ? $this->multirelationDisplayLabels($payload, $field, $value)
-            : $this->relationDisplayLabel($payload, $field, $value);
+            ? $this->multirelationDisplayLabels($payload, $field, $value, false, $useCurrentNames)
+            : $this->relationDisplayLabel($payload, $field, $value, false, $useCurrentNames);
     }
 
     public function preloadLabels(Collection $records, ?User $user = null): void
@@ -418,7 +456,7 @@ class ObjectRelations
 
         foreach ($ids as $id) {
             $record = $recordsById->get($id);
-            $this->labelCache[$id] = $record ? $this->brief($record) : null;
+            $this->labelCache[$id] = $record ? $this->referenceBrief($record) : null;
             if ($record?->businessObject?->key === 'customer_contact') {
                 $this->contactDetailsById[$record->id] = $this->contactDetails($record);
             }
@@ -597,41 +635,7 @@ class ObjectRelations
             }
         }
 
-        if ($object->key === 'outbound'
-            && ! isset($errors['payload.project_id'])
-            && ! isset($errors['payload.drawing_id'])) {
-            $drawingId = $payload['drawing_id'] ?? null;
-            $projectId = $payload['project_id'] ?? null;
-            $drawing = is_string($drawingId) && $drawingId !== ''
-                ? ObjectRecord::query()
-                    ->whereKey($drawingId)
-                    ->whereRelation('businessObject', 'key', 'drawing')
-                    ->first()
-                : null;
-            if ($drawing && ($drawing->payload['project_id'] ?? null) !== $projectId) {
-                $errors['payload.drawing_id'] = '图纸编号必须属于当前选择的项目。';
-            }
-        }
-
-        if ($object->key === 'work_order'
-            && ! isset($errors['payload.team_id'])
-            && ! isset($errors['payload.production_owner_id'])) {
-            $teamId = $payload['team_id'] ?? null;
-            $ownerId = $payload['production_owner_id'] ?? null;
-            $unchanged = ($existingPayload['team_id'] ?? null) === $teamId
-                && ($existingPayload['production_owner_id'] ?? null) === $ownerId;
-            if (is_string($ownerId) && $ownerId !== '' && ! $unchanged) {
-                $owner = ObjectRecord::query()
-                    ->whereKey($ownerId)
-                    ->whereRelation('businessObject', 'key', 'team_member')
-                    ->first();
-                if (! is_string($teamId) || $teamId === '' || ($owner?->payload['team_id'] ?? null) !== $teamId) {
-                    $errors['payload.production_owner_id'] = '生产负责人必须是当前加工班组中已启用的成员。';
-                }
-            }
-        }
-
-        if (in_array($object->key, ['receivable', 'contract'], true)
+        if ($object->key === 'contract'
             && ! isset($errors['payload.project_id'])
             && ! isset($errors['payload.customer_id'])) {
             $projectId = $payload['project_id'] ?? null;
@@ -997,31 +1001,12 @@ class ObjectRelations
         ?ObjectRecord $editingRecord,
         array $context,
     ): void {
-        if ($source->key === 'production_team' && ($field['target'] ?? null) === 'team_member') {
-            if (! $editingRecord) {
-                $query->whereRaw('1 = 0');
-
-                return;
-            }
-
-            $query->where('payload->team_id', $editingRecord->id);
-        }
-
         if ($source->key === 'project' && ($field['key'] ?? null) === 'customer_contact_ids') {
             $customerId = $context['customer_id'] ?? null;
             if (! is_string($customerId) || $customerId === '') {
                 $query->whereRaw('1 = 0');
             } else {
                 $query->where('payload->customer_id', $customerId);
-            }
-        }
-
-        if ($source->key === 'work_order' && ($field['key'] ?? null) === 'production_owner_id') {
-            $teamId = $context['team_id'] ?? null;
-            if (! is_string($teamId) || $teamId === '') {
-                $query->whereRaw('1 = 0');
-            } else {
-                $query->where('payload->team_id', $teamId);
             }
         }
     }
@@ -1033,28 +1018,11 @@ class ObjectRelations
         BusinessObject $target,
         ?ObjectRecord $editingRecord,
     ): void {
-        if (in_array($target->key, ['material', 'customer_contact', 'production_team', 'team_member'], true)) {
+        if (in_array($target->key, ['customer_contact'], true)) {
             $query->where(function ($query) {
                 $query->whereNull('payload->status')
                     ->orWhere('payload->status', '!=', '停用');
             });
-        }
-
-        if ($source->key === 'receivable' && ($field['target'] ?? null) === 'project') {
-            $occupiedProjectIds = $source->records()
-                ->when($editingRecord, fn ($query) => $query->whereKeyNot($editingRecord->id))
-                ->get(['payload'])
-                ->pluck('payload.project_id')
-                ->filter()
-                ->unique()
-                ->values();
-            if ($occupiedProjectIds->isNotEmpty()) {
-                $query->whereNotIn('id', $occupiedProjectIds->all());
-            }
-        }
-
-        if ($source->key === 'work_order' && ($field['target'] ?? null) === 'drawing') {
-            $query->where('payload->design_status', '已下放');
         }
     }
 
@@ -1071,8 +1039,6 @@ class ObjectRelations
             $target->title_field,
             'name',
             'project_no',
-            'drawing_no',
-            'material_code',
             'phone',
             'spec',
         ])->filter()
@@ -1127,7 +1093,7 @@ class ObjectRelations
             $this->projectVisibility->scopeRecords($query, $object, $user);
         }
 
-        if (in_array($object->key, ['material', 'customer_contact', 'production_team', 'team_member'], true)) {
+        if (in_array($object->key, ['customer_contact'], true)) {
             $query->where(function ($query) {
                 $query->whereNull('payload->status')
                     ->orWhere('payload->status', '!=', '停用');
@@ -1147,12 +1113,6 @@ class ObjectRelations
             ? $this->projectVisibility->customerWritePermissions($user, $records->pluck('id')->all())
             : [];
         $leaders = collect();
-        if ($object->key === 'production_team') {
-            $leaderIds = $records->pluck('payload.leader_id')->filter()->unique()->values();
-            if ($leaderIds->isNotEmpty()) {
-                $leaders = ObjectRecord::whereIn('id', $leaderIds)->get()->keyBy('id');
-            }
-        }
 
         return $records
             ->map(fn (ObjectRecord $record) => [
@@ -1390,16 +1350,6 @@ class ObjectRelations
                 'name' => trim((string) ($record->payload['name'] ?? $record->title)),
                 'phone' => $record->payload['phone'] ?? '',
             ],
-            'production_team' => [
-                'leader_id' => $record->payload['leader_id'] ?? null,
-                'leader_name' => ($leader = $related?->get($record->payload['leader_id'] ?? null))
-                    ? (($leader->payload['name'] ?? '') ?: $leader->title)
-                    : '',
-            ],
-            'team_member' => [
-                'team_id' => $record->payload['team_id'] ?? null,
-                'status' => $record->payload['status'] ?? '启用',
-            ],
             default => [],
         };
     }
@@ -1461,7 +1411,7 @@ class ObjectRelations
 
         $record = $this->labelForId($id);
 
-        return $record ?: [
+        return $record ? array_diff_key($record, ['relation_label' => true]) : [
             'id' => $id,
             'object_key' => null,
             'object_label' => null,
@@ -1479,7 +1429,7 @@ class ObjectRelations
 
         if (! array_key_exists($id, $this->labelCache)) {
             $record = ObjectRecord::with('businessObject')->find($id);
-            $this->labelCache[$id] = $record ? $this->brief($record) : null;
+            $this->labelCache[$id] = $record ? $this->referenceBrief($record) : null;
         }
 
         return $this->labelCache[$id];
@@ -1499,24 +1449,25 @@ class ObjectRelations
         ];
     }
 
+    public function referenceLabel(ObjectRecord $record): string
+    {
+        $record->loadMissing('businessObject');
+
+        return (string) ($record->title ?: $record->code);
+    }
+
+    private function referenceBrief(ObjectRecord $record): array
+    {
+        return [...$this->brief($record), 'relation_label' => $this->referenceLabel($record)];
+    }
+
     private function recordLabel(ObjectRecord $record, ?BusinessObject $object = null): string
     {
         $objectKey = $object?->key ?? ($record->relationLoaded('businessObject') ? $record->businessObject?->key : null);
         $objectLabel = $object?->label ?? ($record->relationLoaded('businessObject') ? $record->businessObject?->label : null);
 
-        if ($objectKey === 'drawing') {
-            return collect([
-                $record->payload['drawing_no'] ?? $record->code,
-                $record->title ?: $objectLabel,
-                $record->payload['design_status'] ?? null,
-            ])->filter()->implode(' · ');
-        }
-
         if ($objectKey === 'project') {
-            return collect([
-                $record->payload['project_no'] ?? $record->code,
-                $record->title ?: $objectLabel,
-            ])->filter()->implode(' · ');
+            return $record->title ?: ($objectLabel ?: $record->code);
         }
 
         return trim($record->code.' · '.($record->title ?: $objectLabel));

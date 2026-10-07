@@ -78,16 +78,7 @@ class OnlineRegressionDefectsTest extends TestCase
         $this->seed(XycPrototypeSeeder::class);
         $this->actingAs($this->userWithRole('production'));
 
-        $requisitionResponse = $this->postJson('/requests', [
-            'requester' => '生产',
-            'material_id' => '1',
-            'qty' => 2,
-            'unit' => '吨',
-            'urgency' => '普通',
-        ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('material_id');
-        $this->assertSame('关联记录格式不正确', $requisitionResponse->json('errors')['material_id'][0]);
+        $this->postJson('/requests', ['material_id' => '1'])->assertNotFound();
 
         $this->actingAs($this->userWithRole('admin'));
         $owner = User::where('email', 'business@xyc.test')->firstOrFail();

@@ -51,19 +51,19 @@ class OntologyRecordCrudTest extends TestCase
         $this->actingAs($admin);
         $this->postJson('/project-customers', [])->assertUnprocessable()->assertJsonValidationErrors('name');
 
-        $drawing = BusinessObject::where('key', 'drawing')->firstOrFail();
+        $drawing = BusinessObject::where('key', 'project')->firstOrFail();
         Storage::disk('local')->put('attachments/contract.pdf', '%PDF-1.4');
         $record = ObjectRecord::create([
             'business_object_id' => $drawing->id,
             'code' => 'TZ-AUTH',
             'title' => '附件授权',
-            'payload' => ['name' => '附件授权', 'attachment' => 'attachments/contract.pdf'],
+            'payload' => ['name' => '附件授权', 'other_attachments' => ['attachments/contract.pdf']],
             'created_by' => $admin->id,
         ]);
-        $this->get("/attachments/{$record->id}/attachment")->assertOk();
+        $this->get("/attachments/{$record->id}/other_attachments/0")->assertOk();
 
         $this->actingAs($this->userWithRole('basic'));
-        $this->get("/attachments/{$record->id}/attachment")->assertForbidden();
+        $this->get("/attachments/{$record->id}/other_attachments/0")->assertForbidden();
     }
 
     public function test_project_customer_relation_can_be_updated(): void
@@ -147,7 +147,7 @@ class OntologyRecordCrudTest extends TestCase
                 ->where('records.data.0.display.customer_id', 'CUST-LIVE · 更新后客户'));
     }
 
-    public function test_non_project_customer_relations_keep_their_saved_snapshot(): void
+    public function test_retained_contract_customer_relation_uses_current_name(): void
     {
         $this->seed(XycPrototypeSeeder::class);
         $this->actingAs($this->userWithRole('admin'));
@@ -180,7 +180,7 @@ class OntologyRecordCrudTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('records.data', 1)
-                ->where('records.data.0.display.customer_id', 'CUST-HISTORY · 历史客户名称'));
+                ->where('records.data.0.display.customer_id', '当前客户名称'));
     }
 
     public function test_unreferenced_customer_contact_can_be_deleted_from_the_retained_table(): void

@@ -25,7 +25,7 @@ class PrepareObjectRecordCreateTool implements Tool
 
     public function description(): Stringable|string
     {
-        return 'Validate and prepare a user-confirmed create proposal for requisition, team_log, customer, customer_contact, or material. This tool never writes the business record. Use exact record UUIDs for relation fields.';
+        return 'Validate and prepare a user-confirmed create proposal for customer or customer_contact. This tool never writes the business record. Use exact record UUIDs for relation fields.';
     }
 
     public function handle(Request $request): Stringable|string
@@ -63,29 +63,7 @@ class PrepareObjectRecordCreateTool implements Tool
                 'address' => $schema->string()->nullable(),
                 'level' => $schema->string()->nullable(),
                 'cooperation_history' => $schema->string()->nullable(),
-                'spec' => $schema->string()->nullable(),
-                'length_mm' => $schema->number()->nullable(),
-                'width_mm' => $schema->number()->nullable(),
-                'status' => $schema->string()->nullable(),
-                'unit_weight_type' => $schema->string()->nullable(),
-                'unit_weight' => $schema->number()->nullable(),
                 'remark' => $schema->string()->nullable(),
-                'requester' => $schema->string()->nullable(),
-                'material_id' => $schema->string()->nullable(),
-                'qty' => $schema->number()->nullable(),
-                'unit' => $schema->string()->nullable(),
-                'project_id' => $schema->string()->nullable(),
-                'urgency' => $schema->string()->nullable(),
-                'reason' => $schema->string()->nullable(),
-                'team_id' => $schema->string()->nullable(),
-                'process' => $schema->string()->nullable(),
-                'completed_qty' => $schema->number()->nullable(),
-                'exception_type' => $schema->string()->nullable(),
-                'work_date' => $schema->string()->nullable(),
-                'part_name' => $schema->string()->nullable(),
-                'shortage_material_id' => $schema->string()->nullable(),
-                'shortage_qty' => $schema->number()->nullable(),
-                'shortage_unit' => $schema->string()->nullable(),
             ])->required()->description('Proposed field values. Omit unknown optional values; never invent relation UUIDs.'),
         ];
     }

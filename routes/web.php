@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\AiContractIntakeController;
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\AiQuotationController;
 use App\Http\Controllers\AiRunController;
 use App\Http\Controllers\AiWriteProposalController;
 use App\Http\Controllers\AttachmentController;
@@ -17,9 +18,8 @@ use App\Http\Controllers\ProjectCustomerController;
 use App\Http\Controllers\ProjectCustomerProfilePreviewController;
 use App\Http\Controllers\RbacController;
 use App\Http\Controllers\RelationOptionsController;
-use App\Http\Controllers\RequisitionController;
-use App\Http\Controllers\ShopFloorController;
 use App\Http\Controllers\TenderConversionController;
+use App\Http\Controllers\VisualizationController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/webhooks/feishu/events', FeishuEventController::class)
@@ -35,20 +35,6 @@ Route::middleware('guest')->group(function () {
     Route::post('/register', [AuthController::class, 'store'])->middleware('throttle:registration')->name('register.store');
 });
 
-Route::get('/purchase-request', [RequisitionController::class, 'publicCreate'])->name('requisitions.public.create');
-Route::get('/purchase-request/material-options', [RequisitionController::class, 'publicMaterialOptions'])
-    ->middleware('throttle:public-requisition-search')
-    ->name('requisitions.public.material-options');
-Route::post('/purchase-request', [RequisitionController::class, 'publicStore'])
-    ->middleware('throttle:public-requisition')
-    ->name('requisitions.public.store');
-Route::get('/team-log/public', [ShopFloorController::class, 'publicTeamLogCreate'])
-    ->middleware(['signed', 'throttle:public-team-log-view'])
-    ->name('team-logs.public.create');
-Route::post('/team-log/public', [ShopFloorController::class, 'publicTeamLogStore'])
-    ->middleware(['signed', 'throttle:public-team-log'])
-    ->name('team-logs.public.store');
-
 Route::middleware('auth')->group(function () {
     Route::get('/settings', [AccountSettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings/email', [AccountSettingsController::class, 'updateEmail'])->middleware('throttle:6,1')->name('settings.email');
@@ -56,6 +42,7 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+    Route::get('/visualization', VisualizationController::class)->middleware('permission:dashboard.view')->name('visualization');
     Route::get('/', DashboardController::class)->middleware('permission:dashboard.view')->name('dashboard');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
@@ -72,6 +59,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/ai/contracts/{intake}/retry', [AiContractIntakeController::class, 'retry'])->middleware('throttle:ai-post')->name('ai.contracts.retry');
         Route::post('/ai/contracts/{intake}/preview', [AiContractIntakeController::class, 'preview'])->middleware('throttle:ai-post')->name('ai.contracts.preview');
         Route::post('/ai/contracts/{intake}/confirm', [AiContractIntakeController::class, 'confirm'])->middleware('throttle:ai-post')->name('ai.contracts.confirm');
+        Route::post('/ai/runs/{run}/quotations/{artifact}', [AiQuotationController::class, 'generate'])->middleware('throttle:ai-post')->name('ai.quotations.generate');
+        Route::get('/ai/runs/{run}/quotations/{artifact}/download', [AiQuotationController::class, 'download'])->name('ai.quotations.download');
         Route::post('/ai/runs', [AiRunController::class, 'store'])->middleware('throttle:ai-post')->name('ai.runs.store');
         Route::get('/ai/runs/{run}', [AiRunController::class, 'show'])->name('ai.runs.show');
         Route::get('/ai/runs/{run}/events', [AiRunController::class, 'events'])->name('ai.runs.events');
@@ -93,27 +82,6 @@ Route::middleware('auth')->group(function () {
         ->whereNumber('index')
         ->name('attachments.download');
 
-    Route::get('/requests/create', [RequisitionController::class, 'create'])
-        ->middleware('permission:requisition.create')
-        ->name('requisitions.create');
-    Route::post('/requests', [RequisitionController::class, 'store'])
-        ->middleware('permission:requisition.create')
-        ->name('requisitions.store');
-    Route::get('/procurement/approvals', [RequisitionController::class, 'approvals'])
-        ->middleware('permission:object.requisition.update')
-        ->name('requisitions.approvals');
-    Route::post('/requests/{record}/approve', [RequisitionController::class, 'approve'])
-        ->middleware('permission:object.requisition.update')
-        ->name('requisitions.approve');
-    Route::post('/requests/{record}/reject', [RequisitionController::class, 'reject'])
-        ->middleware('permission:object.requisition.update')
-        ->name('requisitions.reject');
-    Route::get('/team-log', [ShopFloorController::class, 'teamLogCreate'])
-        ->middleware('permission:object.team_log.view')
-        ->name('team-logs.create');
-    Route::post('/team-log', [ShopFloorController::class, 'teamLogStore'])
-        ->middleware('permission:object.team_log.create')
-        ->name('team-logs.store');
     Route::get('/relation-options', RelationOptionsController::class)->name('relation-options.index');
     Route::post('/projects/{project}/contract-amount/sync', ProjectContractAmountController::class)
         ->name('projects.contract-amount.sync');
@@ -142,3 +110,5 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/procurement_hub.php';
+
+require __DIR__.'/quotations.php';

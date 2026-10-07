@@ -107,8 +107,8 @@ class FilteredRecordSubtotalTest extends TestCase
 
     public function test_item_numbers_are_summed_without_repeating_record_numbers(): void
     {
-        $purchase = BusinessObject::query()->where('key', 'purchase')->firstOrFail();
-        $this->record('purchase', [
+        $purchase = BusinessObject::query()->where('key', 'project')->firstOrFail();
+        $this->record('project', [
             'record_total' => 10,
             'items' => [
                 ['qty' => 2],
@@ -116,7 +116,7 @@ class FilteredRecordSubtotalTest extends TestCase
                 ['qty' => '待补'],
             ],
         ]);
-        $this->record('purchase', [
+        $this->record('project', [
             'record_total' => 20,
             'items' => [
                 ['qty' => -1],

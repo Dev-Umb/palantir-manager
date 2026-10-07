@@ -6,7 +6,6 @@ use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\User;
-use App\Support\MaterialNames;
 use App\Support\ObjectRelations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -19,7 +18,6 @@ class CreateObjectRecord
         private SyncProjectContractAmount $contractAmount,
         private SyncProjectFinance $projectFinance,
         private SyncProjectNotifications $projectNotifications,
-        private MaterialNames $materialNames,
         private ObjectRelations $relations,
     ) {}
 
@@ -43,17 +41,13 @@ class CreateObjectRecord
         ): ObjectRecord {
             $this->relations->lockReferenceGraph();
             $object = BusinessObject::query()->lockForUpdate()->findOrFail($object->id);
+            abort_unless(in_array($object->key, SyncObjectReferenceNames::OBJECT_KEYS, true), 404);
             $payload = $this->normalizePayload($object, $payload, user: $user);
-            $payload = $this->materialNames->normalizeAndGuardUnique($object, $payload);
             $this->relations->validatePayloadRelations($object, $payload, $user);
             $this->relations->validateItemRelations($object, $payload, $user);
             $project = null;
-            if (in_array($object->key, ['receivable', 'contract'], true)) {
+            if ($object->key === 'contract') {
                 $project = $this->projectFinance->lockedProjectOrFail($payload['project_id'] ?? null);
-            }
-            if ($object->key === 'receivable') {
-                $payload = $this->projectFinance->normalizePayload($payload, $project);
-                $this->projectFinance->guardUnique($payload['project_id'] ?? null, null, $project);
             }
             if ($object->key === 'contract') {
                 $payload = $this->projectFinance->fillContractProjectDefaults($payload, project: $project);
@@ -73,10 +67,6 @@ class CreateObjectRecord
                 'workflow_target_roles' => $workflowTargetRoles ?: null,
                 'created_by' => $user?->id,
             ]);
-
-            if ($object->key === 'production_team') {
-                $this->validateProductionTeamLeader($record, $payload);
-            }
 
             AuditLog::create([
                 'user_id' => $user?->id,
@@ -107,17 +97,6 @@ class CreateObjectRecord
         if ($object->key === 'tender') {
             $payload = $this->normalizeTender($payload, $user);
         }
-
-        $payload = match ($object->key) {
-            'drawing' => $this->normalizeDrawing($payload),
-            'work_order' => $this->fillWorkOrderFromTeam(
-                $this->fillWorkOrderFromDrawing($payload, $existingPayload),
-                $existingPayload,
-            ),
-            'teardown' => $this->fillTeardownFromDrawing($payload, $existingPayload),
-            'team_log' => $this->fillTeamLogFromTeam($payload, $existingPayload),
-            default => $payload,
-        };
 
         $payload = $this->roundProjectNumbers($object, $payload);
         $payload = $this->fillProjectNumber($object, $payload, $existingPayload);
@@ -200,186 +179,12 @@ class CreateObjectRecord
         return (string) ($payload[$object->title_field] ?? $payload['name'] ?? $object->label);
     }
 
-    private function fillWorkOrderFromDrawing(array $payload, array $existingPayload = []): array
-    {
-        if (trim((string) ($payload['release_status'] ?? '')) === '') {
-            $payload['release_status'] = $existingPayload['release_status'] ?? '未下放';
-        }
-
-        $drawing = $this->linkedRecord($payload['drawing_id'] ?? null, 'drawing');
-        if (! $drawing) {
-            return $payload;
-        }
-
-        if (($existingPayload['drawing_id'] ?? null) === ($payload['drawing_id'] ?? null)) {
-            foreach (['project_id', 'project_no', 'drawing_no', 'drawing_name'] as $key) {
-                if (array_key_exists($key, $existingPayload)) {
-                    $payload[$key] = $existingPayload[$key];
-                }
-            }
-
-            return $payload;
-        }
-
-        if (($drawing->payload['design_status'] ?? null) !== '已下放') {
-            throw ValidationException::withMessages([
-                'payload.drawing_id' => '图纸编号必须选择已下放的技术图纸。',
-            ]);
-        }
-
-        $drawingPayload = $drawing->payload ?? [];
-        $payload['project_id'] = $drawingPayload['project_id'] ?? ($payload['project_id'] ?? '');
-        $payload['project_no'] = $drawingPayload['project_no'] ?? $drawingPayload['project_no_norm'] ?? ($payload['project_no'] ?? '');
-        $payload['drawing_no'] = $drawingPayload['drawing_no'] ?? $drawing->code;
-        $payload['drawing_name'] = $drawingPayload['name'] ?? $drawing->title;
-
-        return $payload;
-    }
-
-    private function fillTeardownFromDrawing(array $payload, array $existingPayload = []): array
-    {
-        $drawing = $this->linkedRecord($payload['drawing_id'] ?? null, 'drawing');
-        if (! $drawing) {
-            return $payload;
-        }
-
-        if (($existingPayload['drawing_id'] ?? null) === ($payload['drawing_id'] ?? null)) {
-            foreach (['drawing_name', 'project_id', 'project_no'] as $key) {
-                if (array_key_exists($key, $existingPayload)) {
-                    $payload[$key] = $existingPayload[$key];
-                }
-            }
-
-            return $payload;
-        }
-
-        $drawingPayload = $drawing->payload ?? [];
-        $payload['drawing_name'] = $drawingPayload['name'] ?? $drawing->title;
-        $payload['project_id'] = $drawingPayload['project_id'] ?? null;
-
-        return $payload;
-    }
-
-    private function fillWorkOrderFromTeam(array $payload, array $existingPayload = []): array
-    {
-        $teamId = $payload['team_id'] ?? null;
-        if (! is_string($teamId) || $teamId === '') {
-            $payload['team_leader_name'] = '';
-
-            return $payload;
-        }
-
-        $keepsExistingTeam = ($existingPayload['team_id'] ?? null) === $teamId;
-        if ($keepsExistingTeam && array_key_exists('team_leader_name', $existingPayload)) {
-            $payload['team_leader_name'] = $existingPayload['team_leader_name'];
-
-            return $payload;
-        }
-
-        $team = $this->linkedRecord($teamId, 'production_team');
-        if (! $team || (($team->payload['status'] ?? '启用') === '停用' && ! $keepsExistingTeam)) {
-            throw ValidationException::withMessages([
-                'payload.team_id' => '加工班组必须选择当前启用的生产班组。',
-            ]);
-        }
-
-        $leader = $this->linkedRecord($team->payload['leader_id'] ?? null, 'team_member');
-        $payload['team_leader_name'] = $leader
-            && ($leader->payload['status'] ?? '启用') !== '停用'
-            && ($leader->payload['team_id'] ?? null) === $team->id
-                ? (string) (($leader->payload['name'] ?? '') ?: $leader->title)
-                : '';
-
-        return $payload;
-    }
-
-    private function normalizeDrawing(array $payload): array
-    {
-        if (trim((string) ($payload['design_status'] ?? '')) === '') {
-            $payload['design_status'] = '草稿';
-        }
-
-        if (($payload['design_status'] ?? null) === '已下放' && empty($payload['release_date'])) {
-            $payload['release_date'] = now()->format('Y-m-d');
-        }
-
-        return $payload;
-    }
-
-    private function fillTeamLogFromTeam(array $payload, array $existingPayload = []): array
-    {
-        $team = $this->linkedRecord($payload['team_id'] ?? null, 'production_team');
-        $keepsExistingTeam = is_string($payload['team_id'] ?? null)
-            && ($existingPayload['team_id'] ?? null) === $payload['team_id'];
-        if (! $team || (($team->payload['status'] ?? '启用') === '停用' && ! $keepsExistingTeam)) {
-            throw ValidationException::withMessages([
-                'payload.team_id' => '班组名称必须选择当前启用的生产班组。',
-            ]);
-        }
-
-        if ($keepsExistingTeam && array_key_exists('team_leader_name', $existingPayload)) {
-            $payload['team_leader_name'] = $existingPayload['team_leader_name'];
-
-            return $payload;
-        }
-
-        if (! array_key_exists('team_leader_name', $payload)) {
-            $leader = $this->linkedRecord($team->payload['leader_id'] ?? null, 'team_member');
-            $payload['team_leader_name'] = $leader
-                ? (string) (($leader->payload['name'] ?? '') ?: $leader->title)
-                : '';
-        }
-
-        return $payload;
-    }
-
-    public function validateProductionTeamLeader(ObjectRecord $team, array $payload): void
-    {
-        $leaderId = $payload['leader_id'] ?? null;
-        if (! $leaderId) {
-            return;
-        }
-
-        $leader = $this->linkedRecord($leaderId, 'team_member');
-        if (! $leader
-            || ($leader->payload['status'] ?? '启用') === '停用'
-            || ($leader->payload['team_id'] ?? null) !== $team->id) {
-            throw ValidationException::withMessages([
-                'payload.leader_id' => '班组负责人必须是当前班组中已启用的成员。',
-            ]);
-        }
-    }
-
-    public function validateTeamMemberChange(ObjectRecord $member, ?array $payload): void
-    {
-        $leaderTeams = ObjectRecord::query()
-            ->whereRelation('businessObject', 'key', 'production_team')
-            ->where('payload->leader_id', $member->id)
-            ->get();
-        if ($leaderTeams->isEmpty()) {
-            return;
-        }
-
-        $valid = $payload !== null
-            && ($payload['status'] ?? '启用') !== '停用'
-            && $leaderTeams->every(fn (ObjectRecord $team) => ($payload['team_id'] ?? null) === $team->id);
-        if (! $valid) {
-            throw ValidationException::withMessages([
-                'payload.team_id' => '该成员是班组负责人，请先为对应班组更换负责人后再停用、调组或删除。',
-            ]);
-        }
-    }
-
     private function fillSystemCode(BusinessObject $object, array $payload, string $code): array
     {
         foreach ($object->fields ?? [] as $field) {
             if (($field['system'] ?? null) === 'code') {
                 $payload[$field['key']] = $code;
             }
-        }
-
-        if ($object->key === 'material' && empty($payload['material_code'])) {
-            $payload['material_code'] = $code;
         }
 
         return $payload;
@@ -562,9 +367,7 @@ class CreateObjectRecord
     private function snapshotLabel(ObjectRecord $record): string
     {
         return match ($record->businessObject?->key) {
-            'material' => (string) (($record->payload['name'] ?? '') ?: $record->title ?: $record->code),
             'project' => collect([$record->payload['project_no'] ?? $record->code, $record->title])->filter()->implode(' · '),
-            'drawing' => collect([$record->payload['drawing_no'] ?? $record->code, $record->title])->filter()->implode(' · '),
             default => (string) ($record->title ?: $record->code),
         };
     }

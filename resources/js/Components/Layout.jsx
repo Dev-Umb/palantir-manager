@@ -1,15 +1,14 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Bell, Bot, Box, ClipboardCheck, ClipboardPlus, Database, HardHat, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, UserRound, X } from 'lucide-react';
+import { BarChart3, Bell, Bot, Box, ClipboardCheck, ClipboardPlus, Database, HardHat, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { businessText } from '../businessLanguage';
 import { useDialogFocus } from './useDialogFocus';
 
 const iconFor = {
     dashboard: LayoutDashboard,
+    visualization: BarChart3,
     notifications: Bell,
-    'requisition-create': ClipboardPlus,
     approvals: ClipboardCheck,
-    'team-log': HardHat,
     ontology: Database,
     rbac: ShieldCheck,
     settings: Settings,

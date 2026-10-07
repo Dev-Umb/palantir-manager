@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Actions\CreateObjectRecord;
-use App\Actions\SeedXycReferenceData;
 use App\Actions\SyncXycMetadata;
 use App\Models\BusinessObject;
 use App\Models\Role;
@@ -21,8 +20,6 @@ class XycPrototypeSeeder extends Seeder
         if (app()->environment(['local', 'testing'])) {
             $this->seedDemoUsers();
         }
-
-        app(SeedXycReferenceData::class)->handle();
 
         if (! app()->environment(['local', 'testing']) || $this->hasNonReferenceBusinessRecords()) {
             return;
@@ -103,7 +100,7 @@ class XycPrototypeSeeder extends Seeder
 
     private function hasNonReferenceBusinessRecords(): bool
     {
-        return BusinessObject::whereNotIn('key', ['material', 'production_team', 'team_member'])
+        return BusinessObject::whereNotIn('key', [])
             ->whereHas('records')
             ->exists();
     }

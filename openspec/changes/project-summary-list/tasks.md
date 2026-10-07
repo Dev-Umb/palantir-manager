@@ -1,0 +1,3 @@
+- [x] Implement approved design with retained complete grid
+- [x] Verify permissions, missing values, actions and query preservation
+- [x] Quality gate, production build, deploy and read-only verification

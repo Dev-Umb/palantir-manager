@@ -2,16 +2,11 @@ import { Link } from '@inertiajs/react';
 import { AlertTriangle, ArrowRight, CircleDollarSign, Factory, Gauge, Target } from 'lucide-react';
 import { useState } from 'react';
 import {
-    CartesianGrid,
     Cell,
-    Line,
-    LineChart,
     Pie,
     PieChart,
     ResponsiveContainer,
     Tooltip,
-    XAxis,
-    YAxis,
 } from 'recharts';
 
 const kpiIcons = {
@@ -22,7 +17,6 @@ const kpiIcons = {
 };
 
 const chartColors = ['var(--steel)', 'var(--mint)', 'var(--chart-violet)', 'var(--chart-orange)'];
-const workOrderColors = ['var(--muted)', 'var(--steel)', 'var(--red)', 'var(--mint)'];
 
 export function CockpitKpis({ kpis = [] }) {
     if (!kpis.length) return null;
@@ -194,57 +188,6 @@ export function ProjectStatusPanel({ panel }) {
     );
 }
 
-export function ProductionDeliveryPanel({ panel }) {
-    if (!panel) return null;
-
-    const shipment = panel.shipment;
-    const production = panel.production;
-
-    return (
-        <article className="surface cockpit-chart-card" aria-labelledby="production-delivery-title">
-            <PanelHeader
-                eyebrow="生产交付"
-                title="生产与发货快照"
-                id="production-delivery-title"
-                href={shipment?.url || production?.url}
-                action={production ? coverageText(production.coverage) : '查看发货'}
-            />
-            <div className="cockpit-production-stats">
-                {production && (
-                    <div><span>生产量</span><strong>{formatTon(production.total_ton)}</strong><small>计划重量 {formatTon(production.planned_ton)}</small></div>
-                )}
-                {shipment && (
-                    <div><span>累计发货量</span><strong>{formatTon(shipment.total_ton)}</strong><small>按有效发货记录汇总</small></div>
-                )}
-            </div>
-            {shipment && (
-                <>
-                    <div className="cockpit-mini-chart-head"><strong>月度发货吨位</strong><span>单位：吨</span></div>
-                    {shipment.monthly.length ? (
-                        <div className="cockpit-line-chart" role="img" aria-label={`月度发货吨位：${shipment.monthly.map((item) => `${item.label}${item.ton}吨`).join('，')}`}>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={shipment.monthly} margin={{ top: 10, right: 12, left: -12, bottom: 0 }}>
-                                    <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="label" tick={{ fill: 'var(--muted)', fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={18} />
-                                    <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} tickLine={false} axisLine={false} width={42} />
-                                    <Tooltip formatter={(value) => [`${formatNumber(value)} 吨`, '发货量']} />
-                                    <Line type="monotone" dataKey="ton" stroke="var(--steel)" strokeWidth={3} dot={{ r: 4, fill: 'var(--surface)', strokeWidth: 2 }} activeDot={{ r: 5 }} isAnimationActive={false} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    ) : <ChartEmpty text="暂无带有效发货日期的吨位记录" />}
-                    <p className="cockpit-chart-note shipment-note">
-                        按 ship_date 月汇总有效吨位 · 趋势{coverageText(shipment.trend_coverage)}
-                        {shipment.undated_ton > 0 ? ` · ${formatNumber(shipment.undated_ton)} 吨缺日期只计累计值` : ''}
-                        {shipment.invalid_quantity_count > 0 ? ` · ${shipment.invalid_quantity_count} 条吨位异常未计入` : ''}
-                    </p>
-                </>
-            )}
-            {production && <WorkOrderStatus statuses={production.statuses} />}
-        </article>
-    );
-}
-
 export function ProjectProgressPanel({ progress, projects = [] }) {
     const options = projects.length ? projects : (progress ? [progress] : []);
     const [selectedProjectId, setSelectedProjectId] = useState(progress?.project_id || options[0]?.project_id || '');
@@ -265,7 +208,7 @@ export function ProjectProgressPanel({ progress, projects = [] }) {
                     >
                         {options.map((project) => (
                             <option value={project.project_id} key={project.project_id}>
-                                {project.project_no} · {project.project_name}
+                                {project.project_name}
                             </option>
                         ))}
                     </select>
@@ -292,24 +235,6 @@ export function CockpitEmpty() {
             <Gauge size={28} aria-hidden="true" />
             <div><strong>暂无可展示的经营数据</strong><span>当前账号没有获授权的来源对象，或已有对象尚无记录。</span></div>
         </section>
-    );
-}
-
-function WorkOrderStatus({ statuses }) {
-    const total = statuses.reduce((sum, item) => sum + item.count, 0);
-
-    return (
-        <div className="cockpit-work-orders" aria-label={statuses.map((item) => `${item.status}${item.count}个`).join('，')}>
-            <div className="cockpit-status-strip" aria-hidden="true">
-                {statuses.map((item, index) => (
-                    item.count > 0 && <span key={item.status} style={{ flex: item.count, background: workOrderColors[index] }} />
-                ))}
-            </div>
-            <div className="cockpit-status-legend">
-                {statuses.map((item, index) => <span key={item.status}><i style={{ background: workOrderColors[index] }} />{item.status} {item.count}</span>)}
-            </div>
-            {total === 0 && <span className="muted">暂无生产任务</span>}
-        </div>
     );
 }
 
@@ -357,12 +282,6 @@ function formatPanelAsOf(value) {
         second: '2-digit',
         hour12: false,
     }).format(date).replaceAll('/', '-');
-}
-
-function formatTon(value) {
-    if (value === null || !Number.isFinite(Number(value))) return '—';
-
-    return `${formatNumber(value)} 吨`;
 }
 
 function formatNumber(value) {

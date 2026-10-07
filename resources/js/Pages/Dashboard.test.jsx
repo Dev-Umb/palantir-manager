@@ -113,6 +113,7 @@ describe('Company operations cockpit', () => {
         />);
 
         expect(screen.getByRole('heading', { name: '公司经营驾驶舱' })).toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: '生产与发货快照' })).not.toBeInTheDocument();
         expect(screen.getByRole('heading', { name: '公司与业务员金额汇总' })).toBeInTheDocument();
         expect(screen.getByLabelText('公司项目金额总计')).toHaveTextContent('420.00 万元');
         expect(screen.getAllByRole('cell', { name: '业务员甲' })).toHaveLength(2);
@@ -131,9 +132,6 @@ describe('Company operations cockpit', () => {
         expect(screen.getByText('合同金额')).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: '当前招投标管线' })).toBeInTheDocument();
         expect(screen.getByRole('img', { name: /活跃项目共6个/ })).toBeInTheDocument();
-        expect(screen.getByRole('img', { name: /月度发货吨位：07月220吨，08月278吨/ })).toBeInTheDocument();
-        expect(screen.getByText(/趋势覆盖 4\/6/)).toHaveTextContent('12 吨缺日期只计累计值');
-        expect(screen.getByText(/趋势覆盖 4\/6/)).toHaveTextContent('1 条吨位异常未计入');
         expect(screen.getAllByText('已拿到加工函')).toHaveLength(3);
         expect(screen.getByText('部分签署')).toBeInTheDocument();
         expect(screen.getAllByText('业务员甲')).toHaveLength(2);

@@ -7,8 +7,6 @@ use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\User;
-use App\Support\MaterialNames;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,7 +16,6 @@ class ConfirmAiWriteProposal
         private BuildAiWriteProposal $proposals,
         private BuildAiUpdateProposal $updateProposals,
         private CreateObjectRecord $records,
-        private MaterialNames $materialNames,
     ) {}
 
     /**
@@ -152,9 +149,6 @@ class ConfirmAiWriteProposal
     ): array {
         $recordId = (string) ($artifact['data']['record']['id'] ?? '');
         $patch = (array) ($artifact['data']['patch'] ?? []);
-        if ($objectKey === 'material') {
-            BusinessObject::query()->where('key', $objectKey)->lockForUpdate()->firstOrFail();
-        }
         $record = ObjectRecord::query()->lockForUpdate()->findOrFail($recordId);
         $record->loadMissing('businessObject');
 
@@ -181,7 +175,6 @@ class ConfirmAiWriteProposal
         $rebuilt = $this->updateProposals->handle($user, $objectKey, $recordId, $patch);
         $payload = array_replace($currentPayload, $rebuilt['patch']);
         $payload = $this->records->normalizePayload($object, $payload, $currentPayload);
-        $payload = $this->materialNames->normalizeAndGuardUnique($object, $payload, $record->id);
         $record->update([
             'payload' => $payload,
             'title' => (string) ($payload[$object->title_field] ?? $record->title),
@@ -224,36 +217,7 @@ class ConfirmAiWriteProposal
      */
     private function createRecords(BusinessObject $object, array $payload, User $user): array
     {
-        $relatedRecords = [];
-        $recordPayload = Arr::except($payload, [
-            'shortage_material_id',
-            'shortage_qty',
-            'shortage_unit',
-        ]);
-        $action = match ($object->key) {
-            'requisition' => 'requisition.create',
-            'team_log' => 'team_log.create',
-            default => 'ai.object.create',
-        };
-        $record = $this->records->handle($object, $recordPayload, $user, $action);
-
-        if ($object->key === 'team_log' && ($payload['exception_type'] ?? null) === '缺料') {
-            $requisition = BusinessObject::where('key', 'requisition')->firstOrFail();
-            $relatedRecords[] = $this->records->handle($requisition, [
-                'requester' => '生产',
-                'material_id' => $payload['shortage_material_id'],
-                'qty' => $payload['shortage_qty'],
-                'unit' => $payload['shortage_unit'],
-                'project_id' => $payload['project_id'],
-                'urgency' => '紧急',
-                'reason' => collect(['现场报工缺料', $payload['part_name'] ?? null, $payload['remark'] ?? null])
-                    ->filter()
-                    ->implode(' · '),
-                'status' => '待处理',
-            ], $user, 'team_log.shortage_requisition');
-        }
-
-        return [$record, $relatedRecords];
+        return [$this->records->handle($object, $payload, $user, 'ai.object.create'), []];
     }
 
     /** @param array<string, mixed> $extra */

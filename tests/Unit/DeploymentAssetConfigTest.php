@@ -26,9 +26,8 @@ class DeploymentAssetConfigTest extends TestCase
         $this->assertStringContainsString('不自动修改', $script);
         $this->assertStringContainsString('sudo nginx -t', $script);
         $this->assertStringNotContainsString('cp deploy/nginx/palantir-assets.conf /etc/nginx', $script);
-        $this->assertLessThan(
-            strpos($script, 'php artisan db:seed --class=XycPrototypeSeeder --force'),
-            strpos($script, 'php artisan migrate --force'),
-        );
+        $this->assertStringContainsString('php artisan migrate --force', $script);
+        $this->assertStringNotContainsString('php artisan db:seed', $script);
+        $this->assertStringContainsString("--exclude='outputs'", $script);
     }
 }

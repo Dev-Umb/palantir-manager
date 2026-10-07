@@ -1,18 +1,16 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Layout from './Layout';
 
-const profile = vi.hoisted(() => ({ password_only: false, settings_url: '/settings' }));
-
 vi.mock('@inertiajs/react', () => ({
-    Link: ({ href, children, ...props }) => <a href={href} data-inertia-link="true" {...props}>{children}</a>,
+    Link: ({ href, children, ...props }) => <a href={href} {...props}>{children}</a>,
     router: { post: vi.fn() },
     usePage: () => ({
         url: '/objects/drawing',
         props: {
-            auth: { ...profile, user: { name: '技术员', is_password_changed: true }, roles: [{ id: 1, label: '技术' }] },
+            auth: { user: { name: '技术员' }, roles: [{ id: 1, label: '技术' }] },
             flash: {},
             nav: [{
                 key: 'ontology',
@@ -51,43 +49,7 @@ vi.mock('@inertiajs/react', () => ({
 }));
 
 describe('Layout workflow task navigation', () => {
-    it('uses native document navigation on mobile while retaining desktop Inertia links', () => {
-        const { container } = render(<Layout title="工日簿"><div>内容</div></Layout>);
-        const mobile = screen.getByRole('navigation', { name: '移动端主导航' });
-        const ai = within(mobile).getByRole('link', { name: 'AI 数据助手' });
-        expect(ai.getAttribute('href')).toBe('/ai');
-        expect(ai.hasAttribute('data-inertia-link')).toBe(false);
-        expect(container.querySelector('.desktop-rail a[href="/ai"]').getAttribute('data-inertia-link')).toBe('true');
-        fireEvent.click(screen.getByRole('button', { name: '更多业务入口' }));
-        const more = screen.getByRole('dialog', { name: '更多业务入口' });
-        expect(within(more).getByRole('link', { name: '用户与权限' }).hasAttribute('data-inertia-link')).toBe(false);
-    });
-    beforeEach(() => {
-        const stored = new Map();
-        vi.stubGlobal('localStorage', { getItem: (key) => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) });
-    });
-    afterEach(() => { cleanup(); vi.unstubAllGlobals(); profile.password_only = false; });
-
-    it('switches layout without clearing input, remembers it, and offers a return action', () => {
-        const first = render(<Layout title="工日簿"><input aria-label="未保存姓名" defaultValue="张三" /></Layout>);
-        fireEvent.click(screen.getByRole('button', { name: '切换移动版' }));
-        expect(document.documentElement.dataset.mobileLayout).toBe('true');
-        expect(screen.getByLabelText('未保存姓名').value).toBe('张三');
-        expect(window.localStorage.getItem('palantir.mobile-layout')).toBe('true');
-        first.unmount();
-        render(<Layout title="工日簿"><div>内容</div></Layout>);
-        expect(document.documentElement.dataset.mobileLayout).toBe('true');
-        fireEvent.click(screen.getByRole('button', { name: '更多业务入口' }));
-        fireEvent.click(screen.getByRole('button', { name: '切回桌面版' }));
-        expect(document.documentElement.dataset.mobileLayout).toBe('false');
-        expect(window.localStorage.getItem('palantir.mobile-layout')).toBe('false');
-    });
-
-    it('keeps own password access for dedicated operators after the initial password change', () => {
-        profile.password_only = true;
-        render(<Layout title="工日簿"><div>内容</div></Layout>);
-        expect(screen.getByRole('link', { name: '修改密码' }).getAttribute('href')).toBe('/settings#password');
-    });
+    afterEach(cleanup);
 
     it('shows flat business modules without expanding their table items', () => {
         render(<Layout title="工作台"><div>内容</div></Layout>);

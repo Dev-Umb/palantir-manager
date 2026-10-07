@@ -26,6 +26,7 @@ class SyncProjectContracts
         'processing_letter_attachments',
         'contract_attachments',
         'statement_attachments',
+        'other_attachments',
     ];
 
     private const EDITABLE_KEYS = [
@@ -64,11 +65,14 @@ class SyncProjectContracts
 
         $validated = Validator::make($input, [
             'contracts' => ['present', 'array', 'max:50'],
-            'contracts.*' => ['array:id,status,ctype,amount,signed_date,contract_chase_record,contract_qty,remark,processing_letter_attachments,contract_attachments,statement_attachments'],
+            'contracts.*' => ['array:id,status,ctype,amount,signed_date,contract_chase_record,contract_qty,remark,processing_letter_attachments,contract_attachments,statement_attachments,other_attachments,removed_attachments'],
+            'contracts.*.removed_attachments' => ['sometimes', 'array:processing_letter_attachments,contract_attachments,statement_attachments,other_attachments'],
+            'contracts.*.removed_attachments.*' => ['array', 'max:20'],
+            'contracts.*.removed_attachments.*.*' => ['string', 'regex:/\A[a-f0-9]{64}\z/D', 'distinct'],
             'contracts.*.id' => ['nullable', 'uuid', 'distinct'],
             'contracts.*.status' => ['required', Rule::in(['未签署', '已有加工函', '已签署'])],
             'contracts.*.ctype' => ['nullable', Rule::in(['销售合同', '加工合同', '补充协议'])],
-            'contracts.*.amount' => ['required', 'numeric'],
+            'contracts.*.amount' => ['nullable', 'numeric'],
             'contracts.*.signed_date' => ['nullable', 'date'],
             'contracts.*.contract_chase_record' => ['nullable', 'string'],
             'contracts.*.contract_qty' => ['nullable', 'numeric'],
@@ -77,6 +81,8 @@ class SyncProjectContracts
             'contracts.*.processing_letter_attachments.*' => [File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024)],
             'contracts.*.contract_attachments' => ['nullable', 'array', 'max:20'],
             'contracts.*.contract_attachments.*' => [File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024)],
+            'contracts.*.other_attachments' => ['nullable', 'array', 'max:20'],
+            'contracts.*.other_attachments.*' => [File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024)],
             'contracts.*.statement_attachments' => ['nullable', 'array', 'max:20'],
             'contracts.*.statement_attachments.*' => [File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024)],
             'deleted_contract_ids' => ['present', 'array', 'max:50'],
@@ -90,8 +96,9 @@ class SyncProjectContracts
 
         $contracts = collect($validated['contracts'])
             ->map(function (array $contract): array {
-                $normalized = Arr::only($contract, ['id', ...self::EDITABLE_KEYS, ...self::ATTACHMENT_KEYS]);
+                $normalized = Arr::only($contract, ['id', 'removed_attachments', ...self::EDITABLE_KEYS, ...self::ATTACHMENT_KEYS]);
                 $normalized['status'] = $normalized['status'] ?? '未签署';
+                $normalized['amount'] = ($normalized['amount'] ?? null) === '' ? null : ($normalized['amount'] ?? null);
                 foreach (self::ATTACHMENT_KEYS as $key) {
                     $normalized[$key] = array_values($normalized[$key] ?? []);
                 }
@@ -125,7 +132,7 @@ class SyncProjectContracts
 
         foreach ($contracts as $index => $contract) {
             $existingContract = isset($contract['id']) ? $existing->get($contract['id']) : null;
-            $this->guardEvidence($contract, $existingContract?->payload ?? [], $index);
+            $this->guardEvidence($contract, $this->retainedAttachments($contract, $existingContract?->payload ?? [], $index), $index);
             $projectedStatuses->put($contract['id'] ?? "new-{$index}", $contract['status']);
         }
 
@@ -175,7 +182,9 @@ class SyncProjectContracts
 
                 foreach ($batch['contracts'] as $index => $contract) {
                     $existingContract = isset($contract['id']) ? $existing->get($contract['id']) : null;
-                    $payload = $this->payload($project, $contract, $existingContract?->payload ?? []);
+                    $retained = $this->retainedAttachments($contract, $existingContract?->payload ?? [], $index);
+                    $this->guardEvidence($contract, $retained, $index);
+                    $payload = $this->payload($project, $contract, $retained);
                     $this->guardEvidence($payload, [], $index);
 
                     if (! $existingContract) {
@@ -332,6 +341,16 @@ class SyncProjectContracts
                 ->map(function (UploadedFile $file): string {
                     $path = $file->store('attachments', 'local');
                     $this->storedPaths[] = $path;
+                    StoredAttachment::create([
+                        'logical_path' => $path,
+                        'disk' => 'local',
+                        'object_key' => $path,
+                        'original_name' => basename($file->getClientOriginalName()),
+                        'mime_type' => $file->getMimeType(),
+                        'size' => $file->getSize(),
+                        'sha256' => hash_file('sha256', $file->getRealPath()),
+                        'status' => StoredAttachment::STATUS_ATTACHED,
+                    ]);
 
                     return $path;
                 });
@@ -339,6 +358,29 @@ class SyncProjectContracts
         }
 
         return $this->projectFinance->fillContractProjectDefaults($payload, $existingPayload, $project);
+    }
+
+    /** @return array<string, mixed> */
+    private function retainedAttachments(array $submitted, array $existingPayload, int $index): array
+    {
+        foreach (self::ATTACHMENT_KEYS as $key) {
+            $removed = $submitted['removed_attachments'][$key] ?? [];
+            if ($removed === []) {
+                continue;
+            }
+            $files = collect($existingPayload[$key] ?? []);
+            $tokens = $files->map(fn (string $path): string => hash('sha256', $path));
+            if (collect($removed)->diff($tokens)->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    "contracts.{$index}.removed_attachments.{$key}" => '附件已发生变化或不属于当前合同，请刷新后重新核对。',
+                ]);
+            }
+            $existingPayload[$key] = $files
+                ->reject(fn (string $path): bool => in_array(hash('sha256', $path), $removed, true))
+                ->values()->all();
+        }
+
+        return $existingPayload;
     }
 
     private function guardEvidence(array $submitted, array $existingPayload, int $index): void
@@ -351,6 +393,14 @@ class SyncProjectContracts
                     "contracts.{$index}.{$key}" => '每类附件最多保留 20 个文件。',
                 ]);
             }
+        }
+
+        $hasEvidence = $counts['contract_attachments'] > 0
+            || $counts['processing_letter_attachments'] > 0
+            || $counts['other_attachments'] > 0;
+
+        if (! is_numeric($submitted['amount'] ?? null) && ! $hasEvidence) {
+            throw ValidationException::withMessages(["contracts.{$index}.amount" => '金额未确认时，请先上传合同、加工函或报价单等其他附件。']);
         }
 
         if (($submitted['status'] ?? '未签署') === '已有加工函'

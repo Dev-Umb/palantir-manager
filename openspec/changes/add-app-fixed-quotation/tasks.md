@@ -1,0 +1,3 @@
+- [ ] Implement run integration, confirmation card and Android file saving.
+- [ ] Test quote interaction, preserved queries/history, failure retention and download cancellation.
+- [ ] Build and verify signed Android release, publish update through existing channel.

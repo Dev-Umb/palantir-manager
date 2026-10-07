@@ -7,6 +7,7 @@ use App\Models\ProjectNotification;
 use App\Models\TenderNotification;
 use App\Support\BusinessWorkspace;
 use App\Support\HubAccess;
+use App\Support\QuotationAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -104,13 +105,11 @@ class HandleInertiaRequests extends Middleware
             ->get()
             ->filter(fn (BusinessObject $object) => $can("object.{$object->key}.view")
                 && ($object->key !== 'project_business_summary' || $can('object.project.view')))
-            ->reject(fn (BusinessObject $object) => $object->key === 'requisition'
-                    && in_array('procurement', $roles, true)
-                    && ! in_array('admin', $roles, true))
             ->values();
 
         return [
             ['key' => 'dashboard', 'label' => '经营大盘', 'href' => route('dashboard'), 'visible' => $can('dashboard.view'), 'mobile_priority' => 10],
+            ['key' => 'visualization', 'label' => '可视化大盘', 'href' => route('visualization'), 'visible' => $can('dashboard.view'), 'mobile_priority' => 45],
             ['key' => 'notifications', 'label' => '通知中心', 'href' => route('notifications.index'), 'visible' => true, 'mobile_priority' => 40],
             [
                 'key' => 'ontology',
@@ -135,6 +134,7 @@ class HandleInertiaRequests extends Middleware
             ['key' => 'hub', 'exact' => true, 'label' => '招采信息中心', 'href' => route('hub.index'), 'visible' => HubAccess::canRead($request->user()), 'mobile_priority' => 65],
             ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
             ...($can('timebook.view') ? [['key' => 'timebook', 'label' => '工日簿', 'href' => route('timebook.index'), 'visible' => true, 'mobile_priority' => 25]] : []),
+            ['key' => 'quotations', 'label' => '参考报价', 'href' => route('quotations.index'), 'visible' => QuotationAccess::allows($request->user()), 'mobile_priority' => 62],
         ];
     }
 }

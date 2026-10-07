@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Ai\Gateways\ArkOpenAiGateway;
+use App\Support\ObjectRelations;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Foundation\Application;
@@ -20,7 +21,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->scoped(ObjectRelations::class);
     }
 
     /**
@@ -47,18 +48,6 @@ class AppServiceProvider extends ServiceProvider
         });
         RateLimiter::for('registration', fn (Request $request): array => [
             Limit::perMinute(3)->by('registration:ip:'.$request->ip()),
-        ]);
-        RateLimiter::for('public-requisition', fn (Request $request): array => [
-            Limit::perMinute(5)->by('public-requisition:ip:'.$request->ip()),
-        ]);
-        RateLimiter::for('public-requisition-search', fn (Request $request): array => [
-            Limit::perMinute(60)->by('public-requisition-search:ip:'.$request->ip()),
-        ]);
-        RateLimiter::for('public-team-log-view', fn (Request $request): array => [
-            Limit::perMinute(30)->by('public-team-log-view:ip:'.$request->ip()),
-        ]);
-        RateLimiter::for('public-team-log', fn (Request $request): array => [
-            Limit::perMinute(6)->by('public-team-log:ip:'.$request->ip()),
         ]);
         RateLimiter::for('ai-post', fn (Request $request): array => [
             Limit::perMinute(10)->by('ai:user:'.($request->user()?->id ?? 'guest')),

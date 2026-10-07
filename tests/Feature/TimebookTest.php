@@ -279,9 +279,10 @@ class TimebookTest extends TestCase
             ->where('nav', fn ($nav) => collect($nav)->pluck('key')->all() === ['timebook', 'ai', 'settings']));
         $this->get('/ai')->assertOk();
         $this->get('/settings')->assertOk();
-        foreach (['/', '/notifications', '/objects/project', '/objects/customer', '/admin/rbac', '/procurement-hub', '/ai/contracts', '/relation-options', '/purchase-request'] as $path) {
+        foreach (['/', '/notifications', '/objects/project', '/objects/customer', '/admin/rbac', '/procurement-hub', '/ai/contracts', '/relation-options'] as $path) {
             $this->getJson($path)->assertForbidden();
         }
+        $this->getJson('/purchase-request')->assertNotFound();
         $this->putJson('/settings/email', ['email' => 'operator-new@example.test', 'current_password' => 'wrong'])->assertUnprocessable();
         $other = User::factory()->create();
         $this->putJson('/settings/email', ['email' => $other->email, 'current_password' => 'password'])->assertUnprocessable();
