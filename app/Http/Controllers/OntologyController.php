@@ -812,7 +812,7 @@ class OntologyController extends Controller
         if ($type === 'relation' && ($field['target'] ?? null) === 'customer'
             && in_array($operator, ['contains', 'not_contains'], true)) {
             $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value).'%';
-            $customers = ObjectRecord::query()->select('id')
+            $customers = ObjectRecord::query()->selectRaw('CAST(id AS TEXT)')
                 ->whereRelation('businessObject', 'key', 'customer')
                 ->whereRaw('LOWER(title) '.($operator === 'not_contains' ? 'NOT LIKE' : 'LIKE')." LOWER(?) ESCAPE '!'", [$pattern]);
             $query->whereIn($column, $customers);

@@ -1,2 +1,4 @@
 # Design
 Use a customer-record subquery and match its title, never its ID. Negative matching requires a resolved customer with a nonmatching name. Escape SQL wildcard characters as literal text. Keep existing authorization on the outer query. UI switches to a keyword input for fuzzy operators and resets the value when switching between IDs and text. Roll back the two changed production files and rebuilt assets if required. User explicitly authorized development, deployment and testing; review this narrow specification before applying. Local checks, merge, deployment and live verification remain separate evidence.
+
+PostgreSQL stores IDs as UUID while JSON relation values are extracted as text. The subquery explicitly casts IDs to TEXT, which also works with SQLite. Verify on the production PostgreSQL engine in a read-only transaction before release.
