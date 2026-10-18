@@ -183,6 +183,30 @@ describe('Ontology workspace layout', () => {
 describe('Ontology multi-condition filters', () => {
     afterEach(cleanup);
 
+    it('offers customer keywords while preserving exact selectors and other relations', () => {
+        window.history.replaceState({}, '', '/objects/project');
+        render(<Index objects={[]} currentObject={{ id: 3, key: 'project', label: '项目', fields: [
+            { key: 'customer_id', label: '客户名称', type: 'relation', target: 'customer' },
+            { key: 'project_id', label: '关联项目', type: 'relation', target: 'project' },
+        ] }} records={{ data: [], per_page: 50 }} can={{}} relationOptions={{ customer_id: { items: [{ id: 'c1', label: '华东客户' }] } }} />);
+        fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+        fireEvent.click(screen.getByRole('button', { name: /添加条件/ }));
+        const operator = screen.getByLabelText('筛选条件 1');
+        const customerSelect = screen.getByRole('option', { name: '华东客户' }).parentElement;
+        fireEvent.change(customerSelect, { target: { value: 'c1' } });
+        fireEvent.change(operator, { target: { value: 'contains' } });
+        expect(screen.getByLabelText('客户名称关键词')).toHaveValue('');
+        fireEvent.change(screen.getByLabelText('客户名称关键词'), { target: { value: '华东' } });
+        fireEvent.change(operator, { target: { value: 'not_contains' } });
+        expect(screen.getByLabelText('客户名称关键词')).toHaveValue('华东');
+        fireEvent.change(operator, { target: { value: 'equals' } });
+        expect(screen.getByRole('option', { name: '华东客户' }).parentElement).toHaveValue('');
+        expect(screen.queryByLabelText('客户名称关键词')).not.toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('筛选字段 1'), { target: { value: 'project_id' } });
+        expect(within(screen.getByLabelText('筛选条件 1')).queryByRole('option', { name: '包含' })).not.toBeInTheDocument();
+        expect(within(screen.getByLabelText('筛选条件 1')).getByRole('option', { name: '为空' })).toBeInTheDocument();
+    });
+
     it('restores URL-backed OR filters and allows adding another typed condition', () => {
         window.history.replaceState({}, '', '/objects/project?filter_logic=or&filters%5B0%5D%5Bfield%5D=overall_status&filters%5B0%5D%5Boperator%5D=equals&filters%5B0%5D%5Bvalue%5D=%E5%B7%B2%E4%B8%AD%E6%A0%87');
         render(<Index
