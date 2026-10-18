@@ -547,6 +547,47 @@ class BusinessContractWorkflowTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->has('records.data', 0));
     }
 
+    public function test_customer_name_filters_match_names_and_preserve_exact_empty_and_visibility_rules(): void
+    {
+        $admin = $this->userWithRole('admin', '管理员');
+        $owner = $this->userWithRole('business', '业务员');
+        $other = $this->userWithRole('business', '其他业务员');
+        $matching = $this->project($owner, '华东ABC');
+        $different = $this->project($owner, '华北');
+        $foreign = $this->project($other, '华东外部');
+        $empty = $this->project($owner, '未选客户', ['customer_id' => '']);
+        $this->project($owner, '失效客户', ['customer_id' => 'missing']);
+        $literal = $this->project($owner, '百分%_!');
+        $this->actingAs($admin);
+
+        foreach ([
+            ['contains', '华东', [$matching->id, $foreign->id]],
+            ['not_contains', '华东', [$different->id, $literal->id]],
+            ['contains', 'abc', [$matching->id]],
+            ['contains', '%_!', [$literal->id]],
+            ['contains', (string) $matching->payload['customer_id'], []],
+            ['equals', $matching->payload['customer_id'], [$matching->id]],
+            ['is_empty', '1', [$empty->id]],
+        ] as [$operator, $value, $ids]) {
+            $url = '/objects/project?'.http_build_query(['filters' => [
+                ['field' => 'customer_id', 'operator' => $operator, 'value' => $value],
+            ]]);
+            $this->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->where('records.data', fn ($records): bool => collect($records)->pluck('id')->sort()->values()->all() === collect($ids)->sort()->values()->all()));
+        }
+
+        foreach (['and', 'or'] as $logic) {
+            $this->actingAs($owner)->get('/objects/project?'.http_build_query([
+                'filter_logic' => $logic,
+                'filters' => [
+                    ['field' => 'customer_id', 'operator' => 'contains', 'value' => '华东'],
+                    ['field' => 'name', 'operator' => 'contains', 'value' => '华东'],
+                ],
+            ]))->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->has('records.data', 1)->where('records.data.0.id', $matching->id));
+        }
+    }
+
     private function project(User $owner, string $name = '测试项目', array $overrides = []): ObjectRecord
     {
         $customer = ObjectRecord::create([

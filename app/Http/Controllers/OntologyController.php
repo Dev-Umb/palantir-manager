@@ -809,6 +809,17 @@ class OntologyController extends Controller
             $column = $this->relations->contractBusinessOwnerExpression();
         }
 
+        if ($type === 'relation' && ($field['target'] ?? null) === 'customer'
+            && in_array($operator, ['contains', 'not_contains'], true)) {
+            $pattern = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value).'%';
+            $customers = ObjectRecord::query()->select('id')
+                ->whereRelation('businessObject', 'key', 'customer')
+                ->whereRaw('LOWER(title) '.($operator === 'not_contains' ? 'NOT LIKE' : 'LIKE')." LOWER(?) ESCAPE '!'", [$pattern]);
+            $query->whereIn($column, $customers);
+
+            return;
+        }
+
         if ($operator === 'is_empty') {
             $query->where(function (Builder $empty) use ($column): void {
                 $empty->whereNull($column)->orWhere($column, '');
@@ -881,6 +892,7 @@ class OntologyController extends Controller
     {
         $type = $field['type'] ?? 'text';
         $allowed = match (true) {
+            $type === 'relation' && ($field['target'] ?? null) === 'customer' => ['contains', 'not_contains', 'equals', 'not_equals', 'is_empty', 'is_not_empty'],
             in_array($type, ['file', 'files', 'multirelation', 'multiaccount'], true) => [],
             in_array($type, ['number', 'range'], true) => ['equals', 'not_equals', 'greater_than', 'greater_or_equal', 'less_than', 'less_or_equal', 'between', 'is_empty', 'is_not_empty'],
             $type === 'date' => ['equals', 'before', 'on_or_before', 'after', 'on_or_after', 'between', 'is_empty', 'is_not_empty'],

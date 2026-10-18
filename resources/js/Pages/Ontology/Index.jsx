@@ -392,7 +392,13 @@ function ObjectListControls({ objectKey, params, records, fields = [], relationO
     }, [filterPanelOpen]);
 
     function updateFilter(index, key, value) {
-        setFilters((current) => current.map((filter, position) => position === index ? { ...filter, [key]: value } : filter));
+        setFilters((current) => current.map((filter, position) => {
+            if (position !== index) return filter;
+            const field = fields.find((candidate) => candidate.key === filter.field);
+            const switchesCustomerInput = key === 'operator' && field?.type === 'relation' && field.target === 'customer'
+                && ['contains', 'not_contains'].includes(filter.operator) !== ['contains', 'not_contains'].includes(value);
+            return { ...filter, [key]: value, ...(switchesCustomerInput ? { value: '' } : {}) };
+        }));
     }
 
     return (
@@ -516,6 +522,11 @@ function filterOperators(field) {
     if (field?.type === 'date') return [
         ['equals', '等于'], ['before', '早于'], ['on_or_before', '早于或等于'], ['after', '晚于'], ['on_or_after', '晚于或等于'], ['between', '日期区间'], ['is_empty', '为空'], ['is_not_empty', '不为空'],
     ].map(([value, label]) => ({ value, label }));
+    if (field?.type === 'relation' && field.target === 'customer') return [
+        { value: 'equals', label: '等于' }, { value: 'not_equals', label: '不等于' },
+        { value: 'contains', label: '包含' }, { value: 'not_contains', label: '不包含' },
+        { value: 'is_empty', label: '为空' }, { value: 'is_not_empty', label: '不为空' },
+    ];
     if (['select', 'relation', 'account'].includes(field?.type)) return [
         { value: 'equals', label: '等于' }, { value: 'not_equals', label: '不等于' }, { value: 'is_empty', label: '为空' }, { value: 'is_not_empty', label: '不为空' },
     ];
@@ -533,6 +544,9 @@ function FilterValueInput({ field, operator, name, value, onChange, relationOpti
     }
     if (field?.type === 'select') {
         return <select name={name} value={value || ''} onChange={(event) => onChange(event.target.value)}><option value="">请选择</option>{(field.options || []).map((option) => <option key={option} value={option}>{option}</option>)}</select>;
+    }
+    if (field?.type === 'relation' && field.target === 'customer' && ['contains', 'not_contains'].includes(operator)) {
+        return <input name={name} type="text" value={value || ''} onChange={(event) => onChange(event.target.value)} placeholder="输入客户名称关键词" aria-label="客户名称关键词" />;
     }
     if (['relation', 'account'].includes(field?.type)) {
         const options = relationOptions[field.key]?.items || [];
