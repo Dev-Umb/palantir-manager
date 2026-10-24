@@ -1,0 +1,38 @@
+{
+  "title": "合成测试简报",
+  "date": "2026-10-24",
+  "window": "2026-10-24",
+  "scope": "测试数据",
+  "items": [
+    {
+      "id": "example-001",
+      "title": "合成测试采购项目",
+      "category": "",
+      "priority": "P2",
+      "unit": "示例采购单位",
+      "code": "EXAMPLE-001",
+      "published": "2026-10-24（页面无时分）",
+      "registration": "",
+      "deadline": "2026-11-01 10:00",
+      "quantity": "18套（暂估）",
+      "material": "",
+      "contacts": "",
+      "judgment": "",
+      "terms": "",
+      "url": "https://example.com/notices",
+      "platform": "示例采购平台",
+      "status": "纳入",
+      "issues": "规格待核实",
+      "nature": "公开询比",
+      "subtype": "",
+      "invited": false,
+      "framework": false,
+      "evidence": []
+    }
+  ],
+  "coverage": [],
+  "exclusions": [],
+  "limitations": [
+    "合成样例，不用于真实采购"
+  ]
+}

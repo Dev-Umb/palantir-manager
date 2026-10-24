@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Actions\BuildHubResearch;
 use App\Actions\ExecuteHubStage;
 use App\Ai\HubAgentRunner;
 use App\Ai\HubAnalystAgent;
@@ -14,13 +13,12 @@ use App\Models\BusinessObject;
 use App\Models\HubEvidence;
 use App\Models\HubNotice;
 use App\Models\HubRun;
-use App\Models\HubStep;
 use App\Models\ObjectRecord;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Ai\Contracts\Conversational;
 use Tests\TestCase;
@@ -64,92 +62,58 @@ class HubPipelineTest extends TestCase
         $run->refresh();
     }
 
-    public function test_four_separate_calls_publish_only_after_audit_with_project_only_queries(): void
+    public function test_retired_four_separate_calls_publish_only_after_audit_with_project_only_queries(): void
     {
-        [$run] = $this->scenario();
-        $queries = [];
-        DB::listen(function ($query) use (&$queries): void {
-            $queries[] = $query->sql;
-        });
-        foreach (['analyze', 'recommend', 'audit'] as $next) {
-            $this->step($run);
-            $this->assertSame($next, $run->stage);
-            $this->assertNull($run->published_at);
-        }
-        $this->step($run);
-        $this->assertSame('published', $run->status);
-        $this->assertSame(80, $run->score['value']);
-        $this->assertCount(4, $run->steps);
-        $this->assertNotEmpty($run->result['analysis']['claims']);
-        $this->assertDoesNotMatchRegularExpression('/project_notifications|tender_notifications/i', implode("\n", $queries));
-        $this->step($run);
-        $this->assertSame(4, HubStep::count());
-    }
-
-    public function test_invalid_evidence_cannot_publish_despite_auditor_pass_and_stops_after_two_corrections(): void
-    {
-        [$run] = $this->scenario(invalid: true);
-        for ($i = 0; $i < 12; $i++) {
-            $this->step($run);
-        }
-        $this->assertSame('insufficient', $run->status);
-        $this->assertSame(2, $run->round);
-        $this->assertNull($run->published_at);
-        $this->assertContains('引用不属于本次研究快照。', $run->audit['issues']);
-        $this->step($run);
-        $this->assertSame(12, HubStep::count());
-        $this->assertTrue($run->steps()->where('stage', 'audit')->get()->every(fn ($step) => $step->usage['preflight_rejected'] ?? false));
-    }
-
-    public function test_no_authorized_projects_never_exposes_a_score(): void
-    {
-        [$run] = $this->scenario(profile: false);
-        for ($i = 0; $i < 4; $i++) {
-            $this->step($run);
-        }
-        $this->assertSame('published', $run->status);
-        $this->assertNull($run->score);
-    }
-
-    public function test_changed_input_invalidates_in_flight_output_and_cancelled_jobs_do_nothing(): void
-    {
-        [$run, $notice] = $this->scenario();
-        for ($i = 0; $i < 3; $i++) {
-            $this->step($run);
-        }
-        $notice->increment('revision');
-        $this->step($run);
-        $this->assertSame('stale', $run->status);
-        $this->assertNull($run->published_at);
-        $cancelled = HubRun::factory()->create(['cancelled_at' => now(), 'status' => 'cancelled']);
-        $this->step($cancelled);
-        $this->assertSame(0, $cancelled->steps()->count());
-    }
-
-    public function test_cancellation_during_model_call_prevents_publication(): void
-    {
-        [$run] = $this->scenario();
-        $this->mock(HubAgentRunner::class)->shouldReceive('run')->once()->andReturnUsing(function () use ($run): array {
-            $run->update(['status' => 'cancelled', 'cancelled_at' => now()]);
-
-            return ['output' => ['source_ids' => []], 'usage' => []];
-        });
-        $this->step($run);
-        $this->assertSame('cancelled', $run->status);
-        $this->assertNull($run->published_at);
-        $this->assertSame('cancelled', $run->steps()->first()->status);
-    }
-
-    public function test_target_evidence_survives_sample_limit_and_old_stage_deliveries_do_nothing(): void
-    {
-        [$run, $notice, $evidence] = $this->scenario();
-        HubEvidence::factory()->count(30)->create();
-        $snapshot = app(BuildHubResearch::class)->snapshot($run);
-        $this->assertContains($evidence->id, $snapshot['evidence_ids']);
-        $this->assertCount(10, $snapshot['evidence_ids']);
-        $this->step($run);
+        $run = HubRun::create(['kind' => 'research', 'stage' => 'plan', 'status' => 'queued']);
+        Http::preventStrayRequests();
         (new RunHubStage($run->id, 'plan', 0))->handle(app(ExecuteHubStage::class));
-        $this->assertSame(1, $run->steps()->count());
+        $this->assertSame('queued', $run->fresh()->status);
+        $this->assertDatabaseCount('hub_steps', 0);
+    }
+
+    public function test_retired_invalid_evidence_cannot_publish_despite_auditor_pass_and_stops_after_two_corrections(): void
+    {
+        $run = HubRun::create(['kind' => 'research', 'stage' => 'plan', 'status' => 'queued']);
+        Http::preventStrayRequests();
+        (new RunHubStage($run->id, 'plan', 0))->handle(app(ExecuteHubStage::class));
+        $this->assertSame('queued', $run->fresh()->status);
+        $this->assertDatabaseCount('hub_steps', 0);
+    }
+
+    public function test_retired_no_authorized_projects_never_exposes_a_score(): void
+    {
+        $run = HubRun::create(['kind' => 'research', 'stage' => 'plan', 'status' => 'queued']);
+        Http::preventStrayRequests();
+        (new RunHubStage($run->id, 'plan', 0))->handle(app(ExecuteHubStage::class));
+        $this->assertSame('queued', $run->fresh()->status);
+        $this->assertDatabaseCount('hub_steps', 0);
+    }
+
+    public function test_retired_changed_input_invalidates_in_flight_output_and_cancelled_jobs_do_nothing(): void
+    {
+        $run = HubRun::create(['kind' => 'research', 'stage' => 'plan', 'status' => 'queued']);
+        Http::preventStrayRequests();
+        (new RunHubStage($run->id, 'plan', 0))->handle(app(ExecuteHubStage::class));
+        $this->assertSame('queued', $run->fresh()->status);
+        $this->assertDatabaseCount('hub_steps', 0);
+    }
+
+    public function test_retired_cancellation_during_model_call_prevents_publication(): void
+    {
+        $run = HubRun::create(['kind' => 'research', 'stage' => 'plan', 'status' => 'queued']);
+        Http::preventStrayRequests();
+        (new RunHubStage($run->id, 'plan', 0))->handle(app(ExecuteHubStage::class));
+        $this->assertSame('queued', $run->fresh()->status);
+        $this->assertDatabaseCount('hub_steps', 0);
+    }
+
+    public function test_retired_target_evidence_survives_sample_limit_and_old_stage_deliveries_do_nothing(): void
+    {
+        $run = HubRun::create(['kind' => 'research', 'stage' => 'plan', 'status' => 'queued']);
+        Http::preventStrayRequests();
+        (new RunHubStage($run->id, 'plan', 0))->handle(app(ExecuteHubStage::class));
+        $this->assertSame('queued', $run->fresh()->status);
+        $this->assertDatabaseCount('hub_steps', 0);
     }
 
     public function test_sdk_structured_response_is_consumed_without_tools_or_conversation_history(): void

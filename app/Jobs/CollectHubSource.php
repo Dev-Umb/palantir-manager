@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\HubRun;
 use App\Models\HubSource;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,12 +37,7 @@ class CollectHubSource implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        $source = HubSource::find($this->sourceId);
-        if (! $source?->enabled || HubRun::where('hub_source_id', $source->id)->whereIn('status', ['queued', 'running'])->exists()) {
-            return;
-        }
-        $run = HubRun::create(['kind' => 'source', 'hub_source_id' => $source->id, 'stage' => 'discover']);
-        RunHubStage::dispatch($run->id, 'discover', 0);
+        // Already queued legacy work is intentionally discarded.
     }
 
     public function failed(?Throwable $exception): void

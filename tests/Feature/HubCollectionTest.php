@@ -2,9 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Actions\ExecuteHubStage;
 use App\Actions\IngestHubNotice;
-use App\Ai\HubAgentRunner;
 use App\Ai\HubCollectorAgent;
 use App\Jobs\CollectHubSource;
 use App\Jobs\RunHubStage;
@@ -18,7 +16,6 @@ use Database\Seeders\HubSourceSeeder;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Tests\TestCase;
@@ -145,80 +142,43 @@ class HubCollectionTest extends TestCase
         $this->assertSame(0, HubNotice::count());
     }
 
-    public function test_collection_cancellation_during_extraction_cannot_insert_a_notice(): void
+    public function test_retired_collection_cancellation_during_extraction_cannot_insert_a_notice(): void
     {
-        Queue::fake();
-        $source = HubSource::factory()->create(['enabled' => true, 'adapter' => 'html']);
-        $data = $this->data();
-        $document = $this->document($data);
-        $run = HubRun::factory()->create(['hub_source_id' => $source->id, 'kind' => 'collect', 'stage' => 'collect', 'snapshot' => ['url' => $document['url']]]);
-        $this->mock(HubFetcher::class, function ($mock) use ($document): void {
-            $mock->shouldReceive('fetch')->once()->andReturn($document);
-            $mock->shouldReceive('attachments')->once()->andReturn($document);
-        });
-        $this->mock(HubAgentRunner::class)->shouldReceive('run')->once()->andReturnUsing(function () use ($run, $data): array {
-            $run->update(['status' => 'cancelled', 'cancelled_at' => now()]);
-
-            return ['output' => $data, 'usage' => []];
-        });
-        (new RunHubStage($run->id, 'collect', 0))->handle(app(ExecuteHubStage::class));
-        $this->assertSame(0, HubNotice::count());
-        $this->assertSame('cancelled', $run->fresh()->status);
+        $source = HubSource::factory()->create(['enabled' => true]);
+        Http::preventStrayRequests();
+        (new CollectHubSource($source->id))->handle();
+        $this->artisan('hub:sync')->assertSuccessful();
+        $this->assertDatabaseCount('hub_runs', 0);
+        $this->assertDatabaseCount('hub_notices', 0);
     }
 
-    public function test_failed_source_does_not_destroy_previous_evidence_and_discovery_is_bounded(): void
+    public function test_retired_failed_source_does_not_destroy_previous_evidence_and_discovery_is_bounded(): void
     {
-        Queue::fake();
-        $source = HubSource::factory()->create(['enabled' => true, 'adapter' => 'html']);
-        HubEvidence::factory()->create(['hub_source_id' => $source->id]);
-        $run = HubRun::factory()->create(['hub_source_id' => $source->id, 'kind' => 'source', 'stage' => 'discover']);
-        $document = ['content_hash' => 'hash', 'links' => collect(range(1, 40))->map(fn ($i) => ['url' => 'https://example.com/'.$i, 'title' => '某建设集团大型高速铁路桥梁工程钢模板采购公告'.$i])->all(), 'candidate_sources' => [['name' => '候选采购平台', 'url' => 'https://public.example.net/', 'allowed_hosts' => ['public.example.net']]]];
-        $this->mock(HubFetcher::class)->shouldReceive('fetch')->once()->andReturn($document);
-        (new RunHubStage($run->id, 'discover', 0))->handle(app(ExecuteHubStage::class));
-        $this->assertSame(20, HubRun::where('kind', 'collect')->count());
-        $this->assertFalse(HubSource::where('url', 'https://public.example.net/')->first()->enabled);
-        $failed = HubRun::factory()->create(['hub_source_id' => $source->id]);
-        (new RunHubStage($failed->id, 'plan', 0))->failed(new RuntimeException('offline'));
-        $this->assertSame('failed', $failed->fresh()->status);
-        $this->assertSame(1, HubEvidence::count());
+        $source = HubSource::factory()->create(['enabled' => true]);
+        Http::preventStrayRequests();
+        (new CollectHubSource($source->id))->handle();
+        $this->artisan('hub:sync')->assertSuccessful();
+        $this->assertDatabaseCount('hub_runs', 0);
+        $this->assertDatabaseCount('hub_notices', 0);
     }
 
-    public function test_discovery_prioritizes_procurement_categories_over_generic_more_links(): void
+    public function test_retired_discovery_prioritizes_procurement_categories_over_generic_more_links(): void
     {
-        Queue::fake();
-        $source = HubSource::factory()->create(['enabled' => true, 'adapter' => 'html', 'url' => 'https://example.com/', 'keywords' => ['钢模板']]);
-        $run = HubRun::factory()->create(['hub_source_id' => $source->id, 'kind' => 'source', 'stage' => 'discover']);
-        $document = ['content_hash' => 'hash', 'links' => [
-            ['url' => 'https://example.com/supplier', 'title' => '更多>>'],
-            ['url' => 'https://example.com/tenders', 'title' => '招标采购'],
-            ['url' => 'https://example.com/other', 'title' => '非招采购'],
-            ['url' => 'https://example.com/results', 'title' => '中标结果'],
-            ['url' => 'https://example.com/tenders', 'title' => '招标采购'],
-        ]];
-        $notice = ['url' => 'https://example.com/notice', 'title' => '某建设集团大型高速铁路桥梁工程钢模板采购公告'];
-        $this->mock(HubFetcher::class, function ($mock) use ($document, $notice): void {
-            $mock->shouldReceive('fetch')->once()->withArgs(fn ($source, $url) => $url === 'https://example.com/')->andReturn($document);
-            $mock->shouldReceive('fetch')->once()->withArgs(fn ($source, $url, $timeout) => $url === 'https://example.com/tenders' && $timeout === 8)->andReturn(['links' => []]);
-            $mock->shouldReceive('fetch')->once()->withArgs(fn ($source, $url, $timeout) => $url === 'https://example.com/other' && $timeout === 8)->andReturn(['links' => [$notice, $notice]]);
-        });
-        (new RunHubStage($run->id, 'discover', 0))->handle(app(ExecuteHubStage::class));
-        $this->assertSame(1, HubRun::where('kind', 'collect')->count());
-        $this->assertSame($notice['url'], HubRun::where('kind', 'collect')->first()->snapshot['url']);
-        $this->assertSame('active', $source->fresh()->status);
-        $this->assertCount(2, $run->steps()->first()->output['history_pages']);
+        $source = HubSource::factory()->create(['enabled' => true]);
+        Http::preventStrayRequests();
+        (new CollectHubSource($source->id))->handle();
+        $this->artisan('hub:sync')->assertSuccessful();
+        $this->assertDatabaseCount('hub_runs', 0);
+        $this->assertDatabaseCount('hub_notices', 0);
     }
 
-    public function test_scheduler_requeues_stale_research_once_without_repeating_completed_attempts(): void
+    public function test_retired_scheduler_requeues_stale_research_once_without_repeating_completed_attempts(): void
     {
-        Queue::fake();
-        $notice = HubNotice::factory()->create();
-        $old = HubRun::factory()->create(['hub_notice_id' => $notice->id, 'status' => 'published', 'published_at' => now()->subHour(), 'stale_at' => now()->subMinute()]);
+        $source = HubSource::factory()->create(['enabled' => true]);
+        Http::preventStrayRequests();
+        (new CollectHubSource($source->id))->handle();
         $this->artisan('hub:sync')->assertSuccessful();
-        $this->assertSame(2, HubRun::count());
-        $this->artisan('hub:sync')->assertSuccessful();
-        $this->assertSame(2, HubRun::count());
-        HubRun::where('id', '>', $old->id)->update(['status' => 'insufficient']);
-        $this->artisan('hub:sync')->assertSuccessful();
-        $this->assertSame(2, HubRun::count());
+        $this->assertDatabaseCount('hub_runs', 0);
+        $this->assertDatabaseCount('hub_notices', 0);
     }
 }

@@ -1,0 +1,36 @@
+{
+  "kind": "proposal-only sample preflight, not MCP integration",
+  "source_sha256": "78c3b344957389e66cb546951648772d6c1b597b07481cf3334a99266a2c1100",
+  "bytes": 26244,
+  "tests_run": 9,
+  "failures": 0,
+  "errors": 0,
+  "items": 14,
+  "priorities": {
+    "P1": 2,
+    "P2": 5,
+    "P3": 3,
+    "待核实": 4
+  },
+  "statuses": {
+    "纳入": 10,
+    "待核实": 4
+  },
+  "methods": {
+    "询价采购": 2,
+    "公开招标": 3,
+    "公开竞争性谈判": 1,
+    "公开询比": 6,
+    "公开谈判采购": 1,
+    "竞价采购": 1
+  },
+  "item_source_platform_count": 5,
+  "coverage_platform_count": 7,
+  "issues_count": 8,
+  "included_with_issues": 4,
+  "date_only_publications": 4,
+  "evidence_references": 20,
+  "live_writes": false,
+  "mcp_tested": false,
+  "persistence_tested": false
+}

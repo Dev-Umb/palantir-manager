@@ -514,7 +514,7 @@ class _HomePageState extends State<HomePage> {
                           Icons.newspaper_outlined,
                           color: steel,
                         ),
-                        title: const Text('招采参考'),
+                        title: const Text('招采信息'),
                         subtitle: const Text('查看机会、截止时间与公开资料'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => push(context, ProcurementPage(api: api)),
