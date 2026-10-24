@@ -1,0 +1,4 @@
+- [x] Inspect supplied HTML and map retained capabilities.
+- [x] Restore report overview, inline details and scoped ordering.
+- [x] Test rendering, navigation, filtering, ordering and visibility.
+- [ ] Run quality gate, merge PR, deploy scoped changes and verify live report.

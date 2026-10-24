@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\ProcurementBatch;
 use App\Models\ProcurementNotice;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -54,7 +55,9 @@ class ProcurementQuery
         }
         $total = (clone $q)->count();
         $counts = (clone $q)->selectRaw('priority, count(*) as total')->groupBy('priority')->pluck('total', 'priority')->all();
-        $notices = $q->orderByDesc('published_date')->orderByDesc('id')->paginate((int) ($f['limit'] ?? 20), ['*'], 'page', (int) ($f['page'] ?? 1))->withQueryString();
+        $notices = $q->orderByRaw("CASE priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END")
+            ->orderByDesc(ProcurementBatch::select('created_at')->whereColumn('procurement_batches.id', 'procurement_notices.batch_id')->limit(1))
+            ->orderBy('id')->paginate((int) ($f['limit'] ?? 20), ['*'], 'page', (int) ($f['page'] ?? 1))->withQueryString();
 
         return ['notices' => $notices, 'filters' => $f, 'methods' => $this->visible($user)->select('method')->distinct()->orderBy('method')->pluck('method'), 'totals' => ['count' => $total, 'priority' => $counts], 'queried_at' => now()->toIso8601String(), 'scope' => '当前用户有权查看的采集端提交数据；内容未经过原文核验。'];
     }
