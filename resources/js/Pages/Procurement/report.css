@@ -1,0 +1,42 @@
+.procurement-report { color: #183b4b; background: white; padding: 26px 28px; font-size: 15px; line-height: 1.65; min-width: 0; }
+.procurement-report h2 { font-size: 21px; font-weight: 650; margin: 30px 0 12px; }
+.procurement-report > h2:first-child { margin-top: 0; }
+.procurement-report a { color: #007f80; text-decoration: none; }
+.procurement-report a:hover { text-decoration: underline; }
+.procurement-report a:focus-visible, .procurement-report summary:focus-visible, .report-table-wrap:focus-visible { outline: 3px solid #49a9aa; outline-offset: 3px; }
+.report-table-wrap { overflow-x: auto; }
+.procurement-report table { border-collapse: collapse; width: 100%; font-size: 13px; text-align: left; }
+.procurement-report th { background: #dfeeee; font-weight: 600; padding: 12px 10px; white-space: nowrap; }
+.procurement-report td { padding: 13px 10px; border-bottom: 1px solid #d5e3e6; vertical-align: top; }
+.procurement-report tbody tr:nth-child(even) { background: #f7fafa; }
+.procurement-report td:nth-child(2) { min-width: 215px; }
+.procurement-report td:nth-child(4) { min-width: 155px; }
+.procurement-report td:nth-child(5) { min-width: 133px; }
+.procurement-report td small { display: block; color: #627881; font-size: 12px; margin-top: 3px; }
+.report-priority { white-space: nowrap; font-weight: 650; }
+.report-priority.P1 { color: #007b79; }
+.report-priority.P2 { color: #496c82; }
+.report-priority.P3 { color: #77828b; }
+.procurement-report td .report-issue { color: #88652c; white-space: nowrap; }
+.procurement-article { padding: 26px 0; border-bottom: 1px solid #d5e3e6; scroll-margin-top: 20px; overflow-wrap: anywhere; }
+.procurement-article:target { border-top: 3px solid #007f80; }
+.procurement-article h1, .procurement-article h3 { font-size: 21px; font-weight: 650; line-height: 1.45; margin: 6px 0 10px; }
+.procurement-article p { margin: 6px 0; white-space: pre-wrap; }
+.report-eyebrow { color: #007f80; font-size: 14px; }
+.report-label, .report-code, .report-muted { color: #627881; }
+.report-code { font-size: 13px; }
+.report-dates { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 20px; padding: 12px 14px; background: #eff6f6; margin: 12px 0; white-space: pre-wrap; }
+.report-dates span { display: block; color: #627881; font-size: 13px; margin-bottom: 3px; }
+.report-dates strong { font-weight: 500; color: #007f80; }
+.report-quantity { font-weight: 600; color: #007f80; }
+.report-terms { font-size: 14px; }
+.procurement-article .report-warning { background: #fff7e5; border-left: 3px solid #c69432; padding: 9px 12px; font-size: 13px; color: #785b25; }
+.report-source { margin-top: 7px; font-size: 14px; }
+.report-source a { font-weight: 600; }
+.report-source span { font-size: 12px; margin-left: 14px; color: #627881; }
+.procurement-report .report-pending { color: #88652c; }
+.report-actions, .report-pending-links { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 16px; font-size: 13px; }
+.report-notes { margin-top: 14px; font-size: 12px; color: #627881; }
+.report-notes summary { cursor: pointer; }
+.report-notes ul { padding-left: 22px; list-style: disc; }
+@media(max-width:700px) { .procurement-report { padding: 22px 18px; } .report-dates { grid-template-columns: 1fr; gap: 10px; } .procurement-article h1, .procurement-article h3 { font-size: 19px; } .report-source span { display: block; margin-left: 0; } }

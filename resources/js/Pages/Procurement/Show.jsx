@@ -1,3 +1,10 @@
 import { Link } from '@inertiajs/react';
-import {Shell,Panel,Badge,Details,base,formatTime} from './shared';
-export default function Show({notice:n,warnings=[],batch}) { const p=n.payload;return <Shell title={n.title}><Link href={base} className="text-sm text-teal-700">← 招采总览</Link><div className="flex flex-wrap gap-2"><Badge warning={p.priority==='待核实'}>{p.priority}</Badge><Badge>{p.nature}</Badge><Badge>{p.category}</Badge>{n.invited&&<Badge>受邀信息 · 限定可见</Badge>}</div><h1 className="text-2xl font-semibold">{p.title}</h1><p className="text-sm text-slate-500">{p.unit}</p>{p.issues&&<div className="rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4 text-sm leading-7 text-amber-900"><strong>核实提示</strong><p>{p.issues}</p></div>}<div className="grid items-start gap-5 lg:grid-cols-[2fr_1fr]"><Panel title="采购详情"><Details payload={p}/></Panel><div className="flex flex-col gap-4"><Panel title="采集端初判"><p className="whitespace-pre-wrap text-sm leading-7">{p.judgment}</p><p className="mt-3 text-xs text-slate-500">未验证企业实际资质、产能及投标资格。</p><Link className="mt-4 inline-block text-sm text-teal-700" href="/ai">在平台 AI 助手分析 →</Link><p className="mt-1 text-xs text-slate-500">可让助手查询招采记录 #{n.id} 进行比较分析。</p></Panel><Panel title="来源与数据边界"><p>{p.platform}</p>{/^https?:\/\//i.test(p.url)&&<a className="mt-3 inline-block text-sm text-teal-700" href={p.url} target="_blank" rel="noreferrer">查看原始来源 ↗</a>}<p className="mt-2 text-xs text-slate-500">部分来源链接为平台列表，需按采购编号定位。</p><p className="mt-3 text-xs text-slate-500">入库于 {formatTime(n.created_at)} · 北京时间口径</p><p className="mt-3 text-xs text-slate-500">批次 {batch.id}</p></Panel><Panel title="核验说明"><ul className="list-inside list-disc space-y-2 text-xs leading-6 text-slate-600">{warnings.map((w,i)=><li key={i}>{w}</li>)}</ul>{p.evidence?.length>0&&<details className="mt-3 text-xs"><summary>来源文件引用（未上传）</summary><ul className="mt-2 break-all">{p.evidence.map((e,i)=><li key={i}>{e}</li>)}</ul></details>}</Panel></div></div></Shell>; }
+import { Shell, base } from './shared';
+import { ReportArticle } from './Report';
+
+export default function Show({notice, warnings=[], batch}) {
+    return <Shell title={notice.title} hideHeader>
+        <Link href={base} className="text-sm text-teal-700">← 返回招采总览</Link>
+        <section className="procurement-report"><ReportArticle notice={notice} warnings={warnings} batchId={batch?.id} standalone/></section>
+    </Shell>;
+}

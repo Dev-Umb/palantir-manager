@@ -85,6 +85,27 @@ class ProcurementPublishingTest extends TestCase
         $this->get('/procurement-hub/notices/'.$n->id)->assertOk()->assertInertia(fn (Assert $p) => $p->component('Procurement/Show')->where('notice.payload.quantity', '18套（暂估）'));
     }
 
+    public function test_report_priority_order_precedes_pagination_and_preserves_source_order(): void
+    {
+        $client = $this->client();
+        $payload = $this->payload();
+        $item = $payload['items'][0];
+        $payload['items'] = [];
+        foreach (['P3', 'P1', 'P2', 'P1', '待核实'] as $index => $priority) {
+            $payload['items'][] = array_replace($item, ['id' => "row-$index", 'code' => "ORDER-$index", 'priority' => $priority]);
+        }
+        $this->publish($client, $payload);
+        $query = app(ProcurementQuery::class);
+        $page = $query->result(User::findOrFail($client->user_id), ['limit' => 2]);
+        $this->assertSame(['ORDER-1', 'ORDER-3'], $page['notices']->getCollection()->map(fn ($n) => $n->payload['code'])->all());
+        $this->assertSame(5, $page['totals']['count']);
+        $second = $query->result(User::findOrFail($client->user_id), ['limit' => 2, 'page' => 2]);
+        $this->assertSame(['P2', 'P3'], $second['notices']->getCollection()->pluck('priority')->all());
+        $filtered = $query->result(User::findOrFail($client->user_id), ['priority' => 'P3', 'method' => '公开询比']);
+        $this->assertSame(1, $filtered['totals']['count']);
+        $this->assertSame('ORDER-0', $filtered['notices']->first()->payload['code']);
+    }
+
     public function test_retry_is_idempotent_and_changed_content_never_silently_overwrites(): void
     {
         $c = $this->client();

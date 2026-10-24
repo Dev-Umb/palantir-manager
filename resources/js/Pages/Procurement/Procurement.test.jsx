@@ -8,14 +8,14 @@ const {get,post}=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}));
 vi.mock('@inertiajs/react',()=>({Head:()=>null,Link:({children,href,...p})=><a href={href} {...p}>{children}</a>,router:{get,post}}));
 vi.mock('../../Components/Layout',()=>({default:({children,title,eyebrow,hideHeader})=><main>{!hideHeader&&<header><p>{eyebrow}</p><h1>{title}</h1></header>}{children}</main>}));
 afterEach(()=>{cleanup();vi.clearAllMocks();});
-const payload={title:'测试采购',unit:'测试单位',code:'TEST-1',nature:'公开询比',category:'钢模板',quantity:'18套（暂估）',published:'2026-10-24（无时分）',registration:'文件获取 2026-10-30（报名未单列）',deadline:'2026-11-01 10:00',priority:'P2',issues:'尺寸待核实',judgment:'采集端建议核对',url:'https://example.com/list',platform:'测试平台',evidence:['未上传.txt'],terms:'交货条款待核实'};
+const payload={title:'测试采购',unit:'测试单位',code:'TEST-1',nature:'公开询比',category:'钢模板',quantity:'18套（暂估）',status:'纳入',subtype:'新购',material:'异形模板规格',contacts:'测试联系人',published:'2026-10-24（无时分）',registration:'文件获取 2026-10-30（报名未单列）',deadline:'2026-11-01 10:00',priority:'P2',issues:'尺寸待核实',judgment:'采集端建议核对',url:'https://example.com/list',platform:'测试平台',evidence:['未上传.txt'],terms:'交货条款待核实'};
 const notice={id:1,title:payload.title,method:payload.nature,priority:'P2',has_issues:true,payload,created_at:'2026-10-24T02:00:00Z'};
 const props={notices:{data:[notice],links:[]},methods:['公开询比','公开竞争性谈判'],totals:{count:37,priority:{P2:29}}};
 describe('JSON procurement platform',()=>{
  it('removes redundant overview headings while retaining actions and statistics',()=>{
   render(<Index {...props}/>);
   for(const text of ['招采信息中心','招采信息','采购机会 · PC CODEX 采集','招采总览','最新公告、采购规模与截止时间，一览掌握。']) expect(screen.queryByText(text)).toBeNull();
-  expect(screen.queryByRole('heading')).toBeNull();
+  expect(screen.queryByRole('heading',{level:1})).toBeNull();
   expect(screen.getByRole('navigation',{name:'招采操作'})).toBeTruthy();
   expect(screen.getByRole('link',{name:'上传批次'}).getAttribute('href')).toBe('/procurement-hub/batches');
   expect(screen.getByRole('link',{name:/进入平台 AI/}).getAttribute('href')).toBe('/ai');
@@ -33,10 +33,28 @@ describe('JSON procurement platform',()=>{
  });
  it('preserves raw dates, terms, issues and explicitly unuploaded evidence in details',()=>{
   render(<Show notice={notice} batch={{id:'test-batch'}} warnings={['日期精度未核实']}/>);
-  expect(screen.getByText('招采信息中心')).toBeTruthy();
+  expect(screen.getByRole('heading',{level:1}).textContent).toBe(payload.title);
   for(const text of [payload.registration,payload.published,payload.quantity,payload.terms,payload.issues,'未上传.txt']) expect(screen.getByText(text)).toBeTruthy();
   expect(screen.getByRole('link',{name:/查看原始来源/}).getAttribute('href')).toBe(payload.url);
   expect(screen.getByText('来源文件引用（未上传）')).toBeTruthy();
+ });
+ it('matches the supplied report columns and project links resolve to full inline articles',()=>{
+  render(<Index {...props}/>);
+  expect(screen.getAllByRole('columnheader').map(el=>el.textContent)).toEqual(['优先级','项目','数量','报名／文件获取','报价／投标截止','采购性质']);
+  const link=screen.getByRole('link',{name:payload.title});
+  expect(link.getAttribute('href')).toBe('#notice-1');
+  expect(document.querySelector(link.getAttribute('href')).tagName).toBe('ARTICLE');
+  expect(screen.getByText('钢模板 · 测试平台')).toBeTruthy();
+  expect(screen.getByText('公开询比 · 新购')).toBeTruthy();
+  expect(screen.getByRole('link',{name:'独立打开详情 →'}).getAttribute('href')).toBe('/procurement-hub/notices/1');
+  for(const text of [payload.material,payload.contacts,payload.terms]) expect(screen.getByText(text,{exact:false})).toBeTruthy();
+ });
+ it('keeps pending records separate and reachable when all matches are pending',()=>{
+  render(<Index {...props} notices={{data:[{...notice,priority:'待核实',payload:{...payload,priority:'待核实',status:'待核实'}}],links:[]}}/>);
+  expect(screen.getByRole('heading',{name:'待核实清单'})).toBeTruthy();
+  expect(screen.queryByRole('table')).toBeNull();
+  expect(screen.getByRole('navigation',{name:'待核实项目'})).toBeTruthy();
+  expect(document.querySelector(screen.getByRole('link',{name:payload.title}).getAttribute('href'))).toBeTruthy();
  });
  it('renders untrusted text inert and prevents script links',()=>{
   render(<Show notice={{...notice,payload:{...payload,title:'<img src=x onerror=alert(1)>',url:'javascript:alert(1)'}}} batch={{id:'b'}}/>);
