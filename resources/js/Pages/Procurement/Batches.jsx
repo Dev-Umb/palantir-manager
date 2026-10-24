@@ -1,0 +1,3 @@
+import {Link} from '@inertiajs/react';
+import {Shell,Panel,Pages,base} from './shared';
+export default function Batches({batches,canManage}) { return <Shell title="上传批次"><div className="flex justify-between"><h1 className="text-2xl font-semibold">上传批次</h1>{canManage&&<Link href={`${base}/clients`}>管理采集端 →</Link>}</div><Panel>{batches.data.length?batches.data.map(b=><Link className="block border-b py-4 text-sm" href={`${base}/batches/${b.id}`} key={b.id}>{b.date} · {b.title}<p className="text-xs text-slate-500">{b.id} · {b.status}</p></Link>):<p>暂无上传批次。</p>}</Panel><Pages links={batches.links}/></Shell>; }

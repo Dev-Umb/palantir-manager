@@ -1,0 +1,12 @@
+## Approved implementation
+- [x] Inspect context, sample and existing source/MCP rules; obtain user approval for development and final replacement scope.
+- [x] Select isolated worktree preserving unrelated changes; validate proposal before implementation.
+- [x] Implement scoped credentials, JSON adapter, snapshots, idempotent publication and immutable observations.
+- [x] Replace Web and mobile procurement pages and retire old routes/jobs/scheduler.
+- [x] Add scoped old-data cleanup migration and existing platform AI query integration.
+- [x] Package customer Skill with contract, sanitized example and connection template.
+- [x] Test real 14-item sample through HTTP MCP in isolated DB, duplicate retry, permission/expiry/update boundaries and ERP retention.
+- [x] Add UI tests for filters, details, raw content, errors and review controls.
+- [x] Complete final strict spec validation, Skill validation and full quality gate.
+- [ ] Verify native Flutter build/widgets when a compatible SDK is available.
+- [ ] Deploy only after review/merge and separately verify live MCP and external-model analysis; local implementation does not prove release.

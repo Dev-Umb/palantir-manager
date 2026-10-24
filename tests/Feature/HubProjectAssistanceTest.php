@@ -22,7 +22,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
-use Inertia\Testing\AssertableInertia as Assert;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 class HubProjectAssistanceTest extends TestCase
@@ -76,33 +76,22 @@ class HubProjectAssistanceTest extends TestCase
         $this->assertEmpty(app(HubProjectContext::class)->forUser($this->reader('tender'))['projects']);
     }
 
-    public function test_first_page_has_explained_recommendations_reports_and_no_company_prerequisite(): void
+    public function test_retired_first_page_has_explained_recommendations_reports_and_no_company_prerequisite(): void
     {
-        $user = $this->reader();
-        $this->record($user, '桥梁钢模板项目');
-        HubNotice::factory()->create(['title' => '其他办公用品采购', 'published_at' => now()]);
-        $matched = HubNotice::factory()->create(['title' => '桥梁钢模板采购', 'published_at' => now()->subDay()]);
-        HubEvidence::factory()->create(['hub_notice_id' => $matched->id]);
-        $before = ObjectRecord::first()->toArray();
-        $this->actingAs($user)->get('/procurement-hub')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->where('notices.data.0.id', $matched->id)->has('notices.data.0.screening.projects', 1)
-            ->where('focusReport.project_count', 1)->has('briefings', 2)->missing('profileReady')->has('nav', 3));
-        $this->assertSame($before, ObjectRecord::first()->toArray());
+        $user = User::factory()->create();
+        $user->roles()->attach(Role::firstOrCreate(['name' => 'admin'], ['label' => '管理员']));
+        HubNotice::factory()->create();
+        $this->actingAs($user)->get('/procurement-hub')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Procurement/Index')->has('notices.data', 0)->missing('reports')->missing('pendingRun'));
+        $this->post('/procurement-hub/research', [])->assertNotFound();
     }
 
-    public function test_private_reports_are_hidden_from_other_users_and_after_project_changes(): void
+    public function test_retired_private_reports_are_hidden_from_other_users_and_after_project_changes(): void
     {
-        $owner = $this->reader();
-        $project = $this->record($owner, '私有模板项目');
-        $notice = HubNotice::factory()->create();
-        $snapshot = app(HubProjectContext::class)->forUser($owner);
-        HubRun::factory()->create(['user_id' => $owner->id, 'hub_notice_id' => $notice->id, 'status' => 'published', 'published_at' => now(), 'snapshot' => $snapshot,
-            'score' => ['value' => 85], 'result' => ['analysis' => ['claims' => [['text' => '私有报告内容']]]]]);
-        $this->actingAs($this->reader())->get('/procurement-hub/notices/'.$notice->id)->assertInertia(fn (Assert $page) => $page->has('reports', 0));
-        $this->actingAs($owner)->get('/procurement-hub/notices/'.$notice->id)->assertInertia(fn (Assert $page) => $page->where('reports.0.score.value', 85));
-        $project->update(['title' => '项目名称改变']);
-        $this->get('/procurement-hub/notices/'.$notice->id)->assertInertia(fn (Assert $page) => $page->where('reports.0.result', null)->where('reports.0.score', null)->where('reports.0.status', 'stale'));
-        $this->get('/procurement-hub')->assertInertia(fn (Assert $page) => $page->where('notices.data.0.recommendation_score', null));
+        $user = User::factory()->create();
+        $user->roles()->attach(Role::firstOrCreate(['name' => 'admin'], ['label' => '管理员']));
+        HubNotice::factory()->create();
+        $this->actingAs($user)->get('/procurement-hub')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Procurement/Index')->has('notices.data', 0)->missing('reports')->missing('pendingRun'));
+        $this->post('/procurement-hub/research', [])->assertNotFound();
     }
 
     public function test_automatic_analysis_is_bounded_deduplicated_and_respects_cancel(): void
@@ -162,21 +151,13 @@ class HubProjectAssistanceTest extends TestCase
         $this->assertStringNotContainsString('报名已截止', app(HubScreening::class)->brief($notice, ['projects' => []])['recommendation']);
     }
 
-    public function test_feed_exposes_latest_registration_window_without_replacing_submission_deadline(): void
+    public function test_retired_feed_exposes_latest_registration_window_without_replacing_submission_deadline(): void
     {
-        $user = $this->reader();
-        $notice = HubNotice::factory()->create(['deadline' => '2026-09-18 02:00:00']);
-        HubEvidence::factory()->create(['hub_notice_id' => $notice->id, 'text' => '请于2026年9月1日10:00时至2026年9月2日10:00时完成投标报名。']);
-        HubEvidence::factory()->create(['hub_notice_id' => $notice->id, 'text' => '请于2026年9月3日10:00时至2026年9月8日10:00时完成投标报名。']);
-        $this->actingAs($user)->get('/procurement-hub?history=1')->assertInertia(fn (Assert $page) => $page
-            ->where('notices.data.0.registration.start', '2026-09-03T10:00:00+08:00')
-            ->where('notices.data.0.registration.end', '2026-09-08T10:00:00+08:00')
-            ->where('notices.data.0.deadline', '2026-09-18T02:00:00.000000Z')
-            ->missing('notices.data.0.registration_text'));
-        HubEvidence::factory()->create(['hub_notice_id' => $notice->id, 'text' => '请于****至****完成投标报名。']);
-        $this->get('/procurement-hub?history=1')->assertInertia(fn (Assert $page) => $page
-            ->where('notices.data.0.registration.start', null)->where('notices.data.0.registration.end', null)
-            ->where('notices.data.0.deadline', '2026-09-18T02:00:00.000000Z'));
+        $user = User::factory()->create();
+        $user->roles()->attach(Role::firstOrCreate(['name' => 'admin'], ['label' => '管理员']));
+        HubNotice::factory()->create();
+        $this->actingAs($user)->get('/procurement-hub')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Procurement/Index')->has('notices.data', 0)->missing('reports')->missing('pendingRun'));
+        $this->post('/procurement-hub/research', [])->assertNotFound();
     }
 
     public function test_registration_parser_preserves_date_precision_and_rejects_unsupported_dates(): void
@@ -188,15 +169,13 @@ class HubProjectAssistanceTest extends TestCase
         }
     }
 
-    public function test_new_published_report_replaces_old_failed_attempt_but_new_pending_work_stays_visible(): void
+    public function test_retired_new_published_report_replaces_old_failed_attempt_but_new_pending_work_stays_visible(): void
     {
-        $user = $this->reader();
-        $notice = HubNotice::factory()->create();
-        HubRun::factory()->create(['user_id' => $user->id, 'hub_notice_id' => $notice->id, 'status' => 'insufficient']);
-        HubRun::factory()->create(['user_id' => $user->id, 'hub_notice_id' => $notice->id, 'status' => 'published', 'published_at' => now(), 'snapshot' => app(HubProjectContext::class)->forUser($user)]);
-        $this->actingAs($user)->get('/procurement-hub/notices/'.$notice->id)->assertInertia(fn (Assert $page) => $page->where('pendingRun', null)->has('reports', 1));
-        $pending = HubRun::factory()->create(['user_id' => $user->id, 'hub_notice_id' => $notice->id, 'status' => 'queued']);
-        $this->get('/procurement-hub/notices/'.$notice->id)->assertInertia(fn (Assert $page) => $page->where('pendingRun.id', $pending->id)->has('reports', 1));
+        $user = User::factory()->create();
+        $user->roles()->attach(Role::firstOrCreate(['name' => 'admin'], ['label' => '管理员']));
+        HubNotice::factory()->create();
+        $this->actingAs($user)->get('/procurement-hub')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Procurement/Index')->has('notices.data', 0)->missing('reports')->missing('pendingRun'));
+        $this->post('/procurement-hub/research', [])->assertNotFound();
     }
 
     public function test_analysis_context_includes_explicit_matches_and_counterexamples_but_not_unrelated_projects(): void
@@ -217,13 +196,13 @@ class HubProjectAssistanceTest extends TestCase
         $this->assertNotContains($unrelated->id, $ids);
     }
 
-    public function test_current_users_project_report_precedes_a_newer_public_market_report(): void
+    public function test_retired_current_users_project_report_precedes_a_newer_public_market_report(): void
     {
-        $user = $this->reader();
-        $notice = HubNotice::factory()->create();
-        $personal = HubRun::factory()->create(['user_id' => $user->id, 'hub_notice_id' => $notice->id, 'status' => 'published', 'published_at' => now(), 'snapshot' => app(HubProjectContext::class)->forUser($user)]);
-        $public = HubRun::factory()->create(['user_id' => null, 'hub_notice_id' => $notice->id, 'status' => 'published', 'published_at' => now(), 'snapshot' => ['projects' => []]]);
-        $this->actingAs($user)->get('/procurement-hub/notices/'.$notice->id)->assertInertia(fn (Assert $page) => $page->where('reports.0.id', $personal->id)->where('reports.1.id', $public->id));
+        $user = User::factory()->create();
+        $user->roles()->attach(Role::firstOrCreate(['name' => 'admin'], ['label' => '管理员']));
+        HubNotice::factory()->create();
+        $this->actingAs($user)->get('/procurement-hub')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Procurement/Index')->has('notices.data', 0)->missing('reports')->missing('pendingRun'));
+        $this->post('/procurement-hub/research', [])->assertNotFound();
     }
 
     public function test_live_assignment_scope_excludes_transferred_projects_and_includes_informed_projects(): void

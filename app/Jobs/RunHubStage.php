@@ -36,23 +36,7 @@ class RunHubStage implements ShouldQueue
 
     public function handle(ExecuteHubStage $execute): void
     {
-        $run = HubRun::find($this->runId);
-        if (! $run || $run->cancelled_at || $run->stage !== $this->stage || (int) $run->round !== $this->round
-            || ! in_array($run->status, ['queued', 'running'], true)) {
-            return;
-        }
-        $parent = $run->snapshot['parent_run_id'] ?? null;
-        if ($parent && HubRun::find($parent)?->cancelled_at) {
-            $run->update(['status' => 'cancelled', 'cancelled_at' => now()]);
-
-            return;
-        }
-        try {
-            $execute->handle($run);
-        } catch (Throwable $exception) {
-            $run->steps()->where('stage', $this->stage)->where('round', $this->round)->update(['status' => 'failed', 'error' => '执行失败：'.class_basename($exception)]);
-            throw $exception;
-        }
+        // Already queued legacy work is intentionally discarded.
     }
 
     public function failed(?Throwable $exception): void

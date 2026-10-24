@@ -10,7 +10,6 @@ use App\Support\HubAccess;
 use App\Support\QuotationAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Route;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -31,17 +30,11 @@ class HandleInertiaRequests extends Middleware
         if ($request->is('procurement-hub', 'procurement-hub/*')) {
             $canRead = HubAccess::canRead($user);
             $canManage = HubAccess::canManage($user);
-
-            return [
-                ...parent::share($request),
-                'auth' => ['user' => $user?->only('id', 'name', 'email', 'is_password_changed'), 'roles' => $user?->roles->map->only(['id', 'name', 'label'])->values() ?? [], 'permissions' => $permissions, 'settings_url' => Route::has('settings.index') ? route('settings.index') : null],
-                'nav' => [
-                    ['key' => 'hub', 'exact' => true, 'label' => '招采信息中心', 'href' => route('hub.index'), 'visible' => $canRead],
-                    ['key' => 'hub-follows', 'label' => '我的关注', 'href' => route('hub.follows'), 'visible' => $canRead],
-                    ['key' => 'platform', 'label' => '返回主平台', 'href' => '/', 'visible' => true],
-                ],
-                'notificationUnreadCount' => 0,
-                'flash' => ['status' => fn () => $request->session()->get('status')],
+            $navigation = [
+                ['key' => 'hub', 'label' => '招采信息', 'href' => route('hub.index'), 'exact' => true, 'visible' => $canRead],
+                ['key' => 'hub-batches', 'label' => '上传批次', 'href' => route('hub.batches'), 'visible' => $canRead],
+                ['key' => 'hub-clients', 'label' => '采集端管理', 'href' => route('hub.clients'), 'visible' => $canManage],
+                ['key' => 'workspace', 'label' => '返回工作台', 'href' => route('dashboard'), 'visible' => true],
             ];
         }
 
@@ -54,7 +47,7 @@ class HandleInertiaRequests extends Middleware
                 'permissions' => $permissions,
                 'settings_url' => $user ? route('settings.index') : null,
             ],
-            'nav' => $user ? $this->navigation($request, $permissions) : [],
+            'nav' => $navigation ?? ($user ? $this->navigation($request, $permissions) : []),
             'notificationUnreadCount' => fn () => $user && ! $passwordOnly
                 ? $this->unreadNotificationCount($user->id)
                 : 0,

@@ -42,11 +42,10 @@ class HubPilotTest extends TestCase
         $this->assertContains('结论正文缺失，不能发布。', $errors);
     }
 
-    public function test_refresh_is_scheduled_at_midnight_and_noon_in_china(): void
+    public function test_retired_refresh_is_scheduled_at_midnight_and_noon_in_china(): void
     {
-        $event = collect(app(Schedule::class)->events())->first(fn ($event) => str_contains($event->command ?? '', 'hub:sync'));
-        $this->assertSame('0 0,12 * * *', $event->expression);
-        $this->assertSame('Asia/Shanghai', $event->timezone);
+        $events = app(Schedule::class)->events();
+        $this->assertCount(0, array_filter($events, fn ($event) => str_contains($event->command ?? '', 'hub:sync')));
     }
 
     public function test_internal_counterexample_requires_project_references_and_external_claims_still_require_sources(): void
