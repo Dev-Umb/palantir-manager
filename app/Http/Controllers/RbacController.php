@@ -21,10 +21,11 @@ class RbacController extends Controller
     public function index(Request $request): Response
     {
         $users = User::query()->with('roles')->latest()->get();
+        $wechatBound = DB::table('wechat_account_bindings')->where('appid', config('wechat.appid'))->whereNotNull('openid')->pluck('user_id')->flip();
         $adminCount = User::query()->whereHas('roles', fn ($query) => $query->where('name', 'admin'))->count();
 
         return Inertia::render('Rbac/Index', [
-            'users' => $users->map(function (User $user) use ($request, $adminCount): array {
+            'users' => $users->map(function (User $user) use ($request, $adminCount, $wechatBound): array {
                 $blockReason = match (true) {
                     $user->is($request->user()) => '不能删除当前登录账号',
                     $user->roles->contains('name', 'admin') && $adminCount <= 1 => '不能删除最后一个管理员',
@@ -33,6 +34,7 @@ class RbacController extends Controller
 
                 return [
                     ...$user->toArray(),
+                    'wechat_bound' => $wechatBound->has($user->id),
                     'reset_password_url' => route('rbac.users.password', $user),
                     'can_delete' => $blockReason === null,
                     'delete_block_reason' => $blockReason,

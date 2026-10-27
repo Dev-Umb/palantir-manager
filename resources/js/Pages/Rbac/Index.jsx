@@ -43,6 +43,7 @@ function UserRoleEditor({ user, roles }) {
     const [saved, setSaved] = useState(initialRoleIds);
     const [processing, setProcessing] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [unbinding, setUnbinding] = useState(false);
     const [resettingPassword, setResettingPassword] = useState(false);
     const isDirty = !sameIds(selected, saved);
 
@@ -76,6 +77,7 @@ function UserRoleEditor({ user, roles }) {
             <div>
                 <strong>{user.name}</strong>
                 <span>{user.email}</span>
+                <small>微信：{user.wechat_bound ? '已绑定' : '未绑定'}</small>
                 <small>{selected.length ? `已选择 ${selected.length} 个角色` : '尚未分配业务角色'}</small>
             </div>
             <div className="check-row">
@@ -87,6 +89,11 @@ function UserRoleEditor({ user, roles }) {
                 ))}
             </div>
             <div className="user-row-actions">
+                {user.wechat_bound && <button type="button" className="secondary-button" disabled={unbinding} onClick={() => {
+                    if (!window.confirm(`确认解绑“${user.name}”的微信？该用户的小程序登录将失效。`)) return;
+                    setUnbinding(true);
+                    router.delete(`/admin/users/${user.id}/wechat`, { preserveScroll: true, onFinish: () => setUnbinding(false) });
+                }}>解绑微信</button>}
                 <button type="button" className="secondary-button" onClick={() => setResettingPassword(true)} disabled={resettingPassword || deleting} aria-label={`重置${user.name}的密码`}>重置密码</button>
                 {isDirty && <span className="unsaved-badge" role="status">有未保存修改</span>}
                 <button

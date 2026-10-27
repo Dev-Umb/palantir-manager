@@ -148,3 +148,12 @@ describe('RBAC role editor', () => {
         expect(screen.getByText('不能删除最后一个管理员')).toBeInTheDocument();
     });
 });
+
+it('admin wechat unbind requires explicit confirmation and preserves role controls', () => {
+ render(<Index users={[{id:7,name:'测试',email:'a@test',roles:[],wechat_bound:true,can_delete:true}]} roles={[]} permissions={{}} />);
+ expect(screen.getByRole('button',{name:'保存测试的角色'})).toBeTruthy();
+ const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);
+ fireEvent.click(screen.getByRole('button',{name:'解绑微信'}));expect(destroy).not.toHaveBeenCalled();
+ confirm.mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:'解绑微信'}));
+ expect(destroy).toHaveBeenCalledWith('/admin/users/7/wechat',expect.any(Object));
+});

@@ -21,6 +21,7 @@ use App\Http\Controllers\RbacController;
 use App\Http\Controllers\RelationOptionsController;
 use App\Http\Controllers\TenderConversionController;
 use App\Http\Controllers\VisualizationController;
+use App\Http\Controllers\WechatAccountController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/webhooks/feishu/events', FeishuEventController::class)
@@ -28,6 +29,8 @@ Route::post('/webhooks/feishu/events', FeishuEventController::class)
     ->name('webhooks.feishu.events');
 
 require __DIR__.'/timebook.php';
+
+Route::post('/miniapp/wechat/login', [WechatAccountController::class, 'login'])->middleware('throttle:10,1')->name('miniapp.wechat.login');
 
 Route::get('/miniapp/session', [MiniappSessionController::class, 'show'])->name('miniapp.session.show');
 Route::post('/miniapp/session', [MiniappSessionController::class, 'store'])->middleware('throttle:login')->name('miniapp.session.store');
@@ -41,6 +44,8 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::post('/settings/wechat/code', [WechatAccountController::class, 'issue'])->middleware('throttle:6,1')->name('settings.wechat.code');
+    Route::delete('/settings/wechat', [WechatAccountController::class, 'destroy'])->middleware('throttle:6,1')->name('settings.wechat.destroy');
     Route::get('/settings', [AccountSettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings/email', [AccountSettingsController::class, 'updateEmail'])->middleware('throttle:6,1')->name('settings.email');
     Route::put('/settings/password', [AccountSettingsController::class, 'updatePassword'])->middleware('throttle:6,1')->name('settings.password');
@@ -106,6 +111,7 @@ Route::middleware('auth')->group(function () {
         ->name('tenders.convert');
 
     Route::middleware('permission:rbac.manage')->group(function () {
+        Route::delete('/admin/users/{user}/wechat', [WechatAccountController::class, 'adminDestroy'])->middleware('throttle:6,1')->name('rbac.users.wechat.destroy');
         Route::put('/admin/users/{user}/password', [RbacController::class, 'resetPassword'])->middleware('throttle:6,1')->name('rbac.users.password');
         Route::get('/admin/rbac', [RbacController::class, 'index'])->name('rbac.index');
         Route::put('/admin/users/{user}/roles', [RbacController::class, 'updateUserRoles'])->name('rbac.users.roles');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateAccountEmailRequest;
 use App\Http\Requests\UpdateAccountPasswordRequest;
+use App\Support\WechatLogin;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -14,6 +15,7 @@ class AccountSettingsController extends Controller
     public function index(): Response
     {
         return Inertia::render('Settings/Index', [
+            'wechat' => app(WechatLogin::class)->state(auth()->user()),
             'updateEmailUrl' => route('settings.email'),
             'updatePasswordUrl' => route('settings.password'),
         ]);
