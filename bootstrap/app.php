@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsurePermission;
+use App\Http\Middleware\EnsureWechatBinding;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->web(append: [
+            EnsureWechatBinding::class,
             HandleInertiaRequests::class,
         ]);
 
@@ -49,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*', 'miniapp/session')
+            fn (Request $request) => $request->is('api/*', 'miniapp/*', 'settings/wechat/code')
                 || ($request->expectsJson() && $request->user() !== null),
         );
     })->create();

@@ -1,8 +1,9 @@
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { useState } from 'react';
+import { Head, useForm, useHttp, usePage } from '@inertiajs/react';
 import Layout from '../../Components/Layout';
 import PasswordFields from '../../Components/PasswordFields';
 
-export default function Index({ updateEmailUrl, updatePasswordUrl }) {
+export default function Index({ updateEmailUrl, updatePasswordUrl, wechat }) {
     const { auth } = usePage().props;
     const emailForm = useForm({ email: auth.user.email, current_password: '' });
     const passwordForm = useForm({ current_password: '', password: '', password_confirmation: '' });
@@ -27,6 +28,7 @@ export default function Index({ updateEmailUrl, updatePasswordUrl }) {
         <Layout title="用户设置" eyebrow="个人账号">
             <Head title="用户设置" />
             <div className="account-settings">
+                {wechat && <WechatBinding state={wechat} />}
                 <section className="surface">
                     <div className="section-head"><h2>登录账号</h2></div>
                     <p className="muted">{auth.user.name}，您可以修改自己的登录邮箱。角色和业务权限保持不变。</p>
@@ -57,4 +59,38 @@ export default function Index({ updateEmailUrl, updatePasswordUrl }) {
             </div>
         </Layout>
     );
+}
+
+function WechatBinding({ state }) {
+    const [binding, setBinding] = useState(null);
+    const [error, setError] = useState('');
+    const request = useHttp({ current_password: '' });
+    const unbind = useForm({ current_password: '' });
+    const form = state.bound ? unbind : request;
+    function submit(event) {
+        event.preventDefault();
+        setError('');
+        if (state.bound) {
+            if (!window.confirm('确认解绑微信？已登录的小程序会话将失效，后台账号保留。')) return;
+            unbind.delete('/settings/wechat', { preserveScroll: true, onSuccess: () => { unbind.reset(); setBinding(null); } });
+        } else {
+            setBinding(null);
+            request.post('/settings/wechat/code', {
+                onSuccess: (data) => { setBinding(data); request.reset(); },
+                onError: () => setError('生成失败，请检查密码或稍后重试。'),
+            });
+        }
+    }
+    return <section className="surface">
+        <div className="section-head"><h2>微信登录</h2><span className="pill">{state.bound ? '已绑定' : '未绑定'}</span></div>
+        <p className="muted">{state.bound ? '小程序可直接使用已绑定微信登录。' : '生成绑定码后，在本人手机小程序中点击“首次绑定”，输入绑定码即可关联当前账号。'}</p>
+        {!state.configured && <p role="status">微信登录尚未配置，请联系管理员。</p>}
+        {(state.configured || state.bound) && <form className="account-form" aria-label="管理微信绑定" onSubmit={submit}>
+            <label>验证当前账号密码<input type="password" autoComplete="current-password" required value={form.data.current_password} onChange={e => form.setData('current_password', e.target.value)} /></label>
+            {Object.values(form.errors).map((message, i) => <p role="alert" key={i}>{message}</p>)}
+            {error && <p role="alert">{error}</p>}
+            <div><button disabled={form.processing}>{form.processing ? '处理中…' : state.bound ? '解绑微信' : '生成一次性绑定码'}</button></div>
+        </form>}
+        {binding && !state.bound && <div role="status"><p>绑定码：<strong style={{ letterSpacing: 2, overflowWrap: 'anywhere' }}>{binding.code}</strong></p><p className="muted">10 分钟有效，仅显示本次。重新生成后旧码作废；不要转发给他人。手机绑定后刷新本页查看状态。</p></div>}
+    </section>;
 }

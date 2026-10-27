@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Support\WechatLogin;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,7 @@ class MiniappSessionController extends Controller
         $user = $request->user();
 
         return response()->json([
+            'wechatConfigured' => app(WechatLogin::class)->configured(),
             'csrfToken' => $request->session()->token(),
             'version' => app(HandleInertiaRequests::class)->version($request),
             'dashboardPath' => route('dashboard', absolute: false),
