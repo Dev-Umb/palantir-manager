@@ -23,7 +23,7 @@ it('shows both own email and password forms for the dedicated operator', () => {
 it('shows binding code flow without removing account settings', () => {
  render(<Index wechat={{bound:false,configured:true}} />);
  expect(screen.getByRole('form',{name:'修改密码'})).toBeTruthy();
- fireEvent.submit(screen.getByRole('form',{name:'管理微信绑定'}));
+ fireEvent.submit(screen.getByRole('form',{name:'固定微信绑定码'}));
  expect(post).toHaveBeenCalledWith('/settings/wechat/code', expect.any(Object));
  expect(screen.queryByRole('button',{name:'解绑微信'})).toBeNull();
 });

@@ -2,11 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Support\WechatLogin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -54,19 +58,73 @@ class WechatAccountLoginTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_expired_superseded_and_consumed_binding_codes_fail(): void
+    public function test_fixed_code_is_encrypted_stable_and_reusable_after_binding_and_unbinding(): void
+    {
+        $user = User::factory()->create();
+        $code = $this->issue($user);
+        $this->assertSame($code, $this->issue($user));
+        $row = DB::table('wechat_account_bindings')->first();
+        $this->assertNotSame($code, $row->code_encrypted);
+        $this->assertSame($code, Crypt::decryptString($row->code_encrypted));
+        $this->travel(365)->days();
+        $this->postJson('/miniapp/wechat/login', ['code' => 'wx-1', 'binding_code' => strtolower($code)])->assertOk();
+        $binding = session('wechat_binding');
+        $this->assertSame($code, $this->issue($user));
+        $this->postJson('/miniapp/wechat/login', ['code' => 'wx-2', 'binding_code' => $code])->assertOk();
+        $this->assertSame($binding, session('wechat_binding'));
+        $this->assertDatabaseCount('audit_logs', 1);
+        app(WechatLogin::class)->unbind($user, $user);
+        $this->assertSame($code, $this->issue($user));
+        $this->withSession(['wechat_binding' => $binding])->getJson('/miniapp/session')->assertUnauthorized();
+        $this->postJson('/miniapp/wechat/login', ['code' => 'wx-3', 'binding_code' => $code])->assertOk();
+    }
+
+    public function test_reset_invalidates_old_code_without_revoking_existing_binding_or_session(): void
     {
         $user = User::factory()->create();
         $old = $this->issue($user);
-        $fresh = $this->issue($user);
-        $this->postJson('/miniapp/wechat/login', ['code' => 'wx-1', 'binding_code' => $old])->assertUnprocessable();
-        $this->travel(11)->minutes();
-        $this->postJson('/miniapp/wechat/login', ['code' => 'wx-2', 'binding_code' => $fresh])->assertUnprocessable();
-        $fresh = $this->issue($user);
+        $this->postJson('/miniapp/wechat/login', ['code' => 'wx-1', 'binding_code' => $old])->assertOk();
+        $binding = session('wechat_binding');
+        $fresh = app(WechatLogin::class)->issue($user, true)['code'];
+        $this->assertNotSame($old, $fresh);
+        $this->withSession(['wechat_binding' => $binding])->getJson('/miniapp/session')->assertOk()->assertJsonPath('user.id', $user->id);
+        $this->postJson('/miniapp/wechat/login', ['code' => 'wx-2', 'binding_code' => $old])->assertUnprocessable();
         $this->postJson('/miniapp/wechat/login', ['code' => 'wx-3', 'binding_code' => $fresh])->assertOk();
-        $this->deleteJson('/miniapp/session');
+        $this->assertSame($binding, session('wechat_binding'));
+        Http::swap(new Factory);
+        Http::fake(['api.weixin.qq.com/*' => Http::response(['openid' => 'other-identity'])]);
         $this->postJson('/miniapp/wechat/login', ['code' => 'wx-4', 'binding_code' => $fresh])->assertUnprocessable();
-        $this->assertGuest();
+        $this->assertDatabaseHas('wechat_account_bindings', ['openid' => hash('sha256', 'identity-a')]);
+    }
+
+    public function test_legacy_temporary_code_is_not_accepted_as_permanent(): void
+    {
+        $user = User::factory()->create();
+        $code = $this->issue($user);
+        DB::table('wechat_account_bindings')->update(['code_encrypted' => null, 'code_expires_at' => now()->addMinutes(10)]);
+        $this->postJson('/miniapp/wechat/login', ['code' => 'wx-1', 'binding_code' => $code])->assertUnprocessable();
+        $this->assertNotSame($code, $this->issue($user));
+    }
+
+    public function test_admin_code_access_requires_permission_and_operators_own_password(): void
+    {
+        $user = User::factory()->create();
+        $target = User::factory()->create();
+        $url = '/admin/users/'.$target->id.'/wechat/code';
+        $this->postJson($url, ['current_password' => 'password'])->assertUnauthorized();
+        $this->actingAs($user)->postJson($url, ['current_password' => 'password'])->assertForbidden();
+        $permission = Permission::create(['key' => 'rbac.manage', 'label' => '管理', 'module' => 'system', 'action' => 'manage']);
+        $role = Role::create(['name' => 'binding-admin', 'label' => '管理']);
+        $role->permissions()->attach($permission);
+        $user->roles()->attach($role);
+        $this->actingAs($user->fresh());
+        $this->postJson($url, ['current_password' => 'wrong'])->assertUnprocessable();
+        $first = $this->postJson($url, ['current_password' => 'password'])->assertOk()->json('code');
+        $this->postJson($url, ['current_password' => 'password'])->assertOk()->assertJsonPath('code', $first);
+        $second = $this->postJson($url, ['current_password' => 'password', 'reset' => true])->assertOk()->json('code');
+        $this->assertNotSame($first, $second);
+        $this->assertSame($second, $this->issue($target));
+        $this->assertDatabaseMissing('wechat_account_bindings', ['user_id' => $user->id]);
     }
 
     public function test_identity_conflict_does_not_transfer_binding_or_consume_other_account_code(): void

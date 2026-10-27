@@ -51,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*', 'miniapp/*', 'settings/wechat/code')
+            fn (Request $request) => $request->is('api/*', 'miniapp/*', 'settings/wechat/code', 'admin/users/*/wechat/code')
                 || ($request->expectsJson() && $request->user() !== null),
         );
     })->create();

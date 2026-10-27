@@ -24,9 +24,17 @@ class WechatAccountController extends Controller
 
     public function issue(Request $request, WechatLogin $wechat): JsonResponse
     {
-        $request->validate(['current_password' => ['required', 'string', 'current_password']]);
+        $request->validate(['current_password' => ['required', 'string', 'current_password'], 'reset' => ['sometimes', 'boolean']]);
 
-        return response()->json($wechat->issue($request->user()))->header('Cache-Control', 'no-store, private');
+        return response()->json($wechat->issue($request->user(), $request->boolean('reset')))->header('Cache-Control', 'no-store, private');
+    }
+
+    public function adminIssue(Request $request, User $user, WechatLogin $wechat): JsonResponse
+    {
+        abort_unless($request->user()->canDo('rbac.manage'), 403);
+        $request->validate(['current_password' => ['required', 'string', 'current_password'], 'reset' => ['sometimes', 'boolean']]);
+
+        return response()->json($wechat->issue($user, $request->boolean('reset')))->header('Cache-Control', 'no-store, private');
     }
 
     public function destroy(Request $request, WechatLogin $wechat): RedirectResponse
