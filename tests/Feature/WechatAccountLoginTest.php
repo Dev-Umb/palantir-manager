@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Support\WechatLogin;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -18,6 +19,8 @@ class WechatAccountLoginTest extends TestCase
         parent::setUp();
         config(['wechat.appid' => 'wx-test', 'wechat.secret' => 'fake-only']);
         Cache::flush();
+        Http::preventStrayRequests();
+        Http::swap(new Factory);
         Http::preventStrayRequests();
         Http::fake(['api.weixin.qq.com/*' => Http::response(['openid' => 'identity-a', 'session_key' => 'must-not-leak'])]);
     }
@@ -74,7 +77,7 @@ class WechatAccountLoginTest extends TestCase
         $this->deleteJson('/miniapp/session');
         $code = $this->issue($b);
         $this->postJson('/miniapp/wechat/login', ['code' => 'wx-2', 'binding_code' => $code])->assertUnprocessable();
-        $this->assertDatabaseHas('wechat_account_bindings', ['user_id' => $a->id, 'openid' => 'identity-a']);
+        $this->assertDatabaseHas('wechat_account_bindings', ['user_id' => $a->id, 'openid' => hash('sha256', 'identity-a')]);
         $this->assertDatabaseHas('wechat_account_bindings', ['user_id' => $b->id, 'openid' => null, 'code_hash' => hash('sha256', $code)]);
     }
 
@@ -92,8 +95,12 @@ class WechatAccountLoginTest extends TestCase
 
     public function test_upstream_failure_and_missing_config_are_sanitized(): void
     {
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
         Http::fake(['api.weixin.qq.com/*' => Http::response(['errcode' => 40013, 'errmsg' => 'fake-only'])]);
         $this->postJson('/miniapp/wechat/login', ['code' => 'wx-1'])->assertUnprocessable()->assertDontSee('fake-only');
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
         Http::fake(['api.weixin.qq.com/*' => Http::failedConnection()]);
         $this->postJson('/miniapp/wechat/login', ['code' => 'wx-2'])->assertUnprocessable()->assertDontSee('fake-only');
         config(['wechat.secret' => '']);
@@ -110,7 +117,19 @@ class WechatAccountLoginTest extends TestCase
         $this->postJson('/miniapp/wechat/login', ['code' => 'wx-1', 'binding_code' => $code, 'user_id' => $other->id, 'openid' => 'attacker'])->assertOk()->assertJsonPath('user.id', $user->id);
         $this->deleteJson('/miniapp/session');
         $user->delete();
-        $this->postJson('/miniapp/wechat/login',['code' => 'wx-2'])->assertNotFound();
+        $this->postJson('/miniapp/wechat/login', ['code' => 'wx-2'])->assertNotFound();
+        $this->assertGuest();
+    }
+
+    public function test_case_different_wechat_identities_do_not_share_accounts(): void
+    {
+        $user = User::factory()->create();
+        $this->postJson('/miniapp/wechat/login', ['code' => 'case-one', 'binding_code' => $this->issue($user)])->assertOk();
+        $this->deleteJson('/miniapp/session');
+        Http::swap(new Factory);
+        Http::preventStrayRequests();
+        Http::fake(['api.weixin.qq.com/*' => Http::response(['openid' => 'IDENTITY-A'])]);
+        $this->postJson('/miniapp/wechat/login', ['code' => 'case-two'])->assertUnprocessable()->assertJsonValidationErrors('binding_code');
         $this->assertGuest();
     }
 }
