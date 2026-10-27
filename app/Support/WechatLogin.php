@@ -39,7 +39,8 @@ class WechatLogin
             throw ValidationException::withMessages(['wechat' => '微信身份验证失败，请重试或联系管理员检查小程序配置。']);
         }
 
-        return $openid;
+        // Store a canonical digest so case-insensitive database collations cannot merge identities.
+        return hash('sha256', $openid);
     }
 
     /** @return array{bound: bool, configured: bool} */
