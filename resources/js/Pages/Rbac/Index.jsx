@@ -2,6 +2,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import Layout from '../../Components/Layout';
+import WechatBindingCode from '../../Components/WechatBindingCode';
 import PasswordFields from '../../Components/PasswordFields';
 import { businessText, permissionGroupLabel } from '../../businessLanguage';
 
@@ -43,6 +44,7 @@ function UserRoleEditor({ user, roles }) {
     const [saved, setSaved] = useState(initialRoleIds);
     const [processing, setProcessing] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [showBindingCode, setShowBindingCode] = useState(false);
     const [unbinding, setUnbinding] = useState(false);
     const [resettingPassword, setResettingPassword] = useState(false);
     const isDirty = !sameIds(selected, saved);
@@ -89,6 +91,7 @@ function UserRoleEditor({ user, roles }) {
                 ))}
             </div>
             <div className="user-row-actions">
+                <button type="button" className="secondary-button" onClick={() => setShowBindingCode(!showBindingCode)}>{showBindingCode ? '关闭绑定码' : '授权绑定码'}</button>
                 {user.wechat_bound && <button type="button" className="secondary-button" disabled={unbinding} onClick={() => {
                     if (!window.confirm(`确认解绑“${user.name}”的微信？该用户的小程序登录将失效。`)) return;
                     setUnbinding(true);
@@ -116,6 +119,7 @@ function UserRoleEditor({ user, roles }) {
                 </button>
                 {user.delete_block_reason && <small>{user.delete_block_reason}</small>}
             </div>
+            {showBindingCode && <WechatBindingCode url={`/admin/users/${user.id}/wechat/code`} />}
             {resettingPassword && <PasswordResetForm user={user} onClose={() => setResettingPassword(false)} />}
         </article>
     );

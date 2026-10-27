@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -49,24 +50,23 @@ class WechatLogin
         return ['bound' => DB::table('wechat_account_bindings')->where('user_id', $user->id)->where('appid', config('wechat.appid'))->whereNotNull('openid')->exists(), 'configured' => $this->configured()];
     }
 
-    /** @return array{code: string, expires_at: string} */
-    public function issue(User $user): array
+    /** @return array{code: string, expires_at: null} */
+    public function issue(User $user, bool $reset = false): array
     {
         abort_unless($this->configured(), 422, '微信登录尚未配置。');
 
-        return DB::transaction(function () use ($user): array {
+        return DB::transaction(function () use ($user, $reset): array {
             User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
             $row = DB::table('wechat_account_bindings')->where('user_id', $user->id)->where('appid', config('wechat.appid'))->lockForUpdate()->first();
-            if ($row && $row->openid) {
-                throw ValidationException::withMessages(['wechat' => '账号已绑定微信，请先解绑。']);
+            if ($row?->code_encrypted && ! $reset) {
+                return ['code' => Crypt::decryptString($row->code_encrypted), 'expires_at' => null];
             }
             $code = strtoupper(bin2hex(random_bytes(8)));
-            $expires = now()->addMinutes(10);
             DB::table('wechat_account_bindings')->updateOrInsert(['user_id' => $user->id, 'appid' => config('wechat.appid')], [
-                'code_hash' => hash('sha256', $code), 'code_expires_at' => $expires, 'version' => (string) Str::uuid(), 'created_at' => $row?->created_at ?? now(), 'updated_at' => now(),
+                'code_hash' => hash('sha256', $code), 'code_encrypted' => Crypt::encryptString($code), 'code_expires_at' => null, 'version' => $row?->version ?? (string) Str::uuid(), 'created_at' => $row?->created_at ?? now(), 'updated_at' => now(),
             ]);
 
-            return ['code' => $code, 'expires_at' => $expires->toIso8601String()];
+            return ['code' => $code, 'expires_at' => null];
         });
     }
 
@@ -76,15 +76,15 @@ class WechatLogin
             return DB::transaction(function () use ($openid, $code): object {
                 $query = DB::table('wechat_account_bindings')->where('appid', config('wechat.appid'));
                 $row = ($code ? $query->where('code_hash', hash('sha256', strtoupper($code))) : $query->where('openid', $openid))->lockForUpdate()->first();
-                if (! $row || ($code && (! $row->code_expires_at || now()->gte($row->code_expires_at)))) {
-                    throw ValidationException::withMessages(['binding_code' => $code ? '绑定码无效或已过期。若刚刚已完成绑定，请返回微信登录；否则在后台重新生成。' : '当前微信尚未绑定，请先在平台后台生成绑定码。']);
+                if (! $row || ($code && ! $row->code_encrypted)) {
+                    throw ValidationException::withMessages(['binding_code' => $code ? '绑定码无效或已重置，请向管理员获取当前固定绑定码。' : '当前微信尚未绑定，请先在平台后台生成绑定码。']);
                 }
                 User::query()->whereKey($row->user_id)->firstOrFail();
-                if ($code) {
-                    if ($row->openid) {
+                if ($code && $row->openid !== $openid) {
+                    if ($row->openid && $row->openid !== $openid) {
                         throw ValidationException::withMessages(['binding_code' => '账号已绑定，请先解绑后重试。']);
                     }
-                    DB::table('wechat_account_bindings')->where('id', $row->id)->update(['openid' => $openid, 'bound_at' => now(), 'code_hash' => null, 'code_expires_at' => null, 'updated_at' => now()]);
+                    DB::table('wechat_account_bindings')->where('id', $row->id)->update(['openid' => $openid, 'bound_at' => now(), 'updated_at' => now()]);
                     $this->audit($row->user_id, $row->user_id, 'wechat.bind');
                 }
 
@@ -103,7 +103,7 @@ class WechatLogin
         DB::transaction(function () use ($target, $actor): void {
             $row = DB::table('wechat_account_bindings')->where('user_id', $target->id)->where('appid', config('wechat.appid'))->lockForUpdate()->first();
             if ($row) {
-                DB::table('wechat_account_bindings')->where('id', $row->id)->update(['openid' => null, 'bound_at' => null, 'code_hash' => null, 'code_expires_at' => null, 'version' => (string) Str::uuid(), 'updated_at' => now()]);
+                DB::table('wechat_account_bindings')->where('id', $row->id)->update(['openid' => null, 'bound_at' => null, 'version' => (string) Str::uuid(), 'updated_at' => now()]);
                 $this->audit($target->id, $actor->id, 'wechat.unbind');
             }
         });

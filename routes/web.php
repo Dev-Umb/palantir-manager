@@ -111,6 +111,7 @@ Route::middleware('auth')->group(function () {
         ->name('tenders.convert');
 
     Route::middleware('permission:rbac.manage')->group(function () {
+        Route::post('/admin/users/{user}/wechat/code', [WechatAccountController::class, 'adminIssue'])->middleware('throttle:6,1')->name('rbac.users.wechat.code');
         Route::delete('/admin/users/{user}/wechat', [WechatAccountController::class, 'adminDestroy'])->middleware('throttle:6,1')->name('rbac.users.wechat.destroy');
         Route::put('/admin/users/{user}/password', [RbacController::class, 'resetPassword'])->middleware('throttle:6,1')->name('rbac.users.password');
         Route::get('/admin/rbac', [RbacController::class, 'index'])->name('rbac.index');
