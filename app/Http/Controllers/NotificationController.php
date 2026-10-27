@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\ProjectNotification;
 use App\Models\TenderNotification;
 use App\Support\ProjectVisibility;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -125,7 +126,7 @@ class NotificationController extends Controller
         ]);
     }
 
-    public function markRead(Request $request, ProjectNotification $notification): RedirectResponse
+    public function markRead(Request $request, ProjectNotification $notification): RedirectResponse|JsonResponse
     {
         abort_unless($notification->user_id === $request->user()->id, 403);
 
@@ -134,7 +135,9 @@ class NotificationController extends Controller
             $this->auditRead($request, $notification);
         }
 
-        return back();
+        return $request->wantsJson()
+            ? response()->json(['status' => 'read'])
+            : back();
     }
 
     public function markAllRead(Request $request): RedirectResponse

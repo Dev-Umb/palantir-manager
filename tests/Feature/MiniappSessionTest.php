@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\ObjectRecord;
+use App\Models\ProjectNotification;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\XycPrototypeSeeder;
@@ -81,6 +83,28 @@ class MiniappSessionTest extends TestCase
         $this->getJson('/objects/customer', $headers)->assertOk()
             ->assertJsonStructure(['props' => ['records' => ['data' => [['contacts', 'cooperation_projects']]]]]);
         $this->getJson('/notifications', $headers)->assertOk()->assertJsonStructure(['props' => ['notifications', 'tenderNotifications']]);
+    }
+
+    public function test_notification_json_acknowledgement_preserves_browser_redirect_and_owner_scope(): void
+    {
+        $this->seed(XycPrototypeSeeder::class);
+        $user = User::factory()->create();
+        $notification = ProjectNotification::create([
+            'project_id' => ObjectRecord::whereHas('businessObject', fn ($query) => $query->where('key', 'project'))->firstOrFail()->id,
+            'user_id' => $user->id,
+            'type' => ProjectNotification::TYPE_PAYMENT,
+            'status' => ProjectNotification::STATUS_ACTIVE,
+            'triggered_at' => now(),
+            'occurrences' => 1,
+        ]);
+        $path = '/notifications/'.$notification->id.'/read';
+        $this->actingAs(User::factory()->create())->patchJson($path)->assertForbidden();
+        $this->assertNull($notification->fresh()->read_at);
+        $this->actingAs($user)->withHeader('Referer', 'https://servicewechat.com/example/page.html')
+            ->patchJson($path)->assertOk()->assertJsonPath('status', 'read')->assertHeaderMissing('Location');
+        $this->assertNotNull($notification->fresh()->read_at);
+        $this->flushHeaders();
+        $this->from('/notifications')->patch($path)->assertRedirect('/notifications');
     }
 
     public function test_session_writes_require_csrf_including_guest_requests(): void
