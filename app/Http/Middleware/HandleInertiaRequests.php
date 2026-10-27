@@ -24,7 +24,7 @@ class HandleInertiaRequests extends Middleware
         if ($passwordOnly) {
             abort_unless($request->routeIs('timebook.*', 'ai.index', 'ai.messages', 'ai.conversations.show',
                 'ai.runs.store', 'ai.runs.show', 'ai.runs.events', 'ai.runs.cancel',
-                'settings.index', 'settings.email', 'settings.password', 'logout'), 403);
+                'settings.index', 'settings.email', 'settings.password', 'logout', 'miniapp.session.*'), 403);
         }
 
         if ($request->is('procurement-hub', 'procurement-hub/*')) {

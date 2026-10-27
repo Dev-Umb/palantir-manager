@@ -11,6 +11,7 @@ use App\Http\Controllers\AttachmentPreviewController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FeishuEventController;
+use App\Http\Controllers\MiniappSessionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OntologyController;
 use App\Http\Controllers\ProjectContractAmountController;
@@ -27,6 +28,10 @@ Route::post('/webhooks/feishu/events', FeishuEventController::class)
     ->name('webhooks.feishu.events');
 
 require __DIR__.'/timebook.php';
+
+Route::get('/miniapp/session', [MiniappSessionController::class, 'show'])->name('miniapp.session.show');
+Route::post('/miniapp/session', [MiniappSessionController::class, 'store'])->middleware('throttle:login')->name('miniapp.session.store');
+Route::delete('/miniapp/session', [MiniappSessionController::class, 'destroy'])->name('miniapp.session.destroy');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');
