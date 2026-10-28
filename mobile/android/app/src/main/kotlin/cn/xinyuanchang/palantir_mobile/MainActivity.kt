@@ -1,6 +1,8 @@
 package cn.xinyuanchang.palantir_mobile
 
 import android.app.Activity
+import android.content.ClipData
+import androidx.core.content.FileProvider
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -17,6 +19,8 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
+    private val reimbursementNotifications by lazy { ReimbursementNotifications(this) }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent) }
     private val updater by lazy { AppUpdater(this) }
     private val updateWorker = Executors.newSingleThreadExecutor()
     private val sessionStore by lazy { SessionStore(this) }
@@ -31,6 +35,15 @@ class MainActivity : FlutterActivity() {
         File(cacheDir, "pdf").deleteRecursively()
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "palantir/android").setMethodCallHandler { call, result ->
             when (call.method) {
+                "reimbursementAccount" -> { reimbursementNotifications.account(call.argument<String>("account") ?: ""); result.success(null) }
+                "reimbursementNotifications" -> {
+                    try {
+                        @Suppress("UNCHECKED_CAST")
+                        val notices = call.argument<List<Map<String, Any?>>>("notices") ?: emptyList()
+                        result.success(reimbursementNotifications.show(call.argument<String>("account") ?: "", notices))
+                    } catch (_: Exception) { result.error("notifications", "本地通知不可用，请在应用内查看", null) }
+                }
+                "consumeReimbursementNotification" -> result.success(reimbursementNotifications.consume(call.argument<String>("account") ?: ""))
                 "updateInfo" -> result.success(updater.info())
                 "updateProgress" -> result.success(mapOf("bytes" to updater.bytes))
                 "cancelUpdate" -> { updater.cancel(); result.success(null) }
@@ -67,15 +80,16 @@ class MainActivity : FlutterActivity() {
                         runOnUiThread { result.error("session_storage", "无法访问设备上的登录信息，请重试", null) }
                     }
                 }
-                "saveFile" -> {
+                "saveFile", "saveReimbursementFile" -> {
                     if (saver != null) { result.error("busy", "保存窗口已打开", null) }
                     else {
                         try {
                             val bytes = call.argument<ByteArray>("bytes")!!
                             val mime = call.argument<String>("mime")!!
                             val name = call.argument<String>("name")!!
-                            require(bytes.isNotEmpty() && bytes.size <= 20 * 1024 * 1024)
-                            require(mime in listOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                            val reimbursement = call.method == "saveReimbursementFile"
+                            require(bytes.isNotEmpty() && bytes.size <= (if (reimbursement) 210 else 20) * 1024 * 1024)
+                            require(mime in (if (reimbursement) listOf("application/pdf", "image/jpeg", "image/png", "application/zip") else listOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")))
                             require(!name.contains('/') && !name.contains('\\'))
                             saver = result
                             saveBytes = bytes
@@ -86,6 +100,33 @@ class MainActivity : FlutterActivity() {
                             }, 72)
                         } catch (_: Exception) { saver = null; saveBytes = null; result.error("save", "无法打开保存窗口", null) }
                     }
+                }
+                "shareFile" -> worker.execute {
+                    try {
+                        val bytes = call.argument<ByteArray>("bytes")!!
+                        val name = call.argument<String>("name")!!
+                        val mime = call.argument<String>("mime")!!
+                        require(bytes.isNotEmpty() && bytes.size <= 20 * 1024 * 1024)
+                        require(name.isNotBlank() && !name.contains('/') && !name.contains('\\') && name != "." && name != "..")
+                        require(mime in listOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                        val root = File(cacheDir, "quotations").apply { mkdirs() }
+                        root.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 86400000L }?.forEach { it.deleteRecursively() }
+                        val directory = File(root, UUID.randomUUID().toString()).apply { mkdirs() }
+                        val file = File(directory, name).apply { writeBytes(bytes) }
+                        val uri = FileProvider.getUriForFile(this, "$packageName.quotations", file)
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = mime
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            clipData = ClipData.newRawUri(name, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        runOnUiThread {
+                            try {
+                                startActivity(Intent.createChooser(intent, "分享报价单"))
+                                result.success(null)
+                            } catch (_: Exception) { result.error("share", "无法打开分享面板，请重试", null) }
+                        }
+                    } catch (_: Exception) { runOnUiThread { result.error("share", "报价文件无法分享，请重试", null) } }
                 }
                 "pickFile" -> {
                     if (picker != null) { result.error("busy", "文件选择器已打开", null) }

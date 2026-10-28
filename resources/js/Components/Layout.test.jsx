@@ -93,4 +93,28 @@ describe('Layout workflow task navigation', () => {
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(screen.queryByRole('dialog', { name: '更多业务入口' })).toBeNull();
     });
+    it('collapses the cockpit using only the attached arrow and restores retained navigation', () => {
+        const { container } = render(<Layout title="可视化大盘" hideHeader cockpit><div>大盘金额</div></Layout>);
+        const toggle = screen.getByRole('button', { name: '折叠菜单' });
+        expect(toggle.className).toBe('cockpit-rail-tab');
+        expect(toggle.textContent).toBe('');
+        fireEvent.click(toggle);
+        expect(container.querySelector('.app-shell').classList.contains('cockpit-rail-collapsed')).toBe(true);
+        expect(container.querySelector('.desktop-rail').hasAttribute('inert')).toBe(true);
+        expect(screen.getByText('大盘金额')).not.toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: '展开菜单' }));
+        expect(container.querySelector('.desktop-rail').hasAttribute('inert')).toBe(false);
+        expect(screen.getByRole('link', { name: '履约' })).not.toBeNull();
+        expect(screen.getByRole('button', { name: '更多业务入口' })).not.toBeNull();
+    });
+
+    it('leaves non-cockpit layouts unchanged and restores a folded rail after fullscreen exits', () => {
+        const { rerender, container } = render(<Layout title="普通页面"><div>内容</div></Layout>);
+        expect(screen.queryByRole('button', { name: '折叠菜单' })).toBeNull();
+        rerender(<Layout title="驾驶舱" cockpit presentation><div>内容</div></Layout>);
+        expect(container.querySelector('.app-shell').classList.contains('cockpit-rail-collapsed')).toBe(true);
+        rerender(<Layout title="驾驶舱" cockpit><div>内容</div></Layout>);
+        expect(container.querySelector('.app-shell').classList.contains('cockpit-rail-collapsed')).toBe(false);
+    });
+
 });

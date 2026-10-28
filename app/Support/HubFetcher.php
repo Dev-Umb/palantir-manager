@@ -8,7 +8,6 @@ use DOMXPath;
 use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\UriResolver;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -106,15 +105,21 @@ class HubFetcher
             }
             $hash = hash('sha256', $raw);
             $path = 'procurement-hub/evidence/'.$hash;
-            Storage::disk('local')->put($path, $raw);
+            app(BusinessFileStorage::class)->storeBytes($path, $raw, basename(parse_url($url, PHP_URL_PATH)) ?: $hash, str_starts_with($raw, '%PDF') ? 'application/pdf' : 'application/octet-stream');
             $json = json_decode($raw, true);
             if (is_array($json)) {
                 return ['url' => $url, 'text' => $raw, 'title' => '', 'links' => [], 'json' => $json,
                     'raw_path' => $path, 'content_hash' => $hash, 'fetched_at' => now()->toIso8601String()];
             }
             if (str_starts_with($raw, '%PDF')) {
-                $process = new Process(['pdftotext', '-layout', Storage::disk('local')->path($path), '-']);
-                $process->setTimeout(5)->run();
+                $temporary = tempnam(sys_get_temp_dir(), 'hub-pdf-');
+                try {
+                    file_put_contents($temporary, $raw);
+                    $process = new Process(['pdftotext', '-layout', $temporary, '-']);
+                    $process->setTimeout(5)->run();
+                } finally {
+                    unlink($temporary);
+                }
                 if (! $process->isSuccessful() || ! trim($process->getOutput())) {
                     throw new RuntimeException('PDF 暂无法提取文本，原文件已保存，需人工核实。');
                 }

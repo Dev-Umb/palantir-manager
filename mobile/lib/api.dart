@@ -395,7 +395,13 @@ class PalantirApi extends ChangeNotifier {
       await _check(res.statusCode, data ?? {});
       _ensureCurrent(generation);
       if (res.statusCode == 204 && !isPage) return {};
-      if (res.statusCode != 200 && res.statusCode != 201 || data == null) {
+      final acceptedRun =
+          !isPage &&
+          uri(path).path == '/ai/runs' &&
+          method == 'POST' &&
+          res.statusCode == HttpStatus.accepted;
+      if (res.statusCode != 200 && res.statusCode != 201 && !acceptedRun ||
+          data == null) {
         throw ApiFailure('服务器返回内容异常，请重试。');
       }
       if (!isPage) return data;
@@ -577,11 +583,25 @@ class PalantirApi extends ChangeNotifier {
       final req = await _http.getUrl(uri(path));
       _ensureCurrent(generation);
       req.followRedirects = false;
+      req.headers.set('X-TOS-Download', '1');
       _authenticate(req);
-      final res = await req.close();
+      var res = await req.close();
       _ensureCurrent(generation);
       _receiveCookies(res.cookies);
       await _persist();
+      if (res.statusCode == 302) {
+        final address = Uri.tryParse(
+          res.headers.value(HttpHeaders.locationHeader) ?? '',
+        );
+        if (address != null && isTrustedBusinessDownload(address)) {
+          await res.drain<void>();
+          final storageRequest = await _http.getUrl(address);
+          storageRequest.followRedirects = false;
+          // Platform cookies are deliberately never attached to TOS requests.
+          res = await storageRequest.close();
+          _ensureCurrent(generation);
+        }
+      }
       await _checkRedirect(res);
       await _check(res.statusCode, {});
       if (res.statusCode != 200) throw ApiFailure('附件暂时无法打开');
@@ -630,3 +650,13 @@ String progress(Map<String, dynamic> p) {
       ? '—'
       : '${(b / a * 100).toStringAsFixed(2)}%';
 }
+
+bool isTrustedBusinessDownload(Uri address) =>
+    address.scheme == 'https' &&
+    address.host ==
+        'xyc-palantir-contracts-prod.tos-s3-cn-beijing.volces.com' &&
+    address.port == 443 &&
+    address.userInfo.isEmpty &&
+    !address.hasFragment &&
+    address.path.startsWith('/') &&
+    address.queryParameters.containsKey('X-Amz-Signature');

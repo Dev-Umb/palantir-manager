@@ -80,3 +80,25 @@ it('keeps historical attachment links out of the submitted file arrays', () => {
     expect(within(detail).getByText('对账单附件')).toBeInTheDocument();
     expect(within(detail).getAllByRole('link')).toHaveLength(3);
 });
+
+it('accepts a 100 MB contract while rejecting oversized adjacent attachments and batches without losing prior files', () => {
+    const onChange = vi.fn();
+    const contract = emptyProjectContract();
+    render(<ProjectContractEditor contracts={[contract]} onChange={onChange} deletedContractIds={[]} onDeletedContractIdsChange={() => {}} />);
+    const file = (name, size) => {
+        const result = new File(['pdf'], name, { type: 'application/pdf' });
+        Object.defineProperty(result, 'size', { value: size });
+        return result;
+    };
+    fireEvent.change(screen.getByLabelText('上传合同附件'), { target: { files: [file('大合同.pdf', 100 * 1024 * 1024)] } });
+    expect(onChange.mock.calls[0][0][0].contract_attachments[0].name).toBe('大合同.pdf');
+    onChange.mockClear();
+    fireEvent.change(screen.getByLabelText('上传加工函附件'), { target: { files: [file('加工函.pdf', 20 * 1024 * 1024 + 1)] } });
+    expect(screen.getByRole('alert')).toHaveTextContent('不能超过 20 MB');
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('上传合同附件'), { target: { files: [file('超限.pdf', 100 * 1024 * 1024 + 1)] } });
+    expect(screen.getByRole('alert')).toHaveTextContent('不能超过 100 MB');
+    fireEvent.change(screen.getByLabelText('上传合同附件'), { target: { files: [file('1.pdf', 100 * 1024 * 1024), file('2.pdf', 100 * 1024 * 1024), file('3.pdf', 1)] } });
+    expect(screen.getByRole('alert')).toHaveTextContent('不能超过 200 MB');
+    expect(onChange).not.toHaveBeenCalled();
+});

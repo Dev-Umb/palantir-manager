@@ -59,7 +59,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard');
+        return redirect()->route('home');
     }
 
     public function logout(Request $request): RedirectResponse
@@ -83,6 +83,6 @@ class AuthController extends Controller
 
         return $isBusinessOnly
             ? route('objects.index', ['object' => 'project'])
-            : route('dashboard');
+            : route('home');
     }
 }

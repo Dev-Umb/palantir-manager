@@ -3,12 +3,21 @@
 namespace App\Ai\Agents;
 
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasProviderOptions;
+use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
 use Stringable;
 
-class ContractExtractionAgent implements Agent
+class ContractExtractionAgent implements Agent, HasProviderOptions
 {
     use Promptable;
+
+    public function providerOptions(Lab|string $provider): array
+    {
+        return $provider === Lab::OpenAI || $provider === 'openai'
+            ? ['reasoning' => ['effort' => 'low']]
+            : [];
+    }
 
     public function instructions(): Stringable|string
     {

@@ -219,7 +219,7 @@ class ProjectCollectionProgressTest extends TestCase
         ]]);
 
         $this->actingAs(User::where('email', 'ratio-admin@example.com')->firstOrFail())
-            ->get('/')
+            ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('cockpit.kpis.1.key', 'collection_rate')
@@ -266,7 +266,7 @@ class ProjectCollectionProgressTest extends TestCase
         }
 
         $this->actingAs($salespersonA)
-            ->get('/')
+            ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('cockpit.kpis.1.key', 'collection_rate')

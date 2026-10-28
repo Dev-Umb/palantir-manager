@@ -1,0 +1,14 @@
+<navigation-bar title="项目" back="{{false}}" color="#182331" background="#ffffff" /><scroll-view class="scrollarea" scroll-y type="list"><view class="content preview-screen"><view wx:if="{{error}}" class="error">{{error}}<button class="small" bindtap="refresh">重试</button></view><view wx:if="{{loading}}" class="loading">正在加载…</view><block wx:if="{{user}}">
+<view class="list-toolbar row"><text class="sub">共 {{total}} 个项目</text><button wx:if="{{canCreate}}" class="text-button add" bindtap="create">＋ 新增</button></view>
+<view class="row search"><text class="search-icon">⌕</text><input value="{{query}}" bindinput="input" bindconfirm="search" confirm-type="search" placeholder="项目 / 编号 / 客户 / 业务员"/><button class="text-button" bindtap="search">搜索</button></view>
+<view class="status-chips"><button wx:for="{{statuses}}" wx:key="*this" class="chip {{status===item?'active':''}}" data-status="{{item}}" bindtap="filter">{{item}}</button></view>
+<view class="filter-toolbar"><picker range="{{owners}}" range-key="label" bindchange="ownerChange"><view class="owner-filter">{{ownerLabel}} ▾</view></picker><button class="reset-filter" bindtap="clearFilters">清空条件</button></view>
+<view class="active-filters">{{query?'关键词：'+query+' · ':''}}{{status}} · {{ownerLabel}} · {{total}} 个项目</view>
+<view wx:for="{{projects}}" wx:key="id" class="project-card" data-id="{{item.id}}" bindtap="openProject">
+ <view class="row"><view class="name grow">{{item.name}}</view><text class="tag {{item.statusTone}}">{{item.status}}</text></view>
+ <view class="sub ellipsis">{{item.customer}}</view>
+ <view class="project-foot"><text class="sub">{{item.code}} · {{item.owner}}</text><text class="balance">未回款 ¥{{item.unpaidText}}</text></view>
+</view>
+<view wx:if="{{!loading && !error && !projects.length}}" class="empty">没有符合条件的项目</view>
+<view class="row pagination"><button disabled="{{loading || page <= 1}}" bindtap="previous">上一页</button><text>{{page}} / {{last}}</text><button disabled="{{loading || page >= last}}" bindtap="next">下一页</button></view>
+</block></view></scroll-view>

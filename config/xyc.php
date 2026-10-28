@@ -37,6 +37,12 @@ return [
     ],
 
     'permissions' => [
+        ['key' => 'reimbursements.submit', 'module' => 'reimbursements', 'action' => 'submit', 'label' => '提交报销申请'],
+        ['key' => 'reimbursements.manage', 'module' => 'reimbursements', 'action' => 'manage', 'label' => '查看全部报销'],
+        ['key' => 'reimbursements.configure', 'module' => 'reimbursements', 'action' => 'configure', 'label' => '配置报销审批流程'],
+        ['key' => 'support-library.view', 'module' => 'support-library', 'action' => 'view', 'label' => '查看钢箱梁工作台'],
+        ['key' => 'support-library.manage', 'module' => 'support-library', 'action' => 'manage', 'label' => '维护共享支架库'],
+        ['key' => 'support-library.export', 'module' => 'support-library', 'action' => 'export', 'label' => '导出支架明细与备份'],
         ['key' => 'timebook.view', 'module' => 'timebook', 'action' => 'view', 'label' => '查看工日簿'],
         ['key' => 'timebook.create', 'module' => 'timebook', 'action' => 'create', 'label' => '新增记工'],
         ['key' => 'timebook.update', 'module' => 'timebook', 'action' => 'update', 'label' => '修改记工'],
@@ -52,7 +58,7 @@ return [
     'role_permissions' => [
         'basic' => ['dashboard.view', 'ai.harness.view'],
         'admin' => ['*'],
-        'business' => ['dashboard.view', 'ai.harness.view'],
+        'business' => ['dashboard.view', 'ai.harness.view', 'reimbursements.submit'],
         'business_manager_view' => [
             'dashboard.view',
             'object.customer.view',
@@ -62,7 +68,7 @@ return [
             'object.project_business_summary.view',
             'object.contract.view',
         ],
-        'engineering' => ['dashboard.view', 'ai.harness.view'],
+        'engineering' => ['dashboard.view', 'ai.harness.view', 'support-library.view', 'support-library.manage', 'support-library.export'],
         'procurement' => ['dashboard.view', 'ai.harness.view'],
         'production_manager' => ['dashboard.view', 'ai.harness.view'],
         'production' => ['dashboard.view', 'ai.harness.view'],
@@ -132,6 +138,7 @@ return [
                 $code('project_no', '项目编号'),
                 $relation('customer_id', '客户名称', 'customer', ['required' => true]),
                 $field('name', '项目名称', 'text', ['required' => true]),
+                $select('factory_subject', '工厂主体', ['江苏晋武', '文水鑫源昌', '山西弘创重工', '山西汾阳丰源网架钢结构', '文水县恒鑫达贸易', '文水县鑫源晟商贸', '恒鑫盛', '鑫辉', '精致诚', '恒泰机械', '恒鑫昌']),
                 $date('handover_date', '项目对接日期'),
                 $date('first_shipment_date', '首次发货日期'),
                 $date('last_shipment_date', '末次发货日期'),

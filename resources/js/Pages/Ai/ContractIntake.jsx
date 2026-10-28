@@ -9,7 +9,10 @@ async function request(url, { body, ...options } = {}) {
         headers: { Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '', ...(!form && body ? { 'Content-Type': 'application/json' } : {}) },
         body: body ? (form ? body : JSON.stringify(body)) : undefined,
     });
-    const data = await response.json();
+    if (response.status === 413) throw new Error('合同上传请求过大，请选择不超过 100 MB 的文件后重试。');
+    let data;
+    try { data = await response.json(); }
+    catch { throw new Error(response.status === 401 || response.status === 419 ? '登录已失效，请重新登录后重试。' : '服务器暂时无法处理请求，请稍后重试。'); }
     if (!response.ok) throw new Error(Object.values(data.errors || {}).flat().join('；') || data.message || '操作未完成，请重试。');
     return data;
 }
@@ -85,7 +88,7 @@ export default function ContractIntake({ onClose }) {
     function upload(event) {
         event.preventDefault();
         if (!file) return;
-        if (file.size > 20 * 1024 * 1024) { setError('文件不能超过 20 MB。'); return; }
+        if (file.size > 100 * 1024 * 1024) { setError('合同文件不能超过 100 MB。'); return; }
         act(async () => { const body = new FormData(); body.append('file', file); setIntake(await request('/ai/contracts', { method: 'POST', body })); });
     }
 
@@ -138,7 +141,7 @@ export default function ContractIntake({ onClose }) {
                 {!intake && <>
                     <form onSubmit={upload} className="ai-contract-upload">
                         <FileUp size={30} /><label>选择合同文件<input aria-label="合同文件" type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={busy} onChange={(e) => setFile(e.target.files?.[0] || null)} /></label>
-                        <p>PDF、JPG 或 PNG，最大 20 MB。文件将提交给当前 AI 服务识别，确认前不改业务数据。</p>
+                        <p>PDF、JPG 或 PNG，最大 100 MB。文件将提交给当前 AI 服务识别，确认前不改业务数据。PDF 会完整逐页识别，复杂或页数较多时可能需要拆分；原文件始终保留。</p>
                         <button className="action-button" disabled={!file || busy}>{busy ? '正在上传…' : '上传并识别'}</button>
                     </form>
                     {recent.length > 0 && <div className="ai-contract-recent"><h3>最近上传</h3>{recent.map((item) => <button type="button" key={item.id} onClick={() => setIntake(item)}>{item.file_name}<span>{item.status === 'confirmed' ? '已归档' : '继续处理'}</span></button>)}</div>}

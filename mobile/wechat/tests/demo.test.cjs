@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');
+let storage;global.wx={getStorageSync:()=>storage?structuredClone(storage):'',setStorageSync:(k,v)=>{storage=structuredClone(v);}};
+const d=require('../services/demo');
+assert.equal(d.projects().length,3);assert.equal(d.project('p3'),null);assert.equal(d.projects('远山').length,2);assert.equal(d.projects('','待签约').length,1);
+assert.equal(d.progress({incurred:0,paid:0}),'—');assert.equal(d.progress({incurred:null,paid:0}),'—');assert.equal(d.progress({incurred:10,paid:null}),'—');assert.equal(d.progress({incurred:10,paid:0}),'0.0%');assert.equal(d.progress({incurred:800000,paid:560000}),'70.0%');assert.equal(d.money(null),'—');assert.equal(d.money(0),'0.00');
+assert.equal(d.summary().unpaidMissing,1);assert.equal(d.summary().unpaid,'240,000.00');
+assert.throws(()=>d.save({name:'x',customerId:'c1',status:'进行中'},'p3'),/无权/);
+assert.throws(()=>d.save({name:' ',customerId:'c1',status:'进行中'}),/名称/);
+assert.throws(()=>d.save({name:'x',customerId:'no',status:'进行中'}),/客户/);
+const before=d.project('p1');d.save({name:'改名测试',customerId:'c1',status:'已完成',remark:'保留合同'},'p1');assert.deepEqual(d.project('p1').contracts,before.contracts);assert.equal(d.project('p1').unpaid,before.unpaid);assert.equal(d.project('p1').name,'改名测试');
+d.markRead('p1');assert.equal(d.notices().find(n=>n.id==='p1').read,true);d.setRole('admin');assert.equal(d.projects().length,4);assert.ok(d.project('p3'));d.setRole('sales');assert.equal(d.project('p3'),null);
+d.login(false);assert.equal(d.projects().length,0);assert.equal(d.notices().length,0);assert.equal(d.customerList().length,0);assert.throws(()=>d.save({name:'x'}),/账号/);d.login(true);d.reset();assert.equal(d.project('p1').name,before.name);
+const id=d.save({name:'新增测试',customerId:'c1',status:'待签约'});assert.ok(d.project(id));assert.equal(d.project(id).contractAmount,null);
+global.wx.setStorageSync=()=>{throw Error('storage full');};assert.throws(()=>d.save({name:'保存失败',customerId:'c1',status:'进行中'}),/storage full/);assert.equal(d.project('p1').name,before.name);
+console.log('PASS: visibility, search, amounts, zero/missing, edit retention, validation, notifications, login, reset, storage failure');

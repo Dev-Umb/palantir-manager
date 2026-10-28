@@ -90,7 +90,7 @@ class ExampleTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $this->get('/')
+        $this->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Dashboard')
@@ -113,7 +113,7 @@ class ExampleTest extends TestCase
         DB::flushQueryLog();
         DB::enableQueryLog();
 
-        $this->get('/')->assertOk();
+        $this->get('/dashboard')->assertOk();
 
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
@@ -372,7 +372,7 @@ class ExampleTest extends TestCase
                 ])
                 ->has('relationOptions.customer_id.items', 3)
                 ->where('selectedRecordId', null)
-                ->has('currentObject.fields', 30)
+                ->has('currentObject.fields', 31)
                 ->where('currentObject.fields.0.key', 'business_owner_user_id')
                 ->where('currentObject.fields.0.label', '负责业务员')
                 ->where('currentObject.fields.1.key', 'project_no')

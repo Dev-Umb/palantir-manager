@@ -5,7 +5,9 @@ import { pathToFileURL } from 'node:url';
 export function releaseManifest(bytes, { code, name, url, notes }) {
     const address = new URL(url);
     if (!Number.isInteger(code) || code <= 0 || !name || typeof notes !== 'string'
-        || address.origin !== 'https://palantir.umb.ink' || address.username || address.password
+        || !(address.origin === 'https://palantir.umb.ink'
+            || (address.origin === 'https://app-download.umb.ink'
+                && /^\/android\/palantir-[0-9]+\.[0-9]+\.[0-9]+\.apk$/.test(address.pathname))) || address.username || address.password
         || address.hash || !address.pathname.endsWith('.apk') || !bytes.length || bytes.length > 150 * 1024 * 1024) {
         throw new Error('Invalid release metadata');
     }

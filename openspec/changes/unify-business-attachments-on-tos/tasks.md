@@ -1,0 +1,8 @@
+- [x] Identify production storage split and registered file counts.
+- [x] Obtain proposal approval.
+- [x] Inventory all registered and referenced business files and independent design/quotation paths.
+- [x] Implement unified TOS upload and storage-aware cleanup preserving existing validation.
+- [x] Test target uploads, retained preview/download, failure paths and authorization.
+- [x] Run strict validation and quality gate.
+- [ ] Deploy, migrate with per-file size/SHA256 verification and retained local sources.
+- [ ] Independently verify counts, metadata, preserved business references and online preview/download.

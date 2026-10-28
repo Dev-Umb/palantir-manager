@@ -1,0 +1,37 @@
+<view wx:if="{{!run && !messages.length}}" class="chat-welcome">
+ <view class="assistant-mark">✦</view><view class="chat-title">有什么可以帮你？</view>
+ <view class="chat-description">查项目、理资料、做报价<br/>直接说出你的需求</view>
+ <view class="chat-examples"><view class="example-label">你可以这样问</view><view>“帮我查一下项目的回款情况”</view><view>“制作一份报价单，需要哪些资料？”</view></view>
+</view>
+<block wx:for="{{messages}}" wx:key="index">
+ <view class="chat-question"><text selectable>{{item.question}}</text></view>
+ <view class="chat-response"><view class="assistant-label">✦ 鑫源昌助手</view><text selectable class="answer">{{item.answer}}</text></view>
+</block>
+<block wx:if="{{run}}">
+ <view class="chat-question"><text selectable>{{run.input}}</text></view>
+ <view class="chat-response"><view class="assistant-label">✦ 鑫源昌助手 <text class="run-status">{{aiStatus}}</text></view>
+ <text wx:if="{{run.answer}}" selectable class="answer">{{run.answer}}</text>
+ <view wx:elif="{{aiActive}}" class="chat-description">正在处理你的问题，结果会显示在这里。</view>
+ <view wx:if="{{aiError}}" class="error">{{aiError}}</view>
+ <button wx:if="{{run.status==='failed' || run.status==='cancelled'}}" class="chat-retry" bindtap="retryAi" disabled="{{busy}}">重新尝试</button></view>
+</block>
+<view wx:for="{{aiArtifacts}}" wx:key="id" wx:for-item="artifact" class="card">
+ <view class="subtitle">{{artifact.title}}</view>
+ <text wx:if="{{artifact.summary}}" selectable class="answer">{{artifact.summary}}</text>
+ <block wx:if="{{artifact.type==='choice'}}"><text>{{artifact.data.question}}</text><button wx:for="{{artifact.data.options}}" wx:key="value" data-value="{{item.value}}" bindtap="quickReply" disabled="{{busy || aiActive}}">{{item.label}}</button></block>
+ <block wx:if="{{artifact.type==='form'}}"><view wx:for="{{artifact.data.fields}}" wx:key="key" class="field"><label>{{item.label}}{{item.required?' *':''}}</label><input data-key="{{item.key}}" bindinput="formInput" value="{{formValues[item.key]}}" placeholder="{{item.placeholder}}"/><view wx:if="{{item.options}}" class="hint">可选：<text wx:for="{{item.options}}" wx:key="value">{{item.label}} </text></view></view><button data-id="{{artifact.id}}" bindtap="formReply" disabled="{{busy || aiActive}}">提交补充资料</button></block>
+ <block wx:if="{{artifact.proposal}}"><view class="hint">状态：{{artifact.data.status}}；请逐项核对后确认</view><view wx:for="{{artifact.rows}}" wx:key="label" class="cell"><view>{{item.label}}</view><text selectable>{{item.value}}</text></view><view wx:if="{{artifact.data.status==='pending'}}" class="row"><button data-id="{{artifact.id}}" data-action="reject" bindtap="proposalAction" disabled="{{busy || aiActive}}">放弃</button><button data-id="{{artifact.id}}" data-action="confirm" bindtap="proposalAction" disabled="{{busy || aiActive}}">确认写入</button></view></block>
+ <button wx:if="{{artifact.type==='quotation_docx'}}" data-id="{{artifact.id}}" bindtap="chooseQuotation" disabled="{{busy || aiActive}}">核对报价单</button>
+</view>
+<view wx:if="{{quote}}" class="card">
+ <view class="subtitle">固定模板报价单</view>
+ <view class="field"><label>标题</label><input data-key="title" value="{{quote.title}}" bindinput="quoteInput" disabled="{{quoteGenerated || busy}}"/></view>
+ <view class="field"><label>日期（YYYY-MM-DD）</label><input data-key="date" value="{{quote.date}}" bindinput="quoteInput" disabled="{{quoteGenerated || busy}}"/></view>
+ <view class="field"><label>联系人</label><input data-key="contact" value="{{quote.contact}}" bindinput="quoteInput" disabled="{{quoteGenerated || busy}}"/></view>
+ <view class="field"><label>电话</label><input data-key="phone" value="{{quote.phone}}" bindinput="quoteInput" disabled="{{quoteGenerated || busy}}"/></view>
+ <view class="field"><label>税率（固定模板需 13）</label><input data-key="tax_rate" value="{{quote.tax_rate}}" bindinput="quoteInput" disabled="{{quoteGenerated || busy}}"/></view>
+ <view class="field"><label>运费口径（固定模板需含运费）</label><input data-key="shipping" value="{{quote.shipping}}" bindinput="quoteInput" disabled="{{quoteGenerated || busy}}"/></view>
+ <view wx:for="{{quote.items}}" wx:key="index" class="card"><label>产品 {{index+1}}</label><input placeholder="物资名称" data-index="{{index}}" data-key="name" value="{{item.name}}" bindinput="quoteItemInput" disabled="{{quoteGenerated || busy}}"/><input placeholder="计价单位：吨、套、吨日、件、台、米、平方米" data-index="{{index}}" data-key="unit" value="{{item.unit}}" bindinput="quoteItemInput" disabled="{{quoteGenerated || busy}}"/><input placeholder="综合单价" data-index="{{index}}" data-key="price" value="{{item.price}}" bindinput="quoteItemInput" disabled="{{quoteGenerated || busy}}"/><input placeholder="材料费（可选）" data-index="{{index}}" data-key="material_price" value="{{item.material_price}}" bindinput="quoteItemInput" disabled="{{quoteGenerated || busy}}"/><input placeholder="加工费（可选）" data-index="{{index}}" data-key="processing_price" value="{{item.processing_price}}" bindinput="quoteItemInput" disabled="{{quoteGenerated || busy}}"/><button wx:if="{{!quoteGenerated && quote.items.length>1}}" data-index="{{index}}" bindtap="removeQuoteItem">移除此产品</button></view>
+ <button wx:if="{{!quoteGenerated && quote.items.length<3}}" bindtap="addQuoteItem">添加产品</button><button wx:if="{{!quoteGenerated}}" bindtap="generateQuote" disabled="{{busy || aiActive}}">生成盖章报价单</button><button wx:else bindtap="openQuote" disabled="{{busy}}">预览报价 PDF</button>
+</view>
+<view wx:for="{{sources}}" wx:key="index" class="cell"><text selectable>{{item.label}} {{item.detail}}</text><button wx:if="{{item.url}}" data-url="{{item.url}}" bindtap="copySource">复制来源链接</button></view>

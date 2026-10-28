@@ -1,0 +1,68 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/index/index",
+    "pages/projects/projects",
+    "pages/customers/customers",
+    "pages/mine/mine",
+    "pages/detail/detail",
+    "pages/edit/edit",
+    "pages/tools/tools",
+    "pages/customer/customer",
+    "pages/reimbursements/index",
+    "pages/reimbursements/form",
+    "pages/reimbursements/detail",
+    "pages/reimbursements/notices"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationStyle": "custom"
+  },
+  "style": "v2",
+  "renderer": "skyline",
+  "rendererOptions": {
+    "skyline": {
+      "defaultDisplayBlock": true,
+      "defaultContentBox": true,
+      "tagNameStyleIsolation": "legacy",
+      "disableABTest": true,
+      "sdkVersionBegin": "3.0.0",
+      "sdkVersionEnd": "15.255.255"
+    }
+  },
+  "componentFramework": "glass-easel",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "tabBar": {
+    "color": "#8a93a0",
+    "selectedColor": "#2864bd",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "工作台",
+        "iconPath": "assets/tabs/home.png",
+        "selectedIconPath": "assets/tabs/home-active.png"
+      },
+      {
+        "pagePath": "pages/projects/projects",
+        "text": "项目",
+        "iconPath": "assets/tabs/projects.png",
+        "selectedIconPath": "assets/tabs/projects-active.png"
+      },
+      {
+        "pagePath": "pages/customers/customers",
+        "text": "客户",
+        "iconPath": "assets/tabs/customers.png",
+        "selectedIconPath": "assets/tabs/customers-active.png"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的",
+        "iconPath": "assets/tabs/mine.png",
+        "selectedIconPath": "assets/tabs/mine-active.png"
+      }
+    ]
+  }
+}

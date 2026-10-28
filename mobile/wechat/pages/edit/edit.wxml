@@ -1,0 +1,24 @@
+<navigation-bar title="{{choiceKey?choiceTitle:'项目资料'}}" back="{{true}}" delta="{{0}}" bind:back="back" color="#182331" background="#ffffff" />
+<block wx:if="{{!choiceKey}}">
+ <scroll-view class="scrollarea" scroll-y type="list"><view class="editor-content">
+  <view wx:if="{{error}}" class="error">{{error}}<button wx:if="{{!allowed}}" bindtap="refresh">重新加载</button></view>
+  <view wx:if="{{loading}}" class="loading">正在加载项目资料…</view><view wx:if="{{!loading && !error && !allowed}}" class="empty">当前账号无权编辑</view>
+  <view wx:if="{{allowed}}" class="form-card">
+   <view class="form-heading">项目资料</view><view class="form-description">带 * 的为必填项</view>
+   <view wx:for="{{fields}}" wx:key="key" class="editor-field"><view class="field-label">{{item.label}}<text wx:if="{{item.required}}" class="required"> *</text></view>
+    <button wx:if="{{item.relation}}" class="relation-control" data-key="{{item.key}}" bindtap="choose"><text class="relation-label">{{item.selectedText}}</text><text class="chevron">›</text></button>
+    <picker wx:elif="{{item.type==='select'}}" range="{{item.options}}" data-key="{{item.key}}" bindchange="select"><view class="field-select"><text>{{values[item.key] || '请选择'}}</text><text class="chevron">⌄</text></view></picker>
+    <picker wx:elif="{{item.type==='date'}}" mode="date" value="{{values[item.key]}}" data-key="{{item.key}}" bindchange="date"><view class="field-select"><text>{{values[item.key] || '请选择日期'}}</text><text class="chevron">⌄</text></view></picker>
+    <textarea wx:elif="{{item.type==='textarea'}}" class="field-textarea" value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="input" maxlength="-1" placeholder="请输入{{item.label}}"/>
+    <input wx:else class="field-input" value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="input" maxlength="-1" placeholder="请输入{{item.label}}"/>
+   </view>
+  </view>
+ </view></scroll-view>
+ <view wx:if="{{allowed}}" class="editor-footer"><button class="save-button" disabled="{{busy || loading}}" loading="{{busy}}" bindtap="save">保存项目</button></view>
+</block>
+<block wx:else>
+ <view class="choice-header"><view class="choice-search"><input value="{{choiceQuery}}" bindinput="choiceInput" bindconfirm="searchChoices" confirm-type="search" placeholder="搜索{{choiceTitle}}"/><button bindtap="searchChoices">搜索</button></view><view class="choice-hint">{{choiceMultiple?'可选择多项，选好后点完成':'点击一项即可选定'}}</view></view>
+ <view wx:if="{{choiceLoading}}" class="loading">正在加载…</view><view wx:if="{{choiceError}}" class="error">{{choiceError}}</view>
+ <scroll-view class="choice-list" scroll-y type="list"><view class="choice-content"><view wx:if="{{!choiceLoading && !choiceError && !choices.length}}" class="empty">没有匹配结果，请更换关键词</view><view wx:for="{{choices}}" wx:key="id" data-id="{{item.id}}" bindtap="pick" class="choice-option {{item.selected?'is-selected':''}}"><text class="choice-label">{{item.label}}</text><text class="choice-check">{{item.selected?'✓':''}}</text></view></view></scroll-view>
+ <view class="choice-footer"><button class="clear-button" bindtap="clearChoice">清除选择</button><button class="done-button" bindtap="closeChoices">完成</button></view>
+</block>

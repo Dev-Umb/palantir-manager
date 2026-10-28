@@ -18,7 +18,7 @@ class FixedQuotationPdf
         }
         try {
             file_put_contents($directory.'/quotation.docx', $docx);
-            $result = Process::timeout(45)->run([
+            $result = Process::path($directory)->env(['XDG_CACHE_HOME' => $directory.'/cache'])->timeout(45)->run([
                 config('quotation.pdf_binary', '/usr/bin/libreoffice'),
                 '-env:UserInstallation=file://'.$directory.'/profile',
                 '--headless', '--convert-to', 'pdf:writer_pdf_Export',

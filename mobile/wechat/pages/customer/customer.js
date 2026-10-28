@@ -1,0 +1,2 @@
+const api=require('../../services/api');const b=require('../../services/business');const u=require('../../utils/page');
+Page({data:{customer:null,error:'',loading:false},onLoad(q){this.id=q.id;u.attach(this,{customer:null});this.refresh();},onUnload:u.unload,refresh(){return u.run(this,async()=>({customer:(await api.request('/project-customers/'+encodeURIComponent(this.id))).customer}));},openProject:u.openProject});

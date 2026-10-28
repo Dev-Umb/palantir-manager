@@ -1,0 +1,2104 @@
+{
+  "schema_version": "user-library-1",
+  "data_kind": "用户支架库",
+  "source": {
+    "file": "支架库.xlsx",
+    "original_path": "C:\\Users\\Galaxy\\Desktop\\支架库.xlsx",
+    "sha256": "f366362b56fd7b608d6cb9685c10444e7e58cbaa0943a656253a463b37771711"
+  },
+  "application_verified": true,
+  "model_mapping": {
+    "C14A": "原表C",
+    "C16A": "原表C"
+  },
+  "parts": [
+    {
+      "id": "P002",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 6000,
+      "length_mm": 6000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 430.3,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A2:E2"
+    },
+    {
+      "id": "P003",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 5000,
+      "length_mm": 5000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 378,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A3:E3"
+    },
+    {
+      "id": "P004",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 4000,
+      "length_mm": 4000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 325.7,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A4:E4"
+    },
+    {
+      "id": "P005",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 3000,
+      "length_mm": 3000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 238,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A5:E5"
+    },
+    {
+      "id": "P006",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 2000,
+      "length_mm": 2000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 185.6,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A6:E6"
+    },
+    {
+      "id": "P007",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 1000,
+      "length_mm": 1000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 97.8,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A7:E7"
+    },
+    {
+      "id": "P008",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 700,
+      "length_mm": 700,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 84,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A8:E8"
+    },
+    {
+      "id": "P009",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 500,
+      "length_mm": 500,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 54,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A9:E9"
+    },
+    {
+      "id": "P010",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 400,
+      "length_mm": 400,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 50,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A10:E10"
+    },
+    {
+      "id": "P011",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 300,
+      "length_mm": 300,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 44,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A11:E11"
+    },
+    {
+      "id": "P012",
+      "spec": "φ273",
+      "kind": "钢柱",
+      "length_raw": 200,
+      "length_mm": 200,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 38,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A12:E12"
+    },
+    {
+      "id": "P013",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 6000,
+      "length_mm": 6000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 928.9,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A13:E13"
+    },
+    {
+      "id": "P014",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 5000,
+      "length_mm": 5000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 800.7,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A14:E14"
+    },
+    {
+      "id": "P015",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 4000,
+      "length_mm": 4000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 672.5,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A15:E15"
+    },
+    {
+      "id": "P016",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 3000,
+      "length_mm": 3000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 508.7,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A16:E16"
+    },
+    {
+      "id": "P017",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 2000,
+      "length_mm": 2000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 380.5,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A17:E17"
+    },
+    {
+      "id": "P018",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 1000,
+      "length_mm": 1000,
+      "length_status": "按原表mm",
+      "unit_weight_kg": 216.7,
+      "bolts_per_piece_raw": 8,
+      "note": "吊装",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A18:E18"
+    },
+    {
+      "id": "P019",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 1350,
+      "length_mm": 1350,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A19:E19"
+    },
+    {
+      "id": "P020",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 750,
+      "length_mm": 750,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A20:E20"
+    },
+    {
+      "id": "P021",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 500,
+      "length_mm": 500,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A21:E21"
+    },
+    {
+      "id": "P022",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 300,
+      "length_mm": 300,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A22:E22"
+    },
+    {
+      "id": "P023",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 200,
+      "length_mm": 200,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A23:E23"
+    },
+    {
+      "id": "P024",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 150,
+      "length_mm": 150,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A24:E24"
+    },
+    {
+      "id": "P025",
+      "spec": "φ530",
+      "kind": "钢柱",
+      "length_raw": 100,
+      "length_mm": 100,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [],
+      "source": "吊装φ273!A25:E25"
+    },
+    {
+      "id": "P026",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2674,
+      "length_mm": 2674,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A26:E26"
+    },
+    {
+      "id": "P027",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2674,
+      "length_mm": 2674,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "带中孔",
+      "hole": "带中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A27:E27"
+    },
+    {
+      "id": "P028",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1674,
+      "length_mm": 1674,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A28:E28"
+    },
+    {
+      "id": "P029",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1674,
+      "length_mm": 1674,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "带中孔",
+      "hole": "带中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A29:E29"
+    },
+    {
+      "id": "P030",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 3330,
+      "length_mm": 3330,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A30:E30"
+    },
+    {
+      "id": "P031",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2630,
+      "length_mm": 2630,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A31:E31"
+    },
+    {
+      "id": "P032",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 3050,
+      "length_mm": 3050,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A32:E32"
+    },
+    {
+      "id": "P033",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2255,
+      "length_mm": 2255,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A33:E33"
+    },
+    {
+      "id": "P034",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2825,
+      "length_mm": 2825,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A34:E34"
+    },
+    {
+      "id": "P035",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1930,
+      "length_mm": 1930,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A35:E35"
+    },
+    {
+      "id": "P036",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1225,
+      "length_mm": 1225,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 3,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A36:E36"
+    },
+    {
+      "id": "P037",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1611,
+      "length_mm": 1611,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 3,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A37:E37"
+    },
+    {
+      "id": "P038",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2417,
+      "length_mm": 2417,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A38:E38"
+    },
+    {
+      "id": "P039",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2417,
+      "length_mm": 2417,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "带中孔",
+      "hole": "带中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A39:E39"
+    },
+    {
+      "id": "P040",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1417,
+      "length_mm": 1417,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A40:E40"
+    },
+    {
+      "id": "P041",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1917,
+      "length_mm": 1917,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 8,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A41:E41"
+    },
+    {
+      "id": "P042",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 3140,
+      "length_mm": 3140,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A42:E42"
+    },
+    {
+      "id": "P043",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2490,
+      "length_mm": 2490,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A43:E43"
+    },
+    {
+      "id": "P044",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2790,
+      "length_mm": 2790,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A44:E44"
+    },
+    {
+      "id": "P045",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2835,
+      "length_mm": 2835,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A45:E45"
+    },
+    {
+      "id": "P046",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2080,
+      "length_mm": 2080,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A46:E46"
+    },
+    {
+      "id": "P047",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2435,
+      "length_mm": 2435,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A47:E47"
+    },
+    {
+      "id": "P048",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2585,
+      "length_mm": 2585,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A48:E48"
+    },
+    {
+      "id": "P049",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1730,
+      "length_mm": 1730,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A49:E49"
+    },
+    {
+      "id": "P050",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 2140,
+      "length_mm": 2140,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A50:E50"
+    },
+    {
+      "id": "P051",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1550,
+      "length_mm": 1550,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 3,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A51:E51"
+    },
+    {
+      "id": "P052",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1465,
+      "length_mm": 1465,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A52:E52"
+    },
+    {
+      "id": "P053",
+      "spec": "C",
+      "kind": "柱撑",
+      "length_raw": 1940,
+      "length_mm": 1940,
+      "length_status": "按原表mm",
+      "unit_weight_kg": null,
+      "bolts_per_piece_raw": 4,
+      "note": "",
+      "hole": "未注明中孔",
+      "models": [
+        "C14A",
+        "C16A"
+      ],
+      "source": "吊装φ273!A53:E53"
+    }
+  ],
+  "frames": [
+    {
+      "id": "DZ273-H6000-S2000",
+      "name": "φ273-6m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 6000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A2:F2",
+        "支架搭配!A3:F3"
+      ]
+    },
+    {
+      "id": "DZ273-H6000-S3000",
+      "name": "φ273-6m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 6000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A4:F4",
+        "支架搭配!A5:F5"
+      ]
+    },
+    {
+      "id": "DZ273-H5000-S2000",
+      "name": "φ273-5m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 5000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A6:F6",
+        "支架搭配!A7:F7"
+      ]
+    },
+    {
+      "id": "DZ273-H5000-S3000",
+      "name": "φ273-5m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 5000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A8:F8",
+        "支架搭配!A9:F9"
+      ]
+    },
+    {
+      "id": "DZ273-H4000-S2000",
+      "name": "φ273-4m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 4000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A10:F10",
+        "支架搭配!A11:F11"
+      ]
+    },
+    {
+      "id": "DZ273-H4000-S3000",
+      "name": "φ273-4m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 4000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A12:F12",
+        "支架搭配!A13:F13"
+      ]
+    },
+    {
+      "id": "DZ273-H3000-S2000",
+      "name": "φ273-3m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 3000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A14:F14",
+        "支架搭配!A15:F15"
+      ]
+    },
+    {
+      "id": "DZ273-H3000-S3000",
+      "name": "φ273-3m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 3000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A16:F16",
+        "支架搭配!A17:F17"
+      ]
+    },
+    {
+      "id": "DZ273-H2000-S2000",
+      "name": "φ273-2m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 2000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A18:F18",
+        "支架搭配!A19:F19",
+        "支架搭配!A20:F20"
+      ]
+    },
+    {
+      "id": "DZ273-H2000-S3000",
+      "name": "φ273-2m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 2000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A21:F21",
+        "支架搭配!A22:F22",
+        "支架搭配!A23:F23"
+      ]
+    },
+    {
+      "id": "DZ273-H1000-S2000",
+      "name": "φ273-1m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 1000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A24:F24"
+      ]
+    },
+    {
+      "id": "DZ273-H1000-S3000",
+      "name": "φ273-1m",
+      "support_use": "吊装",
+      "diameter_mm": 273,
+      "height_mm": 1000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A25:F25"
+      ]
+    },
+    {
+      "id": "DZ530-H6000-S2000",
+      "name": "φ530-6m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 6000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A26:F26",
+        "支架搭配!A27:F27"
+      ]
+    },
+    {
+      "id": "DZ530-H6000-S2500",
+      "name": "φ530-6m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 6000,
+      "spacing_mm": 2500,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A28:F28",
+        "支架搭配!A29:F29"
+      ]
+    },
+    {
+      "id": "DZ530-H6000-S3000",
+      "name": "φ530-6m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 6000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A30:F30",
+        "支架搭配!A31:F31"
+      ]
+    },
+    {
+      "id": "DZ530-H5000-S2000",
+      "name": "φ530-5m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 5000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A32:F32",
+        "支架搭配!A33:F33"
+      ]
+    },
+    {
+      "id": "DZ530-H5000-S2500",
+      "name": "φ530-5m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 5000,
+      "spacing_mm": 2500,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A34:F34",
+        "支架搭配!A35:F35"
+      ]
+    },
+    {
+      "id": "DZ530-H5000-S3000",
+      "name": "φ530-5m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 5000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A36:F36",
+        "支架搭配!A37:F37"
+      ]
+    },
+    {
+      "id": "DZ530-H4000-S2000",
+      "name": "φ530-4m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 4000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A38:F38",
+        "支架搭配!A39:F39"
+      ]
+    },
+    {
+      "id": "DZ530-H4000-S2500",
+      "name": "φ530-4m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 4000,
+      "spacing_mm": 2500,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A40:F40",
+        "支架搭配!A41:F41"
+      ]
+    },
+    {
+      "id": "DZ530-H4000-S3000",
+      "name": "φ530-4m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 4000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A42:F42",
+        "支架搭配!A43:F43"
+      ]
+    },
+    {
+      "id": "DZ530-H3000-S2000",
+      "name": "φ530-3m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 3000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A44:F44",
+        "支架搭配!A45:F45"
+      ]
+    },
+    {
+      "id": "DZ530-H3000-S2500",
+      "name": "φ530-3m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 3000,
+      "spacing_mm": 2500,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A46:F46",
+        "支架搭配!A47:F47"
+      ]
+    },
+    {
+      "id": "DZ530-H3000-S3000",
+      "name": "φ530-3m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 3000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A48:F48",
+        "支架搭配!A49:F49"
+      ]
+    },
+    {
+      "id": "DZ530-H2000-S2000",
+      "name": "φ530-2m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 2000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A50:F50",
+        "支架搭配!A51:F51"
+      ]
+    },
+    {
+      "id": "DZ530-H2000-S2500",
+      "name": "φ530-2m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 2000,
+      "spacing_mm": 2500,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A52:F52",
+        "支架搭配!A53:F53"
+      ]
+    },
+    {
+      "id": "DZ530-H2000-S3000",
+      "name": "φ530-2m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 2000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A54:F54",
+        "支架搭配!A55:F55",
+        "支架搭配!A56:F56"
+      ]
+    },
+    {
+      "id": "DZ530-H1000-S2000",
+      "name": "φ530-1m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 1000,
+      "spacing_mm": 2000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A57:F57"
+      ]
+    },
+    {
+      "id": "DZ530-H1000-S2500",
+      "name": "φ530-1m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 1000,
+      "spacing_mm": 2500,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A58:F58"
+      ]
+    },
+    {
+      "id": "DZ530-H1000-S3000",
+      "name": "φ530-1m",
+      "support_use": "吊装",
+      "diameter_mm": 530,
+      "height_mm": 1000,
+      "spacing_mm": 3000,
+      "column_brace_models": [
+        "C14A",
+        "C16A"
+      ],
+      "version": "原表快照＋2026-10-11用户确认",
+      "sources": [
+        "支架搭配!A59:F59"
+      ]
+    }
+  ],
+  "composition": [
+    {
+      "frame_id": "DZ273-H6000-S2000",
+      "part_id": "P028",
+      "unresolved_key": null,
+      "length_mm": 1674,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A2:F2",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ273-H6000-S2000",
+      "part_id": "P031",
+      "unresolved_key": null,
+      "length_mm": 2630,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A3:F3",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H6000-S3000",
+      "part_id": "P026",
+      "unresolved_key": null,
+      "length_mm": 2674,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A4:F4",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ273-H6000-S3000",
+      "part_id": "P030",
+      "unresolved_key": null,
+      "length_mm": 3330,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A5:F5",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H5000-S2000",
+      "part_id": "P028",
+      "unresolved_key": null,
+      "length_mm": 1674,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A6:F6",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ273-H5000-S2000",
+      "part_id": "P033",
+      "unresolved_key": null,
+      "length_mm": 2255,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A7:F7",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H5000-S3000",
+      "part_id": "P026",
+      "unresolved_key": null,
+      "length_mm": 2674,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A8:F8",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ273-H5000-S3000",
+      "part_id": "P032",
+      "unresolved_key": null,
+      "length_mm": 3050,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A9:F9",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H4000-S2000",
+      "part_id": "P028",
+      "unresolved_key": null,
+      "length_mm": 1674,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A10:F10",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ273-H4000-S2000",
+      "part_id": "P035",
+      "unresolved_key": null,
+      "length_mm": 1930,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A11:F11",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H4000-S3000",
+      "part_id": "P026",
+      "unresolved_key": null,
+      "length_mm": 2674,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A12:F12",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ273-H4000-S3000",
+      "part_id": "P034",
+      "unresolved_key": null,
+      "length_mm": 2825,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A13:F13",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H3000-S2000",
+      "part_id": "P028",
+      "unresolved_key": null,
+      "length_mm": 1674,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A14:F14",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H3000-S2000",
+      "part_id": "P033",
+      "unresolved_key": null,
+      "length_mm": 2255,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A15:F15",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ273-H3000-S3000",
+      "part_id": "P026",
+      "unresolved_key": null,
+      "length_mm": 2674,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A16:F16",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H3000-S3000",
+      "part_id": "P032",
+      "unresolved_key": null,
+      "length_mm": 3050,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A17:F17",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ273-H2000-S2000",
+      "part_id": "P028",
+      "unresolved_key": null,
+      "length_mm": 1674,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A18:F18",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ273-H2000-S2000",
+      "part_id": "P029",
+      "unresolved_key": null,
+      "length_mm": 1674,
+      "hole": "带中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "带中孔",
+      "source": "支架搭配!A19:F19",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ273-H2000-S2000",
+      "part_id": "P036",
+      "unresolved_key": null,
+      "length_mm": 1225,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A20:F20",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H2000-S3000",
+      "part_id": "P026",
+      "unresolved_key": null,
+      "length_mm": 2674,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A21:F21",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ273-H2000-S3000",
+      "part_id": "P027",
+      "unresolved_key": null,
+      "length_mm": 2674,
+      "hole": "带中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "带中孔",
+      "source": "支架搭配!A22:F22",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ273-H2000-S3000",
+      "part_id": "P037",
+      "unresolved_key": null,
+      "length_mm": 1611,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A23:F23",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ273-H1000-S2000",
+      "part_id": "P028",
+      "unresolved_key": null,
+      "length_mm": 1674,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A24:F24",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ273-H1000-S3000",
+      "part_id": "P026",
+      "unresolved_key": null,
+      "length_mm": 2674,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A25:F25",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H6000-S2000",
+      "part_id": "P040",
+      "unresolved_key": null,
+      "length_mm": 1417,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A26:F26",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ530-H6000-S2000",
+      "part_id": "P043",
+      "unresolved_key": null,
+      "length_mm": 2490,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A27:F27",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H6000-S2500",
+      "part_id": "P041",
+      "unresolved_key": null,
+      "length_mm": 1917,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A28:F28",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ530-H6000-S2500",
+      "part_id": "P044",
+      "unresolved_key": null,
+      "length_mm": 2790,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A29:F29",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H6000-S3000",
+      "part_id": "P038",
+      "unresolved_key": null,
+      "length_mm": 2417,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A30:F30",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ530-H6000-S3000",
+      "part_id": "P042",
+      "unresolved_key": null,
+      "length_mm": 3140,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A31:F31",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H5000-S2000",
+      "part_id": "P040",
+      "unresolved_key": null,
+      "length_mm": 1417,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A32:F32",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ530-H5000-S2000",
+      "part_id": "P046",
+      "unresolved_key": null,
+      "length_mm": 2080,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A33:F33",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H5000-S2500",
+      "part_id": "P041",
+      "unresolved_key": null,
+      "length_mm": 1917,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A34:F34",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ530-H5000-S2500",
+      "part_id": "P047",
+      "unresolved_key": null,
+      "length_mm": 2435,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A35:F35",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H5000-S3000",
+      "part_id": "P038",
+      "unresolved_key": null,
+      "length_mm": 2417,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A36:F36",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ530-H5000-S3000",
+      "part_id": "P045",
+      "unresolved_key": null,
+      "length_mm": 2835,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A37:F37",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H4000-S2000",
+      "part_id": "P040",
+      "unresolved_key": null,
+      "length_mm": 1417,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A38:F38",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ530-H4000-S2000",
+      "part_id": "P049",
+      "unresolved_key": null,
+      "length_mm": 1730,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A39:F39",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H4000-S2500",
+      "part_id": "P041",
+      "unresolved_key": null,
+      "length_mm": 1917,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A40:F40",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ530-H4000-S2500",
+      "part_id": "P050",
+      "unresolved_key": null,
+      "length_mm": 2140,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A41:F41",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H4000-S3000",
+      "part_id": "P038",
+      "unresolved_key": null,
+      "length_mm": 2417,
+      "hole": "未注明中孔",
+      "per_frame": 3,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A42:F42",
+      "per_face": 3
+    },
+    {
+      "frame_id": "DZ530-H4000-S3000",
+      "part_id": "P048",
+      "unresolved_key": null,
+      "length_mm": 2585,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A43:F43",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H3000-S2000",
+      "part_id": "P040",
+      "unresolved_key": null,
+      "length_mm": 1417,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A44:F44",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H3000-S2000",
+      "part_id": "P046",
+      "unresolved_key": null,
+      "length_mm": 2080,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A45:F45",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H3000-S2500",
+      "part_id": "P041",
+      "unresolved_key": null,
+      "length_mm": 1917,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A46:F46",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H3000-S2500",
+      "part_id": "P047",
+      "unresolved_key": null,
+      "length_mm": 2435,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A47:F47",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H3000-S3000",
+      "part_id": "P038",
+      "unresolved_key": null,
+      "length_mm": 2417,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A48:F48",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H3000-S3000",
+      "part_id": "P045",
+      "unresolved_key": null,
+      "length_mm": 2835,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A49:F49",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H2000-S2000",
+      "part_id": "P040",
+      "unresolved_key": null,
+      "length_mm": 1417,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A50:F50",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H2000-S2000",
+      "part_id": "P052",
+      "unresolved_key": null,
+      "length_mm": 1465,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A51:F51",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H2000-S2500",
+      "part_id": "P041",
+      "unresolved_key": null,
+      "length_mm": 1917,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A52:F52",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H2000-S2500",
+      "part_id": "P053",
+      "unresolved_key": null,
+      "length_mm": 1940,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A53:F53",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H2000-S3000",
+      "part_id": "P039",
+      "unresolved_key": null,
+      "length_mm": 2417,
+      "hole": "带中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "带中孔",
+      "source": "支架搭配!A54:F54",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H2000-S3000",
+      "part_id": "P038",
+      "unresolved_key": null,
+      "length_mm": 2417,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A55:F55",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H2000-S3000",
+      "part_id": "P051",
+      "unresolved_key": null,
+      "length_mm": 1550,
+      "hole": "未注明中孔",
+      "per_frame": 2,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A56:F56",
+      "per_face": 2
+    },
+    {
+      "frame_id": "DZ530-H1000-S2000",
+      "part_id": "P040",
+      "unresolved_key": null,
+      "length_mm": 1417,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A57:F57",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H1000-S2500",
+      "part_id": "P041",
+      "unresolved_key": null,
+      "length_mm": 1917,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A58:F58",
+      "per_face": 1
+    },
+    {
+      "frame_id": "DZ530-H1000-S3000",
+      "part_id": "P038",
+      "unresolved_key": null,
+      "length_mm": 2417,
+      "hole": "未注明中孔",
+      "per_frame": 1,
+      "unit": "根",
+      "note": "",
+      "source": "支架搭配!A59:F59",
+      "per_face": 1
+    }
+  ],
+  "confirmations": [
+    "2026-10-11用户确认原表C对C14A、C16A均适用；两型号均沿用原表数量，带中孔构件单独区分。",
+    "2026-10-11用户确认B8:B12的0.7/0.5/0.4/0.3/0.2按米填写，整理为700/500/400/300/200mm。",
+    "2026-10-11用户确认B41的1947应为1917，原文件由用户自行更改；本库保留原值和修订依据。",
+    "2026-10-11用户确认库中数量为1个柱撑面的用量；高度@横向间距@纵向间距@组数，单跨矩形组4根钢柱，按横向2面和纵向2面展开，各组独立累加。",
+    "2026-10-11用户确认每根C14A/C16A柱撑使用一根相应型号槽钢；以14.535/17.240kg/m乘原库长度计算槽钢理论重量，未扣孔、不含连接板等附件。",
+    "2026-10-11用户确认+表示高度分段叠接或连续跨距，分组写法为高度组合@横向跨距组合@纵向跨距组合@组数；所有跨和中间排均设柱撑，逐高度段匹配单面用量。",
+    "2026-10-11用户确认柱撑按原库每根用量累加；钢柱仅计柱间接头，最底端和最顶端无螺栓；单重暂缺"
+  ],
+  "pending": [
+    {
+      "id": "weight",
+      "message": "35条构件记录缺少单重，含全部28条柱撑。不能计算完整总重。",
+      "source": "吊装φ273!C19:C53"
+    },
+    {
+      "id": "scope",
+      "message": "钢柱按网格柱位及高度分段统计；配套螺栓共用口径、底座、连接板及组间联系撑待明确，未计入。",
+      "source": "支架搭配!A1:F59"
+    },
+    {
+      "id": "top_push",
+      "message": "当前仅有吊装搭配，未收录顶推资料。",
+      "source": "支架搭配!A2:A59"
+    }
+  ],
+  "quantity_basis": "每个柱撑面",
+  "group_rule": {
+    "bracing_layout": "all_grid_faces",
+    "columns_per_group_formula": "(横向跨数+1)×(纵向跨数+1)",
+    "transverse_faces_per_bay_per_level": "纵向跨数+1",
+    "longitudinal_faces_per_bay_per_level": "横向跨数+1",
+    "height_rule": "按高度分段逐段叠接与匹配",
+    "source": "2026-10-11用户确认+表示高度分段叠接或连续跨距，分组写法为高度组合@横向跨距组合@纵向跨距组合@组数；所有跨和中间排均设柱撑，逐高度段匹配单面用量。"
+  },
+  "weight_profiles": {
+    "C14A": {
+      "section": "14a",
+      "kg_per_m": 14.535,
+      "channels_per_brace": 1,
+      "type": "普通热轧槽钢",
+      "source_url": "https://tools.jinengtisheng.com/channel-steel-chart/",
+      "source_title": "槽钢规格型号尺寸表：14a、16a行",
+      "verification": "公开规格表逐行核对，非标准原文核验",
+      "confirmed_by_user": "2026-10-11 每根柱撑使用一根槽钢",
+      "scope": "仅按标称截面及原库长度计算，不扣孔重、不加连接板等附件"
+    },
+    "C16A": {
+      "section": "16a",
+      "kg_per_m": 17.24,
+      "channels_per_brace": 1,
+      "type": "普通热轧槽钢",
+      "source_url": "https://tools.jinengtisheng.com/channel-steel-chart/",
+      "source_title": "槽钢规格型号尺寸表：14a、16a行",
+      "verification": "公开规格表逐行核对，非标准原文核验",
+      "confirmed_by_user": "2026-10-11 每根柱撑使用一根槽钢",
+      "scope": "仅按标称截面及原库长度计算，不扣孔重、不加连接板等附件"
+    }
+  },
+  "bolt_rule": {
+    "counting_basis": "brace_per_piece_column_internal_joints",
+    "unit": "套",
+    "spec": "M22×80",
+    "unit_weight_kg": 0.44,
+    "weight_source": "用户确认按0.44kg/套估算；参考https://yaxiio.com/zh/tools/bolt-weight-calculator",
+    "package_description": "每套含M22×80普通螺栓1根、M22螺母1个、普通平垫圈2片",
+    "source": "用户确认柱撑按原库每根用量累加；钢柱仅计内部接头，柱底和柱顶不计；单重统一按0.44kg/套估算"
+  }
+}

@@ -1,3 +1,5 @@
+import 'attachments.dart';
+import 'reimbursements.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -271,7 +273,48 @@ class BusinessShell extends StatefulWidget {
   State<BusinessShell> createState() => _BusinessShellState();
 }
 
-class _BusinessShellState extends State<BusinessShell> {
+class _BusinessShellState extends State<BusinessShell> with WidgetsBindingObserver {
+  bool fetchingReimbursements = false;
+  String reimbursementAccount = '';
+  @override void initState() {
+    super.initState(); WidgetsBinding.instance.addObserver(this);
+    widget.api.addListener(reimbursementSessionChanged);
+    reimbursementSessionChanged();
+    WidgetsBinding.instance.addPostFrameCallback((_) => fetchReimbursementResults());
+  }
+  void reimbursementSessionChanged() {
+    final account = widget.api.user?['id']?.toString() ?? '';
+    if (account != reimbursementAccount) {
+      reimbursementAccount = account;
+      android.invokeMethod('reimbursementAccount', {'account': account}).catchError((_) => null);
+    }
+  }
+  @override void dispose() {
+    WidgetsBinding.instance.removeObserver(this); widget.api.removeListener(reimbursementSessionChanged);
+    android.invokeMethod('reimbursementAccount', {'account': ''}).catchError((_) => null);
+    super.dispose();
+  }
+  @override void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) fetchReimbursementResults();
+  }
+  Future<void> fetchReimbursementResults() async {
+    if (fetchingReimbursements || reimbursementAccount.isEmpty) return;
+    fetchingReimbursements = true; final account = reimbursementAccount;
+    try {
+      String? path = '/reimbursements/notices?unread=1';
+      while (path != null) {
+        final data = mapOf((await widget.api.get(path))['notices']);
+        if (!mounted || reimbursementAccount != account) return;
+        await android.invokeMethod('reimbursementNotifications', {'account': account, 'notices': maps(data['data'])});
+        path = data['next_page_url'];
+      }
+      if (!mounted || reimbursementAccount != account) return;
+      final version = await android.invokeMethod<int>('consumeReimbursementNotification', {'account': account});
+      if (version != null && mounted && reimbursementAccount == account) await push(context, ReimbursementDetail(api: widget.api, path: '/reimbursements/versions/$version'));
+    } catch (_) {
+      // The durable in-app list remains available when local notification permission or networking fails.
+    } finally { fetchingReimbursements = false; }
+  }
   int index = 0;
   final visited = <int>{0};
   void select(int next) => setState(() {
@@ -375,6 +418,7 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
+              IconButton(tooltip: '报销 OA', onPressed: () => push(context, ReimbursementsPage(api: api)), icon: const Icon(Icons.receipt_long_outlined)),
               IconButton(
                 tooltip: '通知中心',
                 onPressed: () => push(context, NotificationsPage(api: api)),
@@ -514,7 +558,7 @@ class _HomePageState extends State<HomePage> {
                           Icons.newspaper_outlined,
                           color: steel,
                         ),
-                        title: const Text('招采信息'),
+                        title: const Text('招采参考'),
                         subtitle: const Text('查看机会、截止时间与公开资料'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => push(context, ProcurementPage(api: api)),

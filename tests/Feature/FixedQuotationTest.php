@@ -196,8 +196,27 @@ class FixedQuotationTest extends TestCase
         }
         $this->assertSame($hash, $run->refresh()->artifacts[0]['data']['document_sha256']);
         $this->assertSame($bytes, Storage::disk('local')->get($storagePath));
-        $this->get($this->path($run).'/download?format=exe')->assertDownload('quotation.docx');
+        $this->get($this->path($run).'/download?format=exe')->assertUnprocessable();
+        $this->mock(FixedQuotationPdf::class, function ($mock) use ($black): void {
+            $mock->shouldReceive('convert')->once()->with($black)->andReturn("%PDF-1.7\nquotation\n%%EOF");
+        });
+        $this->get($this->path($run).'/download?format=pdf')->assertOk()->assertDownload('quotation.pdf')->assertHeader('Content-Type', 'application/pdf');
+        $this->assertSame($bytes, Storage::disk('local')->get($storagePath));
         $this->actingAs($this->salesperson('admin'))->get($this->path($run).'/download?format=pdf')->assertNotFound();
+    }
+
+    public function test_pdf_failure_preserves_docx_download_and_confirmed_document(): void
+    {
+        $user = $this->salesperson();
+        $run = $this->quotationRun($user);
+        $this->actingAs($user)->postJson($this->path($run), $this->input())->assertOk();
+        $original = $run->refresh()->artifacts;
+        $this->mock(FixedQuotationPdf::class, function ($mock): void {
+            $mock->shouldReceive('convert')->once()->andThrow(new \RuntimeException('conversion failed'));
+        });
+        $this->getJson($this->path($run).'/download?format=pdf')->assertStatus(503);
+        $this->get($this->path($run).'/download')->assertOk()->assertDownload('quotation.docx');
+        $this->assertSame($original, $run->refresh()->artifacts);
     }
 
     public function test_docx_download_and_archived_converter_clean_temporary_files(): void

@@ -10,12 +10,14 @@ use App\Http\Requests\QuotationPriceRequest;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\QuotationArchive;
+use App\Support\BusinessFileStorage;
 use App\Support\ProjectVisibility;
 use App\Support\QuotationAgentRunner;
 use App\Support\QuotationCalculator;
 use App\Support\QuotationMarketSearch;
 use App\Support\QuotationTokens;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -172,14 +174,14 @@ class QuotationController extends Controller
         return response()->json(['archive' => $this->archiveRow($archive), 'snapshot' => $archive->snapshot]);
     }
 
-    public function download(Request $request, QuotationArchive $archive): StreamedResponse
+    public function download(Request $request, QuotationArchive $archive): StreamedResponse|RedirectResponse
     {
         abort_unless($archive->user_id === $request->user()->id, 404);
 
         return $this->csv($archive->snapshot);
     }
 
-    public function export(Request $request, QuotationTokens $tokens): StreamedResponse
+    public function export(Request $request, QuotationTokens $tokens): StreamedResponse|RedirectResponse
     {
         $data = $request->validate(['preview_token' => ['required', 'string', 'max:100000']]);
 
@@ -212,8 +214,18 @@ class QuotationController extends Controller
         return ['id' => $archive->id, 'title' => $archive->title, 'project_name' => $archive->snapshot['params']['project_name'] ?? '', 'owner' => $archive->snapshot['owner']['name'] ?? '', 'total_cents' => $archive->snapshot['calculation']['total_cents'] ?? null, 'unit_price_cents' => $archive->snapshot['calculation']['unit_price_cents'] ?? 0, 'created_at' => $archive->created_at->toIso8601String(), 'show_url' => route('quotations.show', $archive), 'download_url' => route('quotations.download', $archive)];
     }
 
-    private function csv(array $snapshot): StreamedResponse
+    private function csv(array $snapshot): StreamedResponse|RedirectResponse
     {
+        $bytes = isset($snapshot['export_csv']) ? base64_decode($snapshot['export_csv'], true) : $this->csvContent($snapshot);
+        abort_unless(is_string($bytes), 404);
+        $path = 'reference-quotations/'.hash('sha256', $bytes).'.csv';
+        $files = app(BusinessFileStorage::class);
+        $files->storeBytes($path, $bytes, 'reference-quotation.csv', 'text/csv; charset=UTF-8');
+        $url = $files->downloadUrl($path, 'reference-quotation.csv', 'text/csv; charset=UTF-8');
+        if ($url !== null) {
+            return redirect()->away($url)->withHeaders(['Cache-Control' => 'private, no-store']);
+        }
+
         return response()->streamDownload(function () use ($snapshot): void {
             echo isset($snapshot['export_csv']) ? base64_decode($snapshot['export_csv'], true) : $this->csvContent($snapshot);
         }, 'reference-quotation.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);

@@ -71,7 +71,7 @@ class AppUpdater(private val activity: Activity) {
         try {
             check(!cancelled.get()) { "下载已取消" }
             val url = URL(args["apkUrl"] as String)
-            require(url.protocol == "https" && url.host == "palantir.umb.ink" && url.port in listOf(-1, 443) && url.userInfo == null && url.ref == null) { "更新来源无效" }
+            require(url.protocol == "https" && (url.host == "palantir.umb.ink" || (url.host == "app-download.umb.ink" && Regex("^/android/palantir-[0-9]+\\.[0-9]+\\.[0-9]+\\.apk$").matches(url.path))) && url.port in listOf(-1, 443) && url.userInfo == null && url.ref == null) { "更新来源无效" }
             val size = (args["sizeBytes"] as Number).toLong()
             require(size in 1..(150L * 1024 * 1024)) { "安装包大小无效" }
             partial.parentFile!!.mkdirs()

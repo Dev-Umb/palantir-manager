@@ -37,7 +37,7 @@ class AttachmentPreview
         return preg_match('#\Aattachments/[A-Za-z0-9._-]+\z#D', $path) === 1 ? $path : null;
     }
 
-    /** @return array{disk: FilesystemAdapter, key: string, mime: string, name: string, size: int, local: bool} */
+    /** @return array{disk: FilesystemAdapter, key: string, mime: string, name: string, size: int, local: bool, path: string} */
     public function resolve(User $user, ObjectRecord $record, string $field, ?int $index, bool $preview = true): array
     {
         $record->loadMissing('businessObject');
@@ -78,9 +78,10 @@ class AttachmentPreview
                 fclose($stream);
             }
         }
-        abort_unless(is_string($mime) && in_array($mime, self::MIME_TYPES, true), 404);
+        abort_unless(is_string($mime) && (! $preview || in_array($mime, self::MIME_TYPES, true)), 404);
 
         return [
+            'path' => $path,
             'disk' => $disk,
             'key' => $key,
             'mime' => $mime,

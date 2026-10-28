@@ -198,7 +198,9 @@ void main() {
       isNull,
     );
     await tester.enterText(find.byKey(const Key('ai-input')), '待发送的问题');
-    await tester.pageBack();
+    await tester.tap(find.byTooltip('历史会话'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('返回工作台'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('AI 助手'));
     await tester.pumpAndSettle();
