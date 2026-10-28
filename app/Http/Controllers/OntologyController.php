@@ -16,9 +16,9 @@ use App\Http\Requests\PreviewProjectCustomerProfileRequest;
 use App\Models\AuditLog;
 use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
-use App\Models\StoredAttachment;
 use App\Models\User;
 use App\Support\AttachmentPreview;
+use App\Support\BusinessFileStorage;
 use App\Support\BusinessWorkspace;
 use App\Support\ObjectRelations;
 use App\Support\ProjectVisibility;
@@ -188,7 +188,7 @@ class OntologyController extends Controller
         ]);
     }
 
-    public function exportCsv(Request $request, string $object): StreamedResponse
+    public function exportCsv(Request $request, string $object): StreamedResponse|RedirectResponse
     {
         $current = BusinessObject::where('key', $object)->firstOrFail();
         abort_unless($this->workspace->allowsObjectTableAccess($current), 404);
@@ -206,8 +206,8 @@ class OntologyController extends Controller
         $fields = collect($current->fields ?? [])->values();
         $filename = preg_replace('/[^A-Za-z0-9_-]/', '-', $current->key) ?: 'records';
 
-        return response()->streamDownload(function () use ($query, $fields, $current): void {
-            $output = fopen('php://output', 'wb');
+        $output = fopen('php://temp', 'w+b');
+        try {
             if ($output === false) {
                 throw new \RuntimeException('Unable to open CSV output stream.');
             }
@@ -267,7 +267,25 @@ class OntologyController extends Controller
                 $writeBatch($batch);
             }
 
-            fclose($output);
+            rewind($output);
+            $bytes = stream_get_contents($output);
+            if ($bytes === false) {
+                throw new \RuntimeException('Unable to read CSV output stream.');
+            }
+        } finally {
+            if (is_resource($output)) {
+                fclose($output);
+            }
+        }
+        $storage = app(BusinessFileStorage::class);
+        $key = 'business-exports/'.$request->user()->id.'/'.hash('sha256', $bytes).'.csv';
+        $storage->storeBytes($key, $bytes, "{$filename}.csv", 'text/csv; charset=UTF-8');
+        if ($url = $storage->downloadUrl($key, "{$filename}.csv", 'text/csv; charset=UTF-8')) {
+            return redirect()->away($url)->header('Cache-Control', 'private, no-store');
+        }
+
+        return response()->streamDownload(function () use ($bytes): void {
+            echo $bytes;
         }, "{$filename}.csv", [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'X-Content-Type-Options' => 'nosniff',
@@ -1202,20 +1220,8 @@ class OntologyController extends Controller
                     ->filter(fn (mixed $path): bool => is_string($path) && $path !== '')
                     ->values();
                 $uploadedFiles = collect($request->file("payload.{$key}", []))
-                    ->map(function ($file) use ($object): string {
-                        $path = $file->store('attachments', 'local');
-                        if (in_array($object->key, ['project', 'contract'], true)) {
-                            StoredAttachment::create([
-                                'logical_path' => $path,
-                                'disk' => 'local',
-                                'object_key' => $path,
-                                'original_name' => basename($file->getClientOriginalName()),
-                                'mime_type' => $file->getMimeType(),
-                                'size' => $file->getSize(),
-                                'sha256' => hash_file('sha256', $file->getRealPath()),
-                                'status' => StoredAttachment::STATUS_ATTACHED,
-                            ]);
-                        }
+                    ->map(function ($file): string {
+                        $path = app(BusinessFileStorage::class)->upload($file)->logical_path;
 
                         return $path;
                     });
@@ -1224,7 +1230,7 @@ class OntologyController extends Controller
                 }
                 $payload[$key] = $existingFiles->concat($uploadedFiles)->values()->all();
             } elseif ($request->hasFile("payload.{$key}")) {
-                $payload[$key] = $request->file("payload.{$key}")->store('attachments', 'local');
+                $payload[$key] = app(BusinessFileStorage::class)->upload($request->file("payload.{$key}"))->logical_path;
             } else {
                 $payload[$key] = (string) ($existingPayload[$key] ?? '');
             }

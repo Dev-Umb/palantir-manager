@@ -3,3 +3,9 @@
 
 # Keep the updater validation boundary callable from isolated release instrumentation.
 -keep class cn.xinyuanchang.palantir_mobile.AppUpdater { *; }
+
+# Preserve the document-save boundary for release instrumentation.
+-keepclassmembers class cn.xinyuanchang.palantir_mobile.MainActivity {
+    private io.flutter.plugin.common.MethodChannel$Result saver;
+    private byte[] saveBytes;
+}

@@ -6,8 +6,17 @@ function previewError(message, denied = false) {
     return Object.assign(new Error(message), { previewMessage: message, denied });
 }
 
-async function checkedFetch(url, signal) {
-    const response = await fetch(url, { signal, credentials: 'same-origin', headers: { Accept: 'application/json, application/pdf, image/jpeg, image/png', 'X-Requested-With': 'XMLHttpRequest' } });
+export function isTrustedStorageUrl(url) {
+    try {
+        const address = new URL(url);
+        return address.protocol === 'https:' && address.hostname === 'xyc-palantir-contracts-prod.tos-s3-cn-beijing.volces.com'
+            && (!address.port || address.port === '443') && !address.username && !address.password && !address.hash && address.searchParams.has('X-Amz-Signature');
+    } catch { return false; }
+}
+
+async function checkedFetch(url, signal, storage = false) {
+    if (storage && !isTrustedStorageUrl(url)) throw previewError('附件下载地址无效。');
+    const response = await fetch(url, { signal, credentials: storage ? 'omit' : 'same-origin', redirect: storage ? 'error' : 'follow', headers: storage ? {} : { Accept: 'application/json, application/pdf, image/jpeg, image/png', 'X-Requested-With': 'XMLHttpRequest' } });
     if (response.status === 401 || response.status === 403 || response.redirected) {
         throw previewError('登录已失效或没有查看权限，请重新登录后再试。', true);
     }
@@ -28,7 +37,7 @@ export default function AttachmentReader({ file }) {
         (async () => {
             const info = await (await checkedFetch(file.info_url, controller.signal)).json();
             if (!['application/pdf', 'image/jpeg', 'image/png'].includes(info.mime_type)) throw previewError('此文件暂不支持在线预览。');
-            const response = await checkedFetch(file.content_url, controller.signal);
+            const response = await checkedFetch(info.content_url || file.content_url, controller.signal, !!info.content_url);
             if (response.headers.get('content-type')?.split(';')[0] !== info.mime_type) throw previewError('附件内容已改变，请关闭后重新打开。');
             const blob = await response.blob();
             if (info.mime_type === 'application/pdf') {

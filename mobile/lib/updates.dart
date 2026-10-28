@@ -9,6 +9,9 @@ import 'environment.dart';
 import 'ui.dart';
 
 const updateChannel = MethodChannel('palantir/android');
+const apkStorageOrigin =
+    'https://app-download.umb.ink';
+
 const appPackage = 'cn.xinyuanchang.palantir_mobile';
 
 class AppRelease {
@@ -34,7 +37,10 @@ class AppRelease {
         !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(hash) ||
         url == null ||
         url.scheme != 'https' ||
-        url.origin != origin.origin ||
+        !(url.origin == origin.origin ||
+            (url.origin == apkStorageOrigin &&
+                RegExp(r'^/android/palantir-[0-9]+\.[0-9]+\.[0-9]+\.apk$')
+                    .hasMatch(url.path))) ||
         url.userInfo.isNotEmpty ||
         url.fragment.isNotEmpty ||
         !url.path.endsWith('.apk')) {
@@ -75,7 +81,7 @@ class UpdateService {
       ..connectionTimeout = const Duration(seconds: 10);
     try {
       final request = await client.getUrl(
-        origin.resolve('/app-updates/android.json'),
+        origin.resolve('/app-updates/android-tos.json'),
       );
       request.followRedirects = false;
       request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');

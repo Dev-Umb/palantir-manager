@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Ai\Agents\ContractExtractionAgent;
+use App\Http\Requests\StoreAiContractIntakeRequest;
 use App\Integrations\Feishu\FeishuAttachmentStorage;
 use App\Models\AiContractIntake;
 use App\Models\AuditLog;
@@ -11,7 +12,9 @@ use App\Models\ObjectRecord;
 use App\Models\StoredAttachment;
 use App\Models\User;
 use App\Support\BusinessWorkspace;
+use App\Support\ContractPageImages;
 use App\Support\ProjectVisibility;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -20,7 +23,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Laravel\Ai\Files\Document;
 use Laravel\Ai\Files\Image;
 use Throwable;
 
@@ -32,6 +34,7 @@ class ProcessAiContractIntake
         private ResyncProjectContractAmount $resync,
         private ProjectVisibility $visibility,
         private BusinessWorkspace $workspace,
+        private ContractPageImages $pages,
     ) {}
 
     public function canUpload(User $user): bool
@@ -43,52 +46,67 @@ class ProcessAiContractIntake
     public function stage(User $user, UploadedFile $file): AiContractIntake
     {
         abort_unless($this->canUpload($user), 403);
-        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($file->getContent());
+        $mime = $file->getMimeType();
         if (! in_array($mime, ['application/pdf', 'image/jpeg', 'image/png'], true)) {
             throw ValidationException::withMessages(['file' => '只支持内容有效的 PDF、JPG 或 PNG 文件。']);
         }
-        $attachment = $this->storage->store($file->getContent(), $file->getClientOriginalName());
+        $attachment = $this->storage->storeUpload($file, StoreAiContractIntakeRequest::MAX_FILE_KILOBYTES * 1024);
 
         return AiContractIntake::create(['user_id' => $user->id, 'stored_attachment_id' => $attachment->id, 'status' => 'staged']);
     }
 
     public function analyze(AiContractIntake $intake, User $user): AiContractIntake
     {
+        $deadline = microtime(true) + 190;
         $this->authorize($intake, $user);
         $claimed = AiContractIntake::whereKey($intake->id)->where('status', 'staged')->update(['status' => 'analyzing']);
         abort_unless($claimed, 409, '文件已开始识别或已经处理。');
         try {
             $attachment = $intake->storedAttachment;
-            $file = $attachment->mime_type === 'application/pdf'
-                ? Document::fromStorage($attachment->object_key, $attachment->disk)->as($attachment->original_name)
-                : Image::fromStorage($attachment->object_key, $attachment->disk);
-            $response = ContractExtractionAgent::make()->stream(
-                '请识别附件中的项目合同，按约定结构提取，缺失填 null，并给出原文依据和警告。',
-                attachments: [$file],
-                provider: config('ai.default'),
-                timeout: min(180, (int) config('ai.request_timeout', 180)),
-            );
-            $response->each(static fn (): bool => true);
-            $extraction = Validator::make(json_decode($response->text, true, flags: JSON_THROW_ON_ERROR), [
-                'project_name' => ['present', 'nullable', 'string', 'max:300'],
-                'project_no' => ['present', 'nullable', 'string', 'max:100'],
-                'customer_name' => ['present', 'nullable', 'string', 'max:300'],
-                'contract_no' => ['present', 'nullable', 'string', 'max:200'],
-                'amount' => ['present', 'nullable', 'numeric'],
-                'ctype' => ['present', 'nullable', 'in:销售合同,加工合同,补充协议'],
-                'signed_date' => ['present', 'nullable', 'date_format:Y-m-d'],
-                'contract_qty' => ['present', 'nullable', 'numeric', 'min:0'],
-                'weight_tonnes' => ['present', 'nullable', 'numeric', 'min:0'],
-                'evidence' => ['present', 'array'],
-                'evidence.*' => ['string'],
-                'warnings' => ['present', 'array'],
-                'warnings.*' => ['string'],
-            ])->validate();
+            $recognize = function (array $files) use ($deadline): array {
+                $response = ContractExtractionAgent::make()->prompt(
+                    '请识别附件中的项目合同，按约定结构提取，缺失填 null，并给出原文依据和警告。PDF 页面按原页码顺序提供，必须综合全部页面；模糊内容不得推断。',
+                    attachments: $files,
+                    provider: config('ai.default'),
+                    timeout: max(1, min(180, (int) config('ai.request_timeout', 180), (int) ($deadline - microtime(true)))),
+                );
+
+                return Validator::make(json_decode($response->text, true, flags: JSON_THROW_ON_ERROR), [
+                    'project_name' => ['present', 'nullable', 'string', 'max:300'],
+                    'project_no' => ['present', 'nullable', 'string', 'max:100'],
+                    'customer_name' => ['present', 'nullable', 'string', 'max:300'],
+                    'contract_no' => ['present', 'nullable', 'string', 'max:200'],
+                    'amount' => ['present', 'nullable', 'numeric'],
+                    'ctype' => ['present', 'nullable', 'in:销售合同,加工合同,补充协议'],
+                    'signed_date' => ['present', 'nullable', 'date_format:Y-m-d'],
+                    'contract_qty' => ['present', 'nullable', 'numeric', 'min:0'],
+                    'weight_tonnes' => ['present', 'nullable', 'numeric', 'min:0'],
+                    'evidence' => ['present', 'array'],
+                    'evidence.*' => ['string'],
+                    'warnings' => ['present', 'array'],
+                    'warnings.*' => ['string'],
+                ])->validate();
+            };
+            $extraction = $attachment->mime_type === 'application/pdf'
+                ? $this->pages->recognize($attachment, $recognize)
+                : $recognize([Image::fromStorage($attachment->object_key, $attachment->disk)]);
             $intake->update(['status' => 'review', 'extraction' => $extraction, 'review' => null, 'error' => null]);
         } catch (Throwable $exception) {
             // Provider diagnostics may contain document contents; retain only the failure class.
-            $intake->update(['status' => 'failed', 'error' => '合同识别失败，文件已暂存，可重试。']);
-            logger()->warning('AI contract extraction failed', ['intake_id' => $intake->id, 'exception_class' => $exception::class]);
+            $intake->update(['status' => 'failed', 'error' => '合同识别失败，原文件已保留。请重试；复杂或页数较多的 PDF 可拆分后重新上传识别。']);
+            $context = ['intake_id' => $intake->id, 'exception_class' => $exception::class];
+            if ($exception instanceof RequestException) {
+                $context['provider_http_status'] = $exception->response->status();
+                $code = $exception->response->json('error.code');
+                if (is_string($code) && preg_match('/\A[a-z_]{1,64}\z/D', $code)) {
+                    $context['provider_error_code'] = $code;
+                }
+                $trace = $exception->response->json('error.trace_id');
+                if (is_string($trace) && Str::isUuid($trace)) {
+                    $context['provider_trace_id'] = $trace;
+                }
+            }
+            logger()->warning('AI contract extraction failed', $context);
         }
 
         return $intake->fresh('storedAttachment');

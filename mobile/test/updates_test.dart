@@ -39,6 +39,28 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final origin = Uri.parse('https://palantir.umb.ink');
 
+  test('TOS只接受指定桶安装包路径，旧平台地址仍可升级', () {
+    expect(
+      AppRelease.parse({
+        ...manifest(),
+        'apkUrl': '$apkStorageOrigin/android/palantir-1.0.11.apk',
+      }, origin).code,
+      8,
+    );
+    expect(AppRelease.parse(manifest(), origin).code, 8);
+    for (final url in [
+      '$apkStorageOrigin/contract.apk',
+      '$apkStorageOrigin:444/android/palantir-1.0.11.apk',
+      '$apkStorageOrigin.evil.test/android/palantir-1.0.11.apk',
+      '$apkStorageOrigin/android/sub/palantir-1.0.11.apk',
+    ]) {
+      expect(
+        () => AppRelease.parse({...manifest(), 'apkUrl': url}, origin),
+        throwsFormatException,
+      );
+    }
+  });
+
   test(
     'rejects foreign origins, oversized packages and invalid manifest fields',
     () {
@@ -65,7 +87,7 @@ void main() {
       final local = Uri.parse('http://127.0.0.1:${server.port}');
       var code = 8;
       server.listen((request) async {
-        expect(request.uri.path, '/app-updates/android.json');
+        expect(request.uri.path, '/app-updates/android-tos.json');
         expect(request.cookies, isEmpty);
         expect(request.headers.value('Authorization'), isNull);
         request.response.write(jsonEncode(manifest(code: code)));

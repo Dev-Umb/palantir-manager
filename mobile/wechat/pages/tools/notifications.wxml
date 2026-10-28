@@ -1,0 +1,17 @@
+<view class="notice-intro"><view class="chat-title">待处理消息</view><view class="chat-description">项目提醒与招采动态，集中查看</view></view>
+<view class="notice-section"><view class="notice-section-title">项目通知</view><text class="notice-section-caption">未读消息</text></view>
+<view wx:for="{{items}}" wx:key="id" class="notice-card">
+ <view class="notice-top"><view class="notice-kind"><view wx:if="{{!item.read_at}}" class="unread-dot"/><text>{{item.type_label}}</text></view><text class="notice-time">{{item.displayDate}}</text></view>
+ <view wx:if="{{item.project}}" class="notice-project">{{item.project.name}}</view>
+ <text selectable class="notice-message">{{item.message}}</text>
+ <view class="notice-actions"><button wx:if="{{item.can_view_project}}" data-id="{{item.project.id}}" bindtap="openProject">查看项目 ›</button><button wx:if="{{!item.read_at}}" class="notice-read" data-id="{{item.id}}" bindtap="read" disabled="{{busy}}">标记已读</button></view></view>
+<view wx:if="{{!busy && !error && !items.length}}" class="notice-empty"><view class="empty-symbol">✓</view><view>暂无项目通知</view><text>有新的提醒时，会显示在这里</text></view>
+<view wx:if="{{last>1}}" class="row pagination"><button bindtap="previous" disabled="{{busy || page<=1}}">上一页</button><text>{{page}} / {{last}}</text><button bindtap="next" disabled="{{busy || page>=last}}">下一页</button></view>
+<view class="notice-section"><view class="notice-section-title">招采通知</view><text class="notice-section-caption">未读消息</text></view>
+<view wx:for="{{tenders}}" wx:key="id" class="notice-card">
+ <view class="notice-top"><view class="notice-kind"><view wx:if="{{!item.read_at}}" class="unread-dot"/><text>{{item.type_label}}</text></view><text class="notice-time">{{item.displayDate}}</text></view>
+ <view wx:if="{{item.project}}" class="notice-project">{{item.project.name}}</view>
+ <text selectable class="notice-message">{{item.message}}</text>
+ <view class="notice-actions"><button wx:if="{{item.project_url}}" data-id="{{item.project.id}}" bindtap="openProject">查看项目 ›</button></view></view>
+<view wx:if="{{!busy && !error && !tenders.length}}" class="notice-empty"><view class="empty-symbol">✓</view><view>暂无招采通知</view><text>有新的提醒时，会显示在这里</text></view>
+<view wx:if="{{tenderLast>1}}" class="row pagination"><button bindtap="tenderPrevious" disabled="{{busy || tenderPage<=1}}">上一页</button><text>{{tenderPage}} / {{tenderLast}}</text><button bindtap="tenderNext" disabled="{{busy || tenderPage>=tenderLast}}">下一页</button></view>

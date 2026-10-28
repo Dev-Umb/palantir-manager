@@ -1,0 +1,6 @@
+<navigation-bar title="客户" back="{{false}}" color="#182331" background="#ffffff" /><scroll-view class="scrollarea" scroll-y type="list"><view class="content preview-screen"><view wx:if="{{error}}" class="error">{{error}}<button class="small" bindtap="refresh">重试</button></view><view wx:if="{{loading}}" class="loading">正在加载…</view><block wx:if="{{user}}">
+<view class="row search"><text class="search-icon">⌕</text><input value="{{query}}" bindinput="input" bindconfirm="search" confirm-type="search" placeholder="搜索客户名称、联系人"/><button class="text-button" bindtap="search">搜索</button></view>
+<view class="box group"><view wx:for="{{customers}}" wx:key="id" class="line row" data-id="{{item.id}}" bindtap="open"><view class="grow"><view class="name">{{item.title}}</view><view class="sub">{{item.contacts.length}} 位联系人 · {{item.cooperation_projects.length}} 个项目</view></view><text class="arrow">›</text></view><view wx:if="{{!loading && !error && !customers.length}}" class="empty">没有符合条件的客户</view></view>
+<view class="hint center">点击客户，查看联系人和关联项目</view>
+<view class="row pagination"><button disabled="{{loading || page <= 1}}" bindtap="previous">上一页</button><text>{{page}} / {{last}} · {{total}} 家</text><button disabled="{{loading || page >= last}}" bindtap="next">下一页</button></view>
+</block></view></scroll-view>

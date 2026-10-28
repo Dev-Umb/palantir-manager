@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { BarChart3, Bell, Bot, Box, ClipboardCheck, ClipboardPlus, Database, HardHat, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, UserRound, X } from 'lucide-react';
+import { BarChart3, Bell, Bot, Box, ClipboardCheck, ClipboardPlus, Database, HardHat, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, UserRound, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { businessText } from '../businessLanguage';
 import { useDialogFocus } from './useDialogFocus';
@@ -16,12 +16,14 @@ const iconFor = {
     timebook: ClipboardCheck,
 };
 
-export default function Layout({ title, eyebrow, children, aside, immersive = false, hideHeader = false }) {
+export default function Layout({ title, eyebrow, children, aside, immersive = false, hideHeader = false, cockpit = false, presentation = false }) {
     const page = usePage();
     const { auth, nav, flash, notificationUnreadCount = 0 } = page.props;
     const passwordChangeRequired = auth.user?.is_password_changed === false || auth.password_only;
     const visibleNav = (nav || []).filter((item) => item.visible);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [railCollapsed, setRailCollapsed] = useState(false);
+    const collapsed = cockpit && (railCollapsed || presentation);
     const [forcedMobile, setForcedMobile] = useState(() => {
         try { return window.localStorage.getItem('palantir.mobile-layout') === 'true'; } catch { return false; }
     });
@@ -63,8 +65,9 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
     }
 
     return (
-        <div className="app-shell">
-            <aside className="rail desktop-rail">
+        <div className={`app-shell ${cockpit ? 'cockpit-shell' : ''} ${collapsed ? 'cockpit-rail-collapsed' : ''}`}>
+            {cockpit && <button type="button" className="cockpit-rail-tab" aria-label={collapsed ? '展开菜单' : '折叠菜单'} aria-expanded={!collapsed} aria-controls="cockpit-desktop-rail" title={collapsed ? '展开菜单' : '折叠菜单'} disabled={presentation} onClick={() => setRailCollapsed((current) => !current)}>{collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}</button>}
+            <aside id={cockpit ? 'cockpit-desktop-rail' : undefined} className="rail desktop-rail" inert={collapsed ? true : undefined}>
                 <div className="brand-lockup">
                     <span className="brand-mark"><Box size={17} /></span>
                     <span>鑫源昌智造中枢</span>
@@ -73,7 +76,7 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                     {visibleNav.map((item) => {
                         const itemLabel = businessText(item.label);
                         const Icon = iconFor[item.key] || LayoutDashboard;
-                        const open = isActive(page.url, item.href, item.exact === true) || (item.children || []).some((group) => group.items.some((child) => isActive(page.url, child.href, true)));
+                        const open = (cockpit && item.key === 'visualization') || isActive(page.url, item.href, item.exact === true) || (item.children || []).some((group) => group.items.some((child) => isActive(page.url, child.href, true)));
                         const moduleGroups = (item.children || []).filter((group) => group.items?.length > 0);
                         return (
                             <div key={item.href} className="nav-group">
@@ -284,7 +287,7 @@ function MobileNavigation({
 }
 
 function isNavItemActive(currentUrl, item) {
-    return isActive(currentUrl, item.href, item.exact === true)
+    return (item.key === 'visualization' && pathOf(currentUrl) === '/visualization') || isActive(currentUrl, item.href, item.exact === true)
         || (item.children || []).some((group) => group.items.some((child) => isActive(currentUrl, child.href, true)));
 }
 

@@ -1,0 +1,21 @@
+<navigation-bar title="工作台" back="{{false}}" color="#182331" background="#ffffff" /><scroll-view class="scrollarea" scroll-y type="list"><view class="content preview-screen"><view wx:if="{{error}}" class="error">{{error}}<button class="small" bindtap="refresh">重试</button></view><view wx:if="{{loading}}" class="loading">正在加载…</view><block wx:if="{{user}}">
+<view class="overview box">
+ <view class="row"><text class="label">未回款 · 元</text><button class="text-button" bindtap="projects">查看项目 ›</button></view>
+ <view class="hero-money">{{unpaid}}</view>
+ <view class="sub">当前账号可见范围<text wx:if="{{coverage}}"> · {{coverage}}</text></view>
+ <view class="overview-stats">
+  <view class="stat"><view class="label">已发生金额</view><view class="stat-value">{{occurred}}</view></view>
+  <view class="stat"><view class="label">已回款</view><view class="stat-value">{{paid}}</view></view>
+  <view class="stat"><view class="label">项目</view><view class="stat-value">{{projectCount}}</view></view>
+ </view>
+</view>
+<view class="quick"><button bindtap="reimbursement">报销 OA</button><button wx:if="{{canCreate}}" bindtap="create">＋ 新建项目</button><button bindtap="projects">⌕ 查找项目</button></view>
+<view class="section row"><text class="heading">待处理</text><button class="text-button" data-kind="notifications" bindtap="openTool">全部通知 {{count}} ›</button></view>
+<view class="box group">
+ <view wx:for="{{notices}}" wx:key="id" class="line row" data-kind="notifications" bindtap="openTool"><view class="grow"><view class="name">{{item.type_label}}</view><view class="sub ellipsis">{{item.project_name}}</view></view><text class="arrow">›</text></view>
+ <view wx:if="{{!notices.length && !loading}}" class="line sub" data-kind="notifications" bindtap="openTool">{{count?'查看全部待处理通知 ›':'暂无待处理通知'}}</view>
+</view>
+<view class="section row"><text class="heading">最近项目</text><button class="text-button" bindtap="projects">全部 ›</button></view>
+<view wx:for="{{projects}}" wx:key="id" class="project-card" data-id="{{item.id}}" bindtap="openProject"><view class="name">{{item.name}}</view><view class="row"><text class="sub grow ellipsis">{{item.customer}}</text><text class="tag {{item.statusTone}}">{{item.status}}</text></view></view>
+<view wx:if="{{!loading && !error && !projects.length}}" class="empty">暂无可见项目</view>
+</block></view></scroll-view>

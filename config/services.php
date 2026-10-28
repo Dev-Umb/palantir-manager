@@ -35,6 +35,8 @@ return [
         ],
     ],
 
+    'business_files' => ['disk' => env('BUSINESS_ATTACHMENT_DISK', 'contract_tos')],
+
     'feishu' => [
         'enabled' => env('FEISHU_ENABLED', false),
         'base_url' => env('FEISHU_BASE_URL', 'https://open.feishu.cn/open-apis'),

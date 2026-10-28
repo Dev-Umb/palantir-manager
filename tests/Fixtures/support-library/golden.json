@@ -1,0 +1,671 @@
+{
+  "date": "2026-10-12",
+  "status": "source toolkit verification only; platform not implemented",
+  "source_sha256": "8fbb651dd2cef4dfeeb62f514dd88bdd4ecc06e96361e2534049fb67c9f6ba61",
+  "row_columns": [
+    "part_id",
+    "length_mm",
+    "quantity",
+    "bolt_quantity",
+    "accounted_weight_kg"
+  ],
+  "cases": [
+    {
+      "expression": "6",
+      "groups": 1,
+      "positions": 1,
+      "columns": 1,
+      "faces": 0,
+      "matched": 0,
+      "braces": 0,
+      "bolts": 0,
+      "knownBolts": 0,
+      "columnW": 430.3,
+      "componentW": 430.3,
+      "full": 430.3,
+      "accounted": 430.3,
+      "missing": 0,
+      "rows": [
+        [
+          "P002",
+          6000,
+          1,
+          0,
+          430.3
+        ]
+      ],
+      "name": "G01",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "expression": "6/4",
+      "groups": 4,
+      "positions": 4,
+      "columns": 4,
+      "faces": 0,
+      "matched": 0,
+      "braces": 0,
+      "bolts": 0,
+      "knownBolts": 0,
+      "columnW": 1721.2,
+      "componentW": 1721.2,
+      "full": 1721.2,
+      "accounted": 1721.2,
+      "missing": 0,
+      "rows": [
+        [
+          "P002",
+          6000,
+          4,
+          0,
+          1721.2
+        ]
+      ],
+      "name": "G02",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "expression": "6+5/4",
+      "groups": 4,
+      "positions": 4,
+      "columns": 8,
+      "faces": 0,
+      "matched": 0,
+      "braces": 0,
+      "bolts": 32,
+      "knownBolts": 32,
+      "columnW": 3233.2,
+      "componentW": 3233.2,
+      "full": 3247.28,
+      "accounted": 3247.28,
+      "missing": 0,
+      "rows": [
+        [
+          "P002",
+          6000,
+          4,
+          32,
+          1721.2
+        ],
+        [
+          "P003",
+          5000,
+          4,
+          0,
+          1512
+        ]
+      ],
+      "name": "G03",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "expression": "6@2@3/4",
+      "groups": 4,
+      "positions": 16,
+      "columns": 16,
+      "faces": 16,
+      "matched": 16,
+      "braces": 80,
+      "bolts": 512,
+      "knownBolts": 512,
+      "columnW": 6884.8,
+      "componentW": 9787.61392,
+      "full": 10012.89392,
+      "accounted": 10012.89392,
+      "missing": 0,
+      "rows": [
+        [
+          "P002",
+          6000,
+          16,
+          0,
+          6884.8
+        ],
+        [
+          "C14A-P028",
+          1674,
+          24,
+          192,
+          583.95816
+        ],
+        [
+          "C14A-P031",
+          2630,
+          16,
+          64,
+          611.6328
+        ],
+        [
+          "C14A-P026",
+          2674,
+          24,
+          192,
+          932.79816
+        ],
+        [
+          "C14A-P030",
+          3330,
+          16,
+          64,
+          774.4248
+        ]
+      ],
+      "name": "G04",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "expression": "6+5@2+3@3+3/4",
+      "groups": 4,
+      "positions": 36,
+      "columns": 72,
+      "faces": 96,
+      "matched": 96,
+      "braces": 480,
+      "bolts": 3360,
+      "knownBolts": 3360,
+      "columnW": 29098.8,
+      "componentW": 47626.73892,
+      "full": 49105.13892,
+      "accounted": 49105.13892,
+      "missing": 0,
+      "rows": [
+        [
+          "P002",
+          6000,
+          36,
+          288,
+          15490.8
+        ],
+        [
+          "P003",
+          5000,
+          36,
+          0,
+          13608
+        ],
+        [
+          "C14A-P028",
+          1674,
+          72,
+          576,
+          1751.87448
+        ],
+        [
+          "C14A-P033",
+          2255,
+          24,
+          96,
+          786.6342
+        ],
+        [
+          "C14A-P031",
+          2630,
+          24,
+          96,
+          917.4492
+        ],
+        [
+          "C14A-P026",
+          2674,
+          216,
+          1728,
+          8395.18344
+        ],
+        [
+          "C14A-P032",
+          3050,
+          72,
+          288,
+          3191.886
+        ],
+        [
+          "C14A-P030",
+          3330,
+          72,
+          288,
+          3484.9116
+        ]
+      ],
+      "name": "G05",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "expression": "6+5+0.7@2+3@3+3/4",
+      "groups": 4,
+      "positions": 36,
+      "columns": 108,
+      "faces": 144,
+      "matched": 96,
+      "braces": 480,
+      "bolts": null,
+      "knownBolts": 3648,
+      "columnW": 32122.8,
+      "componentW": 50650.73892,
+      "full": null,
+      "accounted": 52255.85892,
+      "missing": 4,
+      "rows": [
+        [
+          "P002",
+          6000,
+          36,
+          288,
+          15490.8
+        ],
+        [
+          "P003",
+          5000,
+          36,
+          288,
+          13608
+        ],
+        [
+          "P008",
+          700,
+          36,
+          0,
+          3024
+        ],
+        [
+          "C14A-P028",
+          1674,
+          72,
+          576,
+          1751.87448
+        ],
+        [
+          "C14A-P033",
+          2255,
+          24,
+          96,
+          786.6342
+        ],
+        [
+          "C14A-P031",
+          2630,
+          24,
+          96,
+          917.4492
+        ],
+        [
+          "C14A-P026",
+          2674,
+          216,
+          1728,
+          8395.18344
+        ],
+        [
+          "C14A-P032",
+          3050,
+          72,
+          288,
+          3191.886
+        ],
+        [
+          "C14A-P030",
+          3330,
+          72,
+          288,
+          3484.9116
+        ]
+      ],
+      "name": "G06",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "expression": "0.7@2@3/4",
+      "groups": 4,
+      "positions": 16,
+      "columns": 16,
+      "faces": 16,
+      "matched": 0,
+      "braces": 0,
+      "bolts": null,
+      "knownBolts": 0,
+      "columnW": 1344,
+      "componentW": 1344,
+      "full": null,
+      "accounted": 1344,
+      "missing": 2,
+      "rows": [
+        [
+          "P008",
+          700,
+          16,
+          0,
+          1344
+        ]
+      ],
+      "name": "G07",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "expression": "6@2@2.5/4",
+      "groups": 4,
+      "positions": 16,
+      "columns": 16,
+      "faces": 16,
+      "matched": 8,
+      "braces": 40,
+      "bolts": null,
+      "knownBolts": 256,
+      "columnW": 6884.8,
+      "componentW": 8080.39096,
+      "full": null,
+      "accounted": 8193.03096,
+      "missing": 1,
+      "rows": [
+        [
+          "P002",
+          6000,
+          16,
+          0,
+          6884.8
+        ],
+        [
+          "C14A-P028",
+          1674,
+          24,
+          192,
+          583.95816
+        ],
+        [
+          "C14A-P031",
+          2630,
+          16,
+          64,
+          611.6328
+        ]
+      ],
+      "name": "G08",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "expression": "2@2@3",
+      "groups": 1,
+      "positions": 4,
+      "columns": 4,
+      "faces": 4,
+      "matched": 4,
+      "braces": 16,
+      "bolts": 88,
+      "knownBolts": 88,
+      "columnW": 742.4,
+      "componentW": 1160.07776,
+      "full": 1198.79776,
+      "accounted": 1198.79776,
+      "missing": 0,
+      "rows": [
+        [
+          "P006",
+          2000,
+          4,
+          0,
+          742.4
+        ],
+        [
+          "C14A-P036",
+          1225,
+          4,
+          12,
+          71.2215
+        ],
+        [
+          "C14A-P037",
+          1611,
+          4,
+          12,
+          93.66354
+        ],
+        [
+          "C14A-P028",
+          1674,
+          2,
+          16,
+          48.66318
+        ],
+        [
+          "C14A-P029",
+          1674,
+          2,
+          16,
+          48.66318
+        ],
+        [
+          "C14A-P026",
+          2674,
+          2,
+          16,
+          77.73318
+        ],
+        [
+          "C14A-P027",
+          2674,
+          2,
+          16,
+          77.73318
+        ]
+      ],
+      "name": "G09",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "expression": "6+6/4",
+      "groups": 4,
+      "positions": 4,
+      "columns": 8,
+      "faces": 0,
+      "matched": 0,
+      "braces": 0,
+      "bolts": 32,
+      "knownBolts": 32,
+      "columnW": 3442.4,
+      "componentW": 3442.4,
+      "full": 3456.48,
+      "accounted": 3456.48,
+      "missing": 0,
+      "rows": [
+        [
+          "P002",
+          6000,
+          8,
+          32,
+          3442.4
+        ]
+      ],
+      "name": "G10",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C14A",
+        "diameter_mm": 273
+      }
+    },
+    {
+      "name": "G11",
+      "conditions": [
+        {
+          "support_use": "吊装",
+          "column_brace_model": "C14A",
+          "diameter_mm": 273,
+          "combination": "6@2@3/4",
+          "bolt_unit_weight_kg": 0.44
+        },
+        {
+          "support_use": "吊装",
+          "column_brace_model": "C16A",
+          "diameter_mm": 273,
+          "combination": "6@2@3/4",
+          "bolt_unit_weight_kg": 0.44
+        }
+      ],
+      "groups": 8,
+      "positions": 32,
+      "columns": 32,
+      "faces": 32,
+      "matched": 32,
+      "braces": 160,
+      "bolts": 1024,
+      "knownBolts": 1024,
+      "full": 20566.0088,
+      "accounted": 20566.0088,
+      "rows": [
+        [
+          "P002",
+          6000,
+          32,
+          0,
+          13769.6
+        ],
+        [
+          "C14A-P028",
+          1674,
+          24,
+          192,
+          583.95816
+        ],
+        [
+          "C16A-P028",
+          1674,
+          24,
+          192,
+          692.63424
+        ],
+        [
+          "C14A-P031",
+          2630,
+          16,
+          64,
+          611.6328
+        ],
+        [
+          "C16A-P031",
+          2630,
+          16,
+          64,
+          725.4592
+        ],
+        [
+          "C14A-P026",
+          2674,
+          24,
+          192,
+          932.79816
+        ],
+        [
+          "C16A-P026",
+          2674,
+          24,
+          192,
+          1106.39424
+        ],
+        [
+          "C14A-P030",
+          3330,
+          16,
+          64,
+          774.4248
+        ],
+        [
+          "C16A-P030",
+          3330,
+          16,
+          64,
+          918.5472
+        ]
+      ]
+    },
+    {
+      "name": "G12",
+      "conditions": {
+        "support_use": "吊装",
+        "column_brace_model": "C16A",
+        "diameter_mm": 273,
+        "combination": "6@2@3/4",
+        "bolt_unit_weight_kg": 0.44
+      },
+      "groups": 4,
+      "positions": 16,
+      "columns": 16,
+      "faces": 16,
+      "matched": 16,
+      "braces": 80,
+      "bolts": 512,
+      "knownBolts": 512,
+      "full": 10553.11488,
+      "accounted": 10553.11488,
+      "rows": [
+        [
+          "P002",
+          6000,
+          16,
+          0,
+          6884.8
+        ],
+        [
+          "C16A-P028",
+          1674,
+          24,
+          192,
+          692.63424
+        ],
+        [
+          "C16A-P031",
+          2630,
+          16,
+          64,
+          725.4592
+        ],
+        [
+          "C16A-P026",
+          2674,
+          24,
+          192,
+          1106.39424
+        ],
+        [
+          "C16A-P030",
+          3330,
+          16,
+          64,
+          918.5472
+        ]
+      ]
+    }
+  ]
+}

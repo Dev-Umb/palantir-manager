@@ -1,0 +1,10 @@
+<navigation-bar title="我的" back="{{false}}" color="#182331" background="#ffffff" /><scroll-view class="scrollarea" scroll-y type="list"><view class="content preview-screen"><view wx:if="{{error}}" class="error">{{error}}<button class="small" bindtap="refresh">重试</button></view><view wx:if="{{loading}}" class="loading">正在加载…</view><block wx:if="{{user}}">
+<view class="profile row"><view class="avatar">人</view><view class="grow"><view class="name">{{user.name}}</view><view class="sub">{{roles}} · 由平台确认</view></view></view>
+<view class="box group"><view class="line row" data-kind="notifications" bindtap="openTool"><text>通知中心</text><text class="arrow">›</text></view><view class="line row" bindtap="account"><text>账号信息</text><text class="arrow">›</text></view></view>
+<view class="section heading">业务工具</view><view class="box group">
+ <view class="line row" data-kind="ai" bindtap="openTool"><text>AI 助手</text><text class="arrow">›</text></view>
+ <view class="line row" data-kind="quote" bindtap="openTool"><text>报价单</text><text class="arrow">›</text></view>
+ <view class="line row" data-kind="upload" bindtap="openTool"><text>上传合同</text><text class="arrow">›</text></view>
+ <view class="line row" data-kind="procurement" bindtap="openTool"><text>招采参考</text><text class="arrow">›</text></view>
+</view><button class="logout" bindtap="logout">退出登录</button><view class="hint center">连接平台 · 权限以当前账号为准</view>
+</block></view></scroll-view>

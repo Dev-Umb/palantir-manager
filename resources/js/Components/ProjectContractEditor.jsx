@@ -1,5 +1,6 @@
 import AttachmentTray from './AttachmentTray';
 import { Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
 const attachmentFields = [
     ['processing_letter_attachments', 'existing_processing_letter_attachments', '加工函附件'],
@@ -65,6 +66,24 @@ export function projectContractSubmission(contracts = []) {
 }
 
 export default function ProjectContractEditor({ contracts, onChange, deletedContractIds, onDeletedContractIdsChange, errors = {} }) {
+    const [uploadError, setUploadError] = useState('');
+
+    function addFiles(index, field, input) {
+        const files = Array.from(input.files || []);
+        const limit = field === 'contract_attachments' ? 100 : 20;
+        input.value = '';
+        if (files.some((file) => file.size > limit * 1024 * 1024)) {
+            setUploadError(`每份${field === 'contract_attachments' ? '合同' : '附件'}不能超过 ${limit} MB。`);
+            return;
+        }
+        const bytes = contracts.reduce((sum, contract) => sum + attachmentFields.reduce((total, [key]) => total + (contract[key] || []).reduce((size, file) => size + file.size, 0), 0), 0);
+        if (bytes + files.reduce((sum, file) => sum + file.size, 0) > 200 * 1024 * 1024) {
+            setUploadError('本次合同区上传总计不能超过 200 MB，请分次保存。');
+            return;
+        }
+        setUploadError('');
+        update(index, field, [...(contracts[index][field] || []), ...files]);
+    }
     function update(index, key, value) {
         onChange(contracts.map((contract, contractIndex) => contractIndex === index
             ? { ...contract, [key]: value }
@@ -101,6 +120,8 @@ export default function ProjectContractEditor({ contracts, onChange, deletedCont
                     <Plus size={14} /> 添加合同
                 </button>
             </div>
+
+            {uploadError && <p className="form-error" role="alert">{uploadError}</p>}
 
             {contracts.length === 0 && <p className="empty-value">当前项目暂无合同，可按需添加多份合同。</p>}
             {contracts.map((contract, index) => (
@@ -177,11 +198,13 @@ export default function ProjectContractEditor({ contracts, onChange, deletedCont
                                     </div>)}
                                 </div>
                                 {(contract[field] || []).length > 0 && <small>本次新增 {contract[field].length} 个附件</small>}
+                                <small>PDF、JPG 或 PNG；每份{field === 'contract_attachments' ? '合同最大 100 MB' : '附件最大 20 MB'}。本次上传总计最多 200 MB，较多文件请分次保存。</small>
                                 <input
+                                    aria-label={`上传${label}`}
                                     type="file"
                                     multiple
                                     accept=".pdf,.jpg,.jpeg,.png"
-                                    onChange={(event) => { update(index, field, [...(contract[field] || []), ...Array.from(event.target.files || [])]); event.target.value = ''; }}
+                                    onChange={(event) => addFiles(index, field, event.target)}
                                 />
                                 {errors[`contracts.${index}.${field}`] && <p className="form-error">{errors[`contracts.${index}.${field}`]}</p>}
                             </div>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsurePermission;
+use App\Http\Middleware\EnsureReimbursementAccess;
 use App\Http\Middleware\EnsureWechatBinding;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'permission' => EnsurePermission::class,
+            'reimbursement-access' => EnsureReimbursementAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

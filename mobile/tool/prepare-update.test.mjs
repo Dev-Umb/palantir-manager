@@ -20,3 +20,12 @@ test('publishing rejects untrusted origins, missing bytes and invalid versions',
     }
     assert.throws(() => releaseManifest(Buffer.alloc(0), metadata));
 });
+
+
+test('TOS release accepts only the dedicated APK prefix', () => {
+    const trusted = 'https://app-download.umb.ink';
+    assert.equal(releaseManifest(Buffer.from('apk'), {...metadata, url: trusted + '/android/palantir-1.0.11.apk'}).versionCode, 8);
+    for (const url of [trusted + '/contracts/app.apk', trusted + ':444/android/palantir-1.0.11.apk', trusted + '.evil.test/android/palantir-1.0.11.apk']) {
+        assert.throws(() => releaseManifest(Buffer.from('apk'), {...metadata, url}));
+    }
+});

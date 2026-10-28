@@ -1,0 +1,17 @@
+
+<navigation-bar title="{{title}}" back="{{true}}" color="#192b42" background="#ffffff" />
+<view wx:if="{{kind==='ai' || kind==='quote'}}" class="chat-toolbar"><text>鑫源昌 · 业务助手</text><button bindtap="newConversation" disabled="{{busy || aiActive}}">＋ 新对话</button></view>
+<scroll-view class="scrollarea" scroll-y type="list"><view class="content {{kind==='ai' || kind==='quote'?'chat-content':''}} {{kind==='notifications'?'notification-content':''}}">
+ <view wx:if="{{error}}" class="error">{{error}}<button bindtap="refresh" disabled="{{busy}}">刷新状态</button><button wx:if="{{error==='登录已失效，请重新登录'}}" bindtap="login">重新登录</button></view>
+ <view wx:if="{{busy && kind!=='ai' && kind!=='quote'}}" class="loading">正在处理…</view>
+ <block wx:if="{{kind==='notifications'}}"><include src="notifications.wxml"/></block>
+ <block wx:elif="{{kind==='ai' || kind==='quote'}}"><include src="ai.wxml"/></block>
+ <block wx:elif="{{kind==='upload'}}"><include src="intake.wxml"/></block>
+ <block wx:elif="{{kind==='procurement'}}"><include src="procurement.wxml"/></block>
+</view></scroll-view>
+<view wx:if="{{kind==='ai' || kind==='quote'}}" class="chat-composer">
+ <view class="composer-box"><textarea placeholder="说说你想做什么…" maxlength="4000" value="{{prompt}}" bindinput="aiInput" auto-height cursor-spacing="24" adjust-position="{{true}}" disabled="{{busy || aiActive}}"/>
+ <button wx:if="{{aiActive}}" class="send-button stop-button" bindtap="cancelAi" disabled="{{busy}}" aria-label="停止当前任务">停止</button>
+ <button wx:else class="send-button" bindtap="sendAi" loading="{{busy}}" disabled="{{busy || !prompt}}" aria-label="发送消息">↑</button></view>
+ <view class="composer-note">AI 结果请核对 · 数据修改需你确认</view>
+</view>

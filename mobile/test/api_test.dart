@@ -5,6 +5,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:palantir_mobile/api.dart';
 
 void main() {
+  test('private business downloads only trust signed HTTPS bucket URLs', () {
+    const base =
+        'https://xyc-palantir-contracts-prod.tos-s3-cn-beijing.volces.com/attachments/contract.pdf?X-Amz-Signature=test';
+    expect(isTrustedBusinessDownload(Uri.parse(base)), isTrue);
+    for (final url in [
+      base.replaceFirst('https:', 'http:'),
+      base.replaceFirst('.com/', '.com:444/'),
+      base.replaceFirst('xyc-palantir-contracts-prod', 'other-bucket'),
+      base.split('?').first,
+      '$base#fragment',
+      base.replaceFirst('https://', 'https://user@'),
+    ]) {
+      expect(isTrustedBusinessDownload(Uri.parse(url)), isFalse);
+    }
+  });
+
   late HttpServer server;
   late PalantirApi api;
   setUp(() async {
@@ -37,6 +53,42 @@ void main() {
       ...extra,
     },
   };
+  test(
+    'accepts queued quotation task without relaxing other response contracts',
+    () async {
+      server.listen((request) async {
+        request.response.statusCode = HttpStatus.accepted;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'conversation_id': 'c1',
+            'run': {'id': 'r1', 'status': 'queued'},
+          }),
+        );
+        await request.response.close();
+      });
+      final result = await api.send('/ai/runs', {'message': '做个报价单'});
+      expect(result['run']['status'], 'queued');
+      await expectLater(
+        api.send('/ai/messages', {'message': '查项目'}),
+        throwsA(isA<ApiFailure>()),
+      );
+      await expectLater(api.page('/ai/runs'), throwsA(isA<ApiFailure>()));
+    },
+  );
+
+  test('accepted quotation response still requires a JSON object', () async {
+    server.listen((request) async {
+      request.response.statusCode = HttpStatus.accepted;
+      request.response.write('<html>Unavailable</html>');
+      await request.response.close();
+    });
+    await expectLater(
+      api.send('/ai/runs', {'message': '做个报价单'}),
+      throwsA(isA<ApiFailure>()),
+    );
+  });
+
   test('version conflict without header recovers initial HTML and retains same-origin cookies', () async {
     var requests = 0;
     server.listen((request) async {

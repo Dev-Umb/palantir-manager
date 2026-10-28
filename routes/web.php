@@ -53,7 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/visualization', VisualizationController::class)->middleware('permission:dashboard.view')->name('visualization');
-    Route::get('/', DashboardController::class)->middleware('permission:dashboard.view')->name('dashboard');
+    Route::get('/', VisualizationController::class)->middleware('permission:dashboard.view')->name('home');
+    Route::get('/dashboard', DashboardController::class)->middleware('permission:dashboard.view')->name('dashboard');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
@@ -124,3 +125,7 @@ Route::middleware('auth')->group(function () {
 require __DIR__.'/procurement_hub.php';
 
 require __DIR__.'/quotations.php';
+
+require __DIR__.'/support_library.php';
+
+require __DIR__.'/reimbursements.php';

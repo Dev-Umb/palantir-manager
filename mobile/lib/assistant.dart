@@ -18,6 +18,7 @@ class AssistantPage extends StatefulWidget {
 }
 
 class _AssistantPageState extends State<AssistantPage> {
+  final scaffold = GlobalKey<ScaffoldState>();
   final input = TextEditingController();
   final scroll = ScrollController();
   List<Map<String, dynamic>> messages = [], conversations = [];
@@ -148,34 +149,149 @@ class _AssistantPageState extends State<AssistantPage> {
     input.text = '做个报价单\n产品名称、综合单价及计价单位：\n备注：含税13%含运费';
   }
 
-  Future<void> history() async {
-    final id = await showModalBottomSheet<String>(
+  void newConversation() {
+    setState(() {
+      conversation = null;
+      messages = [];
+      error = null;
+    });
+  }
+
+  Future<void> businessActions() async {
+    final action = await showModalBottomSheet<String>(
       context: context,
-      isScrollControlled: true,
+      showDragHandle: true,
       builder: (c) => SafeArea(
-        child: SizedBox(
-          height: 440,
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              const Text(
-                '历史会话',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.request_quote_outlined),
+              title: const Text('快速制作报价单'),
+              onTap: () => Navigator.pop(c, 'quote'),
+            ),
+            if (widget.api.canUpload)
+              ListTile(
+                leading: const Icon(Icons.attach_file),
+                title: const Text('上传合同'),
+                onTap: () => Navigator.pop(c, 'upload'),
               ),
-              if (conversations.isEmpty) note('暂无历史会话。'),
-              ...conversations.map(
-                (r) => ListTile(
-                  leading: const Icon(Icons.chat_bubble_outline),
-                  title: Text(textOf(r['title'])),
-                  onTap: () => Navigator.pop(c, r['id'].toString()),
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
-    if (id == null || !mounted) return;
+    if (!mounted) return;
+    if (action == 'quote') quickQuotation();
+    if (action == 'upload') {
+      openFlow(context, ContractIntakePage(api: widget.api));
+    }
+  }
+
+  Widget conversationDrawer() => Drawer(
+    width: min(MediaQuery.sizeOf(context).width * .82, 340),
+    backgroundColor: const Color(0xfff8fafb),
+    child: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                '鑫源昌 · AI 助手',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: sending
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      newConversation();
+                    },
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('新会话'),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.request_quote_outlined),
+              title: const Text('快速制作报价单'),
+              onTap: sending
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      quickQuotation();
+                    },
+            ),
+            if (widget.api.canUpload)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.attach_file),
+                title: const Text('上传合同'),
+                onTap: sending
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        openFlow(context, ContractIntakePage(api: widget.api));
+                      },
+              ),
+            const Padding(
+              padding: EdgeInsets.only(top: 20, bottom: 12),
+              child: Text(
+                '最近会话',
+                style: TextStyle(color: Colors.blueGrey, fontSize: 12),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: [
+                  if (conversations.isEmpty)
+                    const Text(
+                      '暂无历史会话',
+                      style: TextStyle(color: Colors.blueGrey),
+                    ),
+                  ...conversations.map(
+                    (r) => ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      selected: conversation == r['id'].toString(),
+                      selectedTileColor: steel.withValues(alpha: .08),
+                      title: Text(
+                        textOf(r['title']),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: sending || loading
+                          ? null
+                          : () {
+                              Navigator.pop(context);
+                              selectConversation(r['id'].toString());
+                            },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.arrow_back),
+              title: const Text('返回工作台'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.maybePop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Future<void> selectConversation(String id) async {
     setState(() {
       loading = true;
       error = null;
@@ -208,29 +324,32 @@ class _AssistantPageState extends State<AssistantPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    key: scaffold,
+    drawer: conversationDrawer(),
     appBar: AppBar(
-      title: const Text('AI 助手'),
+      centerTitle: true,
+      leading: IconButton(
+        tooltip: '历史会话',
+        onPressed: sending ? null : () => scaffold.currentState?.openDrawer(),
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.white,
+          side: const BorderSide(color: Color(0xffdde4ea)),
+        ),
+        icon: const Icon(Icons.menu),
+      ),
+      title: const Text(
+        'AI 助手',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
       actions: [
         IconButton(
-          tooltip: '快速制作报价单',
-          onPressed: sending ? null : quickQuotation,
-          icon: const Icon(Icons.request_quote_outlined),
-        ),
-        IconButton(
           tooltip: '新会话',
-          onPressed: sending
-              ? null
-              : () => setState(() {
-                  conversation = null;
-                  messages = [];
-                  error = null;
-                }),
-          icon: const Icon(Icons.add_comment_outlined),
-        ),
-        IconButton(
-          tooltip: '历史会话',
-          onPressed: sending ? null : history,
-          icon: const Icon(Icons.history),
+          onPressed: sending ? null : newConversation,
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white,
+            side: const BorderSide(color: Color(0xffdde4ea)),
+          ),
+          icon: const Icon(Icons.edit_outlined),
         ),
       ],
     ),
@@ -243,32 +362,67 @@ class _AssistantPageState extends State<AssistantPage> {
               padding: const EdgeInsets.all(20),
               children: [
                 if (loading) const LinearProgressIndicator(),
-                if (messages.isEmpty) ...[
-                  const Icon(
-                    Icons.auto_awesome_outlined,
-                    size: 40,
-                    color: steel,
+                if (messages.isEmpty && !sending) ...[
+                  SizedBox(
+                    height: MediaQuery.viewInsetsOf(context).bottom > 0
+                        ? 8
+                        : 70,
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: steel.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome_outlined,
+                        size: 27,
+                        color: steel,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
-                    '今天想了解哪些业务进展？',
+                    '今天有什么需要帮忙？',
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
                   ),
-                  note('查项目、看合同、核对未回款。回答基于当前账号可访问的数据。'),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      '查项目、核对回款，或快速制作报价单。',
+                      style: TextStyle(color: Colors.blueGrey, fontSize: 13),
+                    ),
+                  ),
                   for (final question in [
                     '我有哪些项目需要跟进？',
                     '按项目列出未回款金额',
                     '哪些合同还没有签署？',
                     '做个报价单',
                   ])
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: OutlinedButton(
-                        onPressed: () {
-                          input.text = question;
-                        },
-                        child: Text(question),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        question.contains('报价')
+                            ? Icons.request_quote_outlined
+                            : Icons.folder_outlined,
+                        size: 20,
+                        color: steel,
                       ),
+                      title: Text(
+                        question,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: Colors.blueGrey,
+                      ),
+                      onTap: () {
+                        input.text = question;
+                      },
                     ),
                 ],
                 ...messages.map(
@@ -277,13 +431,20 @@ class _AssistantPageState extends State<AssistantPage> {
                         ? Alignment.centerRight
                         : Alignment.centerLeft,
                     child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
+                      constraints: m['role'] == 'user'
+                          ? BoxConstraints(
+                              maxWidth: MediaQuery.sizeOf(context).width * .82,
+                            )
+                          : null,
+                      width: m['role'] == 'user' ? null : double.infinity,
+                      padding: m['role'] == 'user'
+                          ? const EdgeInsets.all(14)
+                          : const EdgeInsets.symmetric(vertical: 12),
                       margin: const EdgeInsets.only(bottom: 14),
                       decoration: BoxDecoration(
                         color: m['role'] == 'user'
                             ? steel.withValues(alpha: .09)
-                            : Colors.white,
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
@@ -297,21 +458,60 @@ class _AssistantPageState extends State<AssistantPage> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          SelectableText(
-                            textOf(m['content'] ?? m['answer']),
-                            style: const TextStyle(height: 1.65),
-                          ),
+                          if (textOf(m['content'] ?? m['answer'])
+                              .trim()
+                              .isNotEmpty)
+                            m['role'] == 'user'
+                                ? SelectableText(
+                                    textOf(m['content'] ?? m['answer']),
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      height: 1.55,
+                                    ),
+                                  )
+                                : AssistantReplyText(
+                                    text: textOf(m['content'] ?? m['answer']),
+                                  ),
+                          if (((m['artifacts'] as List?) ?? []).isNotEmpty)
+                            const SizedBox(height: 14),
                           for (final artifact
                               in ((m['artifacts'] as List?) ?? [])
                                   .whereType<Map<String, dynamic>>())
                             if (artifact['type'] == 'quotation_docx')
-                              QuotationCard(
-                                key: ValueKey(
-                                  '${m['run_id']}-${artifact['id']}',
+                              panel(
+                                Theme(
+                                  data: Theme.of(context).copyWith(
+                                    inputDecorationTheme: InputDecorationTheme(
+                                      filled: true,
+                                      fillColor: const Color(0xfff8fafc),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 12,
+                                          ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xffdde4ea),
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xffdde4ea),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  child: QuotationCard(
+                                    key: ValueKey(
+                                      '${m['run_id']}-${artifact['id']}',
+                                    ),
+                                    api: widget.api,
+                                    runId: '${m['run_id']}',
+                                    artifact: artifact,
+                                  ),
                                 ),
-                                api: widget.api,
-                                runId: '${m['run_id']}',
-                                artifact: artifact,
                               ),
                           if (mapOf(m['table']).isNotEmpty)
                             answerTable(mapOf(m['table'])),
@@ -340,57 +540,93 @@ class _AssistantPageState extends State<AssistantPage> {
                     ),
                   ),
                 ),
-                if (sending) note('正在查询业务数据…'),
-                if (error != null) errorBox(error!),
+                if (sending) const AssistantThinking(),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Color(0xffdde4ea))),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (widget.api.canUpload)
-                  IconButton(
-                    tooltip: '上传合同',
-                    onPressed: sending
-                        ? null
-                        : () => openFlow(
-                            context,
-                            ContractIntakePage(api: widget.api),
+                if (error != null) errorBox(error!),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xffdde4ea)),
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        key: const Key('ai-input'),
+                        controller: input,
+                        minLines: 2,
+                        maxLines: 5,
+                        maxLength: 2000,
+                        enabled: !loading,
+                        decoration: const InputDecoration(
+                          hintText: '问业务进展，或做一份报价单…',
+                          counterText: '',
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                          filled: false,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            tooltip: '业务操作',
+                            onPressed: sending || loading
+                                ? null
+                                : businessActions,
+                            icon: const Icon(Icons.add),
                           ),
-                    icon: const Icon(Icons.attach_file),
-                  ),
-                Expanded(
-                  child: TextField(
-                    key: const Key('ai-input'),
-                    controller: input,
-                    minLines: 1,
-                    maxLines: 5,
-                    maxLength: 2000,
-                    enabled: !loading,
-                    decoration: const InputDecoration(
-                      hintText: '输入问题，或继续追问…',
-                      counterText: '',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: input,
-                  builder: (context, value, child) => IconButton.filled(
-                    key: const Key('ai-send'),
-                    tooltip: '发送',
-                    onPressed: sending || loading || value.text.trim().isEmpty
-                        ? null
-                        : send,
-                    icon: Icon(
-                      sending ? Icons.hourglass_top : Icons.arrow_upward,
-                    ),
+                          if (sending)
+                            const SizedBox(
+                              width: 15,
+                              height: 15,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: steel,
+                              ),
+                            ),
+                          if (sending) const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              sending ? '正在处理，请稍候…' : '基于你的业务权限回答',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.blueGrey,
+                              ),
+                            ),
+                          ),
+                          ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: input,
+                            builder: (context, value, child) =>
+                                IconButton.filled(
+                                  key: const Key('ai-send'),
+                                  tooltip: '发送',
+                                  onPressed:
+                                      sending ||
+                                          loading ||
+                                          value.text.trim().isEmpty
+                                      ? null
+                                      : send,
+                                  icon: Icon(
+                                    sending
+                                        ? Icons.hourglass_top
+                                        : Icons.arrow_upward,
+                                  ),
+                                ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -432,6 +668,64 @@ class _AssistantPageState extends State<AssistantPage> {
               ),
             )
             .toList(),
+      ),
+    );
+  }
+}
+
+class AssistantThinking extends StatelessWidget {
+  const AssistantThinking({super.key});
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'AI正在处理',
+    liveRegion: true,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2, color: steel),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '正在整理回复…',
+            style: TextStyle(fontSize: 13, color: steel.withValues(alpha: .8)),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class AssistantReplyText extends StatelessWidget {
+  final String text;
+  const AssistantReplyText({super.key, required this.text});
+  @override
+  Widget build(BuildContext context) {
+    final spans = <TextSpan>[];
+    final pattern = RegExp(r'\*\*([^*]+)\*\*');
+    var offset = 0;
+    for (final match in pattern.allMatches(text)) {
+      if (match.start > offset) {
+        spans.add(TextSpan(text: text.substring(offset, match.start)));
+      }
+      spans.add(
+        TextSpan(
+          text: match.group(1),
+          style: const TextStyle(fontWeight: FontWeight.w600, color: ink),
+        ),
+      );
+      offset = match.end;
+    }
+    if (offset < text.length) spans.add(TextSpan(text: text.substring(offset)));
+    return SelectableText.rich(
+      TextSpan(children: spans),
+      style: const TextStyle(
+        fontSize: 14,
+        height: 1.65,
+        color: Color(0xff334f60),
       ),
     );
   }

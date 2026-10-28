@@ -52,7 +52,7 @@ class CompanyOperationsCockpitTest extends TestCase
         $auditCountBefore = AuditLog::count();
 
         $this->actingAs($admin)
-            ->get('/')
+            ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Dashboard')
@@ -93,7 +93,7 @@ class CompanyOperationsCockpitTest extends TestCase
         $this->record('project', ['name' => '不可见项目', 'overall_status' => '投标中']);
 
         $this->actingAs($basic)
-            ->get('/')
+            ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('cockpit.meta.scope', '我的可见范围')
@@ -127,7 +127,7 @@ class CompanyOperationsCockpitTest extends TestCase
             'unpaid_amount' => 0,
         ], $other);
         $this->actingAs($owner)
-            ->get('/')
+            ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('cockpit.meta.scope', '我的可见范围')
@@ -173,7 +173,7 @@ class CompanyOperationsCockpitTest extends TestCase
         }
 
         $this->actingAs($admin)
-            ->get('/')
+            ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('cockpit.panels.project_amounts.projects_count', 6)
@@ -221,7 +221,7 @@ class CompanyOperationsCockpitTest extends TestCase
         ]);
 
         $this->actingAs($finance)
-            ->get('/')
+            ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('cockpit.kpis', function (Collection $kpis): bool {

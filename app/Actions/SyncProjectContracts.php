@@ -7,13 +7,13 @@ use App\Models\BusinessObject;
 use App\Models\ObjectRecord;
 use App\Models\StoredAttachment;
 use App\Models\User;
+use App\Support\BusinessFileStorage;
 use App\Support\ObjectRelations;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
@@ -80,7 +80,7 @@ class SyncProjectContracts
             'contracts.*.processing_letter_attachments' => ['nullable', 'array', 'max:20'],
             'contracts.*.processing_letter_attachments.*' => [File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024)],
             'contracts.*.contract_attachments' => ['nullable', 'array', 'max:20'],
-            'contracts.*.contract_attachments.*' => [File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024)],
+            'contracts.*.contract_attachments.*' => [File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(100 * 1024)],
             'contracts.*.other_attachments' => ['nullable', 'array', 'max:20'],
             'contracts.*.other_attachments.*' => [File::types(['pdf', 'jpg', 'jpeg', 'png'])->max(20 * 1024)],
             'contracts.*.statement_attachments' => ['nullable', 'array', 'max:20'],
@@ -92,6 +92,7 @@ class SyncProjectContracts
             'contracts.max' => '单个项目最多一次维护 50 份合同。',
             'contracts.*.amount.required' => '每份合同都必须填写合同金额。',
             'contracts.*.amount.numeric' => '合同金额必须是有效数字。',
+            'contracts.*.contract_attachments.*.max' => '每份合同附件不能超过 100 MB。',
         ])->validate();
 
         $contracts = collect($validated['contracts'])
@@ -253,7 +254,9 @@ class SyncProjectContracts
                 $this->projectNotifications->handleProjects([$project->id]);
             });
         } catch (Throwable $exception) {
-            Storage::disk('local')->delete($this->storedPaths);
+            foreach ($this->storedPaths as $path) {
+                app(BusinessFileStorage::class)->deleteUploaded($path);
+            }
             $this->storedPaths = [];
 
             throw $exception;
@@ -339,18 +342,8 @@ class SyncProjectContracts
             $newPaths = collect($submitted[$key] ?? [])
                 ->filter(fn (mixed $file): bool => $file instanceof UploadedFile)
                 ->map(function (UploadedFile $file): string {
-                    $path = $file->store('attachments', 'local');
+                    $path = app(BusinessFileStorage::class)->upload($file)->logical_path;
                     $this->storedPaths[] = $path;
-                    StoredAttachment::create([
-                        'logical_path' => $path,
-                        'disk' => 'local',
-                        'object_key' => $path,
-                        'original_name' => basename($file->getClientOriginalName()),
-                        'mime_type' => $file->getMimeType(),
-                        'size' => $file->getSize(),
-                        'sha256' => hash_file('sha256', $file->getRealPath()),
-                        'status' => StoredAttachment::STATUS_ATTACHED,
-                    ]);
 
                     return $path;
                 });

@@ -1,0 +1,12 @@
+<navigation-bar title="微信登录" back="{{false}}" color="#192b42" background="#ffffff" />
+<scroll-view class="scrollarea" scroll-y type="list"><view class="content">
+ <view class="login-heading">鑫源昌智造中枢</view><view class="muted">使用微信进入你的平台账号</view>
+ <view wx:if="{{loading}}" class="loading">正在检查登录服务…</view>
+ <view wx:if="{{error}}" class="error">{{error}}<button wx:if="{{!configured}}" class="small" bindtap="refresh">重新检查</button></view>
+ <view wx:if="{{!loading && !configured && !error}}" class="error">微信登录暂不可用，请联系管理员完成配置。<button bindtap="refresh">重新检查</button></view>
+ <block wx:if="{{configured && !loading}}">
+ <view wx:if="{{binding}}" class="field"><label>固定绑定码</label><input value="{{bindingCode}}" bindinput="input" maxlength="32" placeholder="输入后台生成的 16 位绑定码" disabled="{{busy}}"/><view class="hint">先登录平台网页，在「用户设置 → 微信登录」生成绑定码。长期有效，仅用于绑定你自己的账号。</view></view>
+ <button class="primary" style="margin-top:48rpx;width:100%;" loading="{{busy}}" disabled="{{busy}}" bindtap="submit">{{binding?'绑定并微信登录':'微信登录'}}</button>
+ <button style="margin-top:24rpx;width:100%;" disabled="{{busy}}" bindtap="toggleBinding">{{binding?'已有绑定，返回登录':'首次使用？绑定已有账号'}}</button>
+ </block><view class="hint">账号权限由平台确认。无需提供手机号，不会自动注册新账号。</view>
+</view></scroll-view>

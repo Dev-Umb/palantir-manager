@@ -102,7 +102,8 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ['key' => 'dashboard', 'label' => '经营大盘', 'href' => route('dashboard'), 'visible' => $can('dashboard.view'), 'mobile_priority' => 10],
-            ['key' => 'visualization', 'label' => '可视化大盘', 'href' => route('visualization'), 'visible' => $can('dashboard.view'), 'mobile_priority' => 45],
+            ['key' => 'visualization', 'label' => '可视化大盘', 'href' => route('home'), 'exact' => true, 'visible' => $can('dashboard.view'), 'mobile_priority' => 45],
+            ['key' => 'reimbursements', 'label' => '报销 OA', 'href' => route('reimbursements.index'), 'visible' => ! $request->user()->isTimebookOperator(), 'mobile_priority' => 35],
             ['key' => 'notifications', 'label' => '通知中心', 'href' => route('notifications.index'), 'visible' => true, 'mobile_priority' => 40],
             [
                 'key' => 'ontology',
@@ -127,6 +128,7 @@ class HandleInertiaRequests extends Middleware
             ['key' => 'hub', 'exact' => true, 'label' => '招采信息中心', 'href' => route('hub.index'), 'visible' => HubAccess::canRead($request->user()), 'mobile_priority' => 65],
             ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
             ...($can('timebook.view') ? [['key' => 'timebook', 'label' => '工日簿', 'href' => route('timebook.index'), 'visible' => true, 'mobile_priority' => 25]] : []),
+            ['key' => 'support-library', 'label' => '钢箱梁工作台', 'href' => route('support-library.index'), 'visible' => $can('support-library.view'), 'mobile_priority' => 64],
             ['key' => 'quotations', 'label' => '参考报价', 'href' => route('quotations.index'), 'visible' => QuotationAccess::allows($request->user()), 'mobile_priority' => 62],
         ];
     }

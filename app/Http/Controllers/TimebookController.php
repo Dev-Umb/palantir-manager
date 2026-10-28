@@ -6,9 +6,11 @@ use App\Actions\WriteTimebookEntry;
 use App\Http\Requests\TimebookEntryRequest;
 use App\Models\TimebookEntry;
 use App\Models\TimebookEntryAudit;
+use App\Support\BusinessFileStorage;
 use App\Support\TimebookExport;
 use App\Support\TimebookQuery;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -76,12 +78,21 @@ class TimebookController extends Controller
         return response()->json(TimebookEntryAudit::query()->where('entry_id', $entry->id)->latest('id')->get());
     }
 
-    public function export(Request $request, TimebookExport $export): \Illuminate\Http\Response
+    public function export(Request $request, TimebookExport $export): \Illuminate\Http\Response|RedirectResponse
     {
         $result = $this->query->result($this->query->filters($request->query()), perPage: PHP_INT_MAX);
         $filename = '工日簿_'.($result['filters']['start'] ?: '全部').'_'.($result['filters']['end'] ?: '全部').'.xlsx';
 
-        return response($export->make($result), 200, [
+        $bytes = $export->make($result);
+        $mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        $storage = app(BusinessFileStorage::class);
+        $key = 'timebook-exports/'.$request->user()->id.'/'.hash('sha256', $bytes).'.xlsx';
+        $storage->storeBytes($key, $bytes, $filename, $mime);
+        if ($url = $storage->downloadUrl($key, $filename, $mime)) {
+            return redirect()->away($url)->header('Cache-Control', 'private, no-store');
+        }
+
+        return response($bytes, 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => "attachment; filename=\"timebook.xlsx\"; filename*=UTF-8''".rawurlencode($filename),
             'Cache-Control' => 'private, no-store',
