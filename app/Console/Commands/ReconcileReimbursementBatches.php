@@ -16,7 +16,7 @@ class ReconcileReimbursementBatches extends Command
 
     public function handle(ReimbursementBatchService $service): int
     {
-        ReimbursementBatchFile::whereIn('status', ['queued', 'processing'])->where('updated_at', '<', now()->subMinutes(20))->each(function ($f): void {
+        ReimbursementBatchFile::where('status', 'processing')->where('updated_at', '<', now()->subMinutes(20))->each(function ($f): void {
             $f->update(['status' => 'failed', 'error' => '处理已中断，请重试。']);
         });
         ReimbursementBatch::where('status', 'processing')->each(fn ($b) => $service->finish($b));

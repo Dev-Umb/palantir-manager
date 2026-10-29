@@ -48,6 +48,17 @@ class ReimbursementBatchTest extends TestCase
         return ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'status' => 'recognized', 'upload_id' => $upload->id, 'reviewed' => $reviewed, 'result' => ['type' => $type, 'amount' => '100.01', 'invoice_date' => '2026-10-29', 'description' => '测试发票'], 'issues' => $reviewed ? [] : ['请核对']]);
     }
 
+    public function test_reconciliation_keeps_waiting_files_in_large_batches(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        $waiting = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'status' => 'queued', 'updated_at' => now()->subHour()]);
+        $stuck = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'status' => 'processing', 'updated_at' => now()->subHour()]);
+        $this->artisan('reimbursements:reconcile-batches')->assertSuccessful();
+        $this->assertSame('queued', $waiting->fresh()->status);
+        $this->assertSame('failed', $stuck->fresh()->status);
+        $this->assertSame('processing', $batch->fresh()->status);
+    }
+
     public function test_owner_only_create_and_retained_options(): void
     {
         $id = (string) Str::uuid();
