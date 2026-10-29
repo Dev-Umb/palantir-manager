@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\ReimbursementDraftService;
 use App\Jobs\SendReimbursementWechatNotice;
 use App\Models\Permission;
 use App\Models\ReimbursementNotice;
@@ -18,6 +19,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -57,6 +59,128 @@ class ReimbursementTest extends TestCase
         $user->roles()->attach($role);
 
         return $user;
+    }
+
+    public function test_pdf_upload_atomically_saves_incomplete_draft_and_retry_does_not_duplicate(): void
+    {
+        $id = (string) Str::uuid();
+        $context = ['id' => $id, 'operation' => (string) Str::uuid(), 'revision' => 0, 'item' => 0, 'payload' => ['title' => '', 'type' => '其他', 'note' => '', 'cc' => [], 'items' => [['description' => '', 'amount' => '1.', 'invoice_date' => null, 'attachments' => []]]]];
+        $upload = fn () => $this->actingAs($this->owner)->postJson('/reimbursements/uploads', ['draft_context' => json_encode($context), 'file' => UploadedFile::fake()->createWithContent('invoice.pdf', "%PDF-1.4\ninvoice")]);
+        $first = $upload()->assertCreated()->json();
+        $this->assertSame($id, $first['draft']['id']);
+        $this->assertSame('1.', $first['draft']['payload']['items'][0]['amount']);
+        $upload()->assertCreated()->assertJsonPath('file.id', $first['file']['id']);
+        $this->assertSame(1, ReimbursementUpload::count());
+        $this->assertSame(0, ReimbursementVersion::count());
+        $this->assertSame(0, ReimbursementNotice::count());
+        $this->actingAs($this->owner)->getJson('/reimbursements/drafts')->assertJsonCount(1, 'records.data');
+        $this->getJson('/reimbursements')->assertJsonPath('pending_count', 0);
+        $this->get('/reimbursements/drafts/'.$id.'/files/'.$first['file']['id'])->assertOk();
+        $this->actingAs($this->admin)->getJson('/reimbursements/drafts/'.$id)->assertForbidden();
+        $this->get('/reimbursements/drafts/'.$id.'/files/'.$first['file']['id'])->assertForbidden();
+        $this->getJson('/reimbursements/drafts')->assertJsonCount(0, 'records.data');
+    }
+
+    public function test_draft_revision_preserves_newer_edits_and_submission_consumes_only_after_success(): void
+    {
+        $input = $this->input();
+        $payload = array_intersect_key($input, array_flip(['title', 'type', 'note', 'items', 'cc']));
+        $id = (string) Str::uuid();
+        $service = app(ReimbursementDraftService::class);
+        $draft = $service->save($this->owner, $id, ['revision' => 0, 'payload' => $payload], true);
+        $payload['title'] = '新标题';
+        $this->actingAs($this->owner)->putJson('/reimbursements/drafts/'.$id, ['revision' => 1, 'payload' => $payload])->assertOk()->assertJsonPath('draft.revision', 2);
+        $this->putJson('/reimbursements/drafts/'.$id, ['revision' => 1, 'payload' => $payload])->assertOk()->assertJsonPath('draft.revision', 2);
+        $older = $payload;
+        $older['title'] = '旧页面';
+        $this->putJson('/reimbursements/drafts/'.$id, ['revision' => 1, 'payload' => $older])->assertConflict();
+        $this->actingAs($this->reviewer)->putJson('/reimbursements/drafts/'.$id, ['revision' => 2, 'payload' => $older])->assertForbidden();
+        $input = [...$input, 'title' => '新标题', 'draft_id' => $id, 'draft_revision' => 2];
+        $this->actingAs($this->owner)->postJson('/reimbursements', [...$input, 'note' => ''])->assertUnprocessable();
+        $this->getJson('/reimbursements/drafts/'.$id)->assertOk();
+        $record = $this->submit($input);
+        $this->actingAs($this->owner)->postJson('/reimbursements', $input)->assertCreated()->assertJsonPath('record.id', $record['id']);
+        $this->getJson('/reimbursements/drafts')->assertJsonCount(0, 'records.data');
+        $this->putJson('/reimbursements/drafts/'.$id, ['revision' => 2, 'payload' => $payload])->assertConflict();
+        $this->assertSame(1, ReimbursementVersion::count());
+    }
+
+    public function test_drafts_reject_foreign_attachments_and_preserve_multiple_drafts(): void
+    {
+        $input = $this->input();
+        $payload = array_intersect_key($input, array_flip(['title', 'type', 'note', 'items', 'cc']));
+        $service = app(ReimbursementDraftService::class);
+        $first = $service->save($this->owner, (string) Str::uuid(), ['revision' => 0, 'payload' => $payload], true);
+        $payload['items'][0]['attachments'] = [];
+        $second = $service->save($this->owner, (string) Str::uuid(), ['revision' => 0, 'payload' => $payload], true);
+        $payload['items'][0]['attachments'] = $input['items'][0]['attachments'];
+        $this->actingAs($this->owner)->putJson('/reimbursements/drafts/'.$second->id, ['revision' => 1, 'payload' => $payload])->assertUnprocessable();
+        $this->getJson('/reimbursements/drafts')->assertJsonCount(2, 'records.data');
+        $this->postJson('/reimbursements', $input)->assertUnprocessable();
+    }
+
+    public function test_draft_upload_conflict_rolls_back_and_rejected_versions_can_be_drafted_again(): void
+    {
+        $input = $this->input();
+        $payload = array_intersect_key($input, array_flip(['title', 'type', 'note', 'items', 'cc']));
+        $service = app(ReimbursementDraftService::class);
+        $id = (string) Str::uuid();
+        $service->save($this->owner, $id, ['revision' => 0, 'payload' => $payload], true);
+        $context = ['id' => $id, 'revision' => 0, 'operation' => (string) Str::uuid(), 'item' => 0, 'payload' => $payload];
+        $this->actingAs($this->owner)->postJson('/reimbursements/uploads', ['draft_context' => json_encode($context), 'file' => UploadedFile::fake()->createWithContent('invoice.pdf', "%PDF-1.4\ninvoice")])->assertConflict();
+        $this->assertSame(1, ReimbursementUpload::count());
+        $record = $this->submit([...$input, 'draft_id' => $id, 'draft_revision' => 1]);
+        $this->decision($this->reviewer, $record, 'reject', note: '补充')->assertOk();
+        $source = ['reimbursement_id' => $record['reimbursement_id'], 'expected_version' => 1];
+        $next = $service->save($this->owner, (string) Str::uuid(), ['revision' => 0, 'payload' => [...$payload, ...$source]], true);
+        $this->actingAs($this->owner)->getJson('/reimbursements/drafts/'.$next->id)->assertOk()->assertJsonPath('draft.source_version_id', $record['id']);
+        $result = $this->submit([...$input, ...$source, 'submission_key' => (string) Str::uuid(), 'draft_id' => $next->id, 'draft_revision' => 1]);
+        $this->assertSame(2, $result['number']);
+        $this->assertSame($record['items'][0]['attachments'][0]['id'], $result['items'][0]['attachments'][0]['id']);
+    }
+
+    public function test_invoice_date_is_validated_and_preserved_with_historical_attachments(): void
+    {
+        $input = $this->input();
+        foreach (['2026-02-30', '29/10/2026', '2026-1-01', 'invalid'] as $date) {
+            $input['items'][0]['invoice_date'] = $date;
+            $this->actingAs($this->owner)->postJson('/reimbursements', $input)->assertUnprocessable()->assertJsonValidationErrors('items.0.invoice_date');
+        }
+        $input['items'][0]['invoice_date'] = '2026-10-29';
+        $extra = $this->input();
+        $input['items'][0]['attachments'][] = $extra['items'][0]['attachments'][0];
+        $record = $this->submit($input);
+        $this->assertSame('2026-10-29', $record['items'][0]['invoice_date']);
+        $this->assertCount(2, $record['items'][0]['attachments']);
+        $this->decision($this->reviewer, $record, 'reject', note: '补充说明')->assertOk();
+        $input = [...$input, 'submission_key' => (string) Str::uuid(), 'reimbursement_id' => $record['reimbursement_id'], 'expected_version' => 1];
+        $input['items'][0]['invoice_date'] = '2026-10-28';
+        $next = $this->submit($input);
+        $this->assertSame('2026-10-28', $next['items'][0]['invoice_date']);
+        $this->assertCount(2, $next['items'][0]['attachments']);
+        $this->assertSame(10, $next['items'][0]['cents']);
+        $this->actingAs($this->owner)->getJson($record['url'])->assertJsonPath('record.items.0.invoice_date', '2026-10-29');
+        $legacy = $this->submit($this->input());
+        $this->assertNull($legacy['items'][0]['invoice_date']);
+    }
+
+    public function test_upload_timing_contains_only_stage_metrics_and_keeps_private_file(): void
+    {
+        Log::spy();
+        $response = $this->actingAs($this->owner)->postJson('/reimbursements/uploads', ['file' => UploadedFile::fake()->image('private-invoice.png')])->assertCreated();
+        $timing = $response->json('timing');
+        $this->assertEqualsCanonicalizing(['trace', 'server_ms', 'storage_write', 'storage_verify'], array_keys($timing));
+        $this->assertTrue(Str::isUuid($timing['trace']));
+        $this->assertGreaterThanOrEqual(0, $timing['storage_write']);
+        $this->assertGreaterThanOrEqual(0, $timing['storage_verify']);
+        Log::shouldHaveReceived('info')->withArgs(function ($message, $context): bool {
+            $this->assertSame(['trace', 'stage', 'bytes', 'duration_ms', 'success'], array_keys($context));
+
+            return $message === 'reimbursement.invoice_timing' && $context['success'];
+        })->twice();
+        $stored = StoredAttachment::firstOrFail();
+        $this->assertSame(hash('sha256', Storage::disk('local')->get($stored->object_key)), $stored->sha256);
+        $this->assertDatabaseHas('reimbursement_uploads', ['id' => $response->json('file.id'), 'user_id' => $this->owner->id]);
     }
 
     public function test_invoice_recognition_is_owner_scoped_cached_and_does_not_submit(): void

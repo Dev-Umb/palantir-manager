@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\ReimbursementDraftService;
 use App\Actions\ReimbursementService;
+use App\Http\Requests\SaveReimbursementDraftRequest;
 use App\Http\Requests\SaveReimbursementWorkflowRequest;
 use App\Http\Requests\SubmitReimbursementRequest;
+use App\Models\ReimbursementDraft;
 use App\Models\ReimbursementNotice;
 use App\Models\ReimbursementUpload;
 use App\Models\ReimbursementVersion;
@@ -16,7 +19,11 @@ use App\Support\InvoicePdfRecognition;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -122,14 +129,21 @@ class ReimbursementController extends Controller
         if (! $lock->get()) {
             return response()->json(['message' => '这张发票正在识别，请稍后重试。'], 409);
         }
+        $started = hrtime(true);
+        $success = false;
+        $trace = (string) Str::uuid();
         try {
-            $result = $recognizer->recognize($stored);
+            $result = $recognizer->recognize($stored, function (string $stage, float $duration, bool $success) use ($trace, $stored): void {
+                Log::info('reimbursement.invoice_timing', ['trace' => $trace, 'stage' => $stage, 'bytes' => $stored->size, 'duration_ms' => round($duration, 1), 'success' => $success]);
+            });
+            $success = true;
             Cache::put($key, $result, now()->addMinutes(30));
 
             return response()->json($result)->header('Cache-Control', 'private, no-store');
         } catch (\Throwable $error) {
             return response()->json(['message' => $error instanceof \UnexpectedValueException ? $error->getMessage().' 已上传附件不受影响。' : '发票识别未完成，请重试或手动填写；已上传附件不受影响。'], 422);
         } finally {
+            Log::info('reimbursement.invoice_timing', ['trace' => $trace, 'stage' => 'recognition', 'bytes' => $stored->size, 'duration_ms' => round((hrtime(true) - $started) / 1e6, 1), 'success' => $success]);
             $lock->release();
         }
     }
@@ -137,8 +151,73 @@ class ReimbursementController extends Controller
     public function upload(Request $request): JsonResponse
     {
         abort_unless($request->user()->canDo('reimbursements.submit'), 403);
+        if (! $request->filled('draft_context')) {
+            return $this->storeUpload($request);
+        }
+        $request->validate(['draft_context' => ['required', 'string', 'max:100000']]);
+        $context = json_decode($request->string('draft_context'), true);
+        $context = Validator::make(is_array($context) ? $context : [], [
+            ...SaveReimbursementDraftRequest::draftRules(),
+            'id' => ['required', 'uuid'], 'operation' => ['required', 'uuid'], 'item' => ['required', 'integer', 'min:0', 'max:49'],
+        ])->validate();
+        abort_unless(isset($context['payload']['items'][$context['item']]), 422);
+        $uploaded = null;
+        $uploadedPath = null;
+        try {
+            return DB::transaction(function () use ($request, $context, &$uploaded, &$uploadedPath): JsonResponse {
+                User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+                $drafts = app(ReimbursementDraftService::class);
+                $existing = ReimbursementUpload::where('draft_operation', $context['operation'])->first();
+                if ($existing) {
+                    abort_unless($existing->user_id === $request->user()->id && $existing->draft_id === $context['id'], 403);
+                    $draft = ReimbursementDraft::findOrFail($context['id']);
+                    abort_if($draft->version_id !== null, 409, '草稿已提交。');
+                    abort_unless($draft->revision === (int) $existing->draft_revision, 409, '草稿在上传后已更新，请重新打开草稿。');
+                    $file = StoredAttachment::findOrFail($existing->stored_attachment_id);
+
+                    return response()->json(['file' => ['id' => $existing->id, 'name' => $file->original_name, 'mime' => $file->mime_type, 'size' => $file->size], 'draft' => $drafts->present($draft)], 201);
+                }
+                $currentDraft = ReimbursementDraft::find($context['id']);
+                if ($currentDraft) {
+                    $drafts->authorize($request->user(), $currentDraft);
+                    abort_unless($currentDraft->revision === (int) $context['revision'], 409, '草稿已更新，请重新打开后上传。');
+                }
+                abort_unless(ReimbursementDraft::whereKey($context['id'])->exists() || $request->file('file')?->getMimeType() === 'application/pdf', 422, '首次草稿需要 PDF 发票。');
+                $draft = $drafts->save($request->user(), $context['id'], $context, true);
+                $response = $this->storeUpload($request);
+                $body = $response->getData(true);
+                $uploaded = ReimbursementUpload::findOrFail($body['file']['id']);
+                $uploadedPath = StoredAttachment::findOrFail($uploaded->stored_attachment_id)->logical_path;
+                $uploaded->forceFill(['draft_id' => $draft->id, 'draft_operation' => $context['operation']])->save();
+                $payload = $context['payload'];
+                $payload['items'][$context['item']]['attachments'][] = $uploaded->id;
+                abort_if(count($payload['items'][$context['item']]['attachments']) > 10, 422);
+                $draft = $drafts->save($request->user(), $draft->id, ['revision' => $draft->revision, 'payload' => $payload]);
+
+                $uploaded->forceFill(['draft_revision' => $draft->revision])->save();
+
+                return response()->json([...$body, 'draft' => $drafts->present($draft)], 201);
+            });
+        } catch (\Throwable $error) {
+            if ($uploadedPath) {
+                $this->files->deleteUploaded($uploadedPath);
+            }
+            throw $error;
+        }
+    }
+
+    private function storeUpload(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->canDo('reimbursements.submit'), 403);
         $request->validate(['file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,image/jpeg,image/png', 'max:20480']]);
-        $stored = $this->files->upload($request->file('file'));
+        $started = hrtime(true);
+        $trace = (string) Str::uuid();
+        $timings = [];
+        $bytes = $request->file('file')->getSize();
+        $stored = $this->files->upload($request->file('file'), function (string $stage, float $duration, bool $success) use (&$timings, $trace, $bytes): void {
+            $timings[$stage] = round($duration, 1);
+            Log::info('reimbursement.invoice_timing', ['trace' => $trace, 'stage' => $stage, 'bytes' => $bytes, 'duration_ms' => $timings[$stage], 'success' => $success]);
+        });
         try {
             $upload = ReimbursementUpload::create(['user_id' => $request->user()->id, 'stored_attachment_id' => $stored->id]);
         } catch (\Throwable $error) {
@@ -146,7 +225,7 @@ class ReimbursementController extends Controller
             throw $error;
         }
 
-        return response()->json(['file' => ['id' => $upload->id, 'name' => $stored->original_name, 'mime' => $stored->mime_type, 'size' => $stored->size]], 201);
+        return response()->json(['file' => ['id' => $upload->id, 'name' => $stored->original_name, 'mime' => $stored->mime_type, 'size' => $stored->size], 'timing' => ['trace' => $trace, 'server_ms' => round((hrtime(true) - $started) / 1e6, 1), ...$timings]], 201);
     }
 
     private function attachment(ReimbursementVersion $version, string $upload): StoredAttachment

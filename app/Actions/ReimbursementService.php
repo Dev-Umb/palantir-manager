@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Models\AuditLog;
 use App\Models\Reimbursement;
+use App\Models\ReimbursementDraft;
 use App\Models\ReimbursementNotice;
 use App\Models\ReimbursementUpload;
 use App\Models\ReimbursementVersion;
@@ -79,6 +80,13 @@ class ReimbursementService
 
                 return $existing;
             }
+            $draft = null;
+            if (! empty($data['draft_id'])) {
+                $draft = ReimbursementDraft::lockForUpdate()->findOrFail($data['draft_id']);
+                app(ReimbursementDraftService::class)->authorize($actor, $draft);
+                abort_unless($draft->version_id === null && $draft->revision === (int) $data['draft_revision'], 409, '草稿已更新或已提交，请重新打开。');
+                abort_unless(($draft->payload['reimbursement_id'] ?? null) === ($data['reimbursement_id'] ?? null) && ($draft->payload['expected_version'] ?? null) === ($data['expected_version'] ?? null), 409);
+            }
             $request = null;
             if (! empty($data['reimbursement_id'])) {
                 $request = Reimbursement::lockForUpdate()->findOrFail($data['reimbursement_id']);
@@ -99,7 +107,7 @@ class ReimbursementService
                 $files = [];
                 foreach ($item['attachments'] as $id) {
                     $upload = ReimbursementUpload::whereKey($id)->lockForUpdate()->first();
-                    if (! $upload || $upload->user_id !== $actor->id || ($upload->reimbursement_id !== null && $upload->reimbursement_id !== $request?->id) || in_array($id, $allIds, true)) {
+                    if (! $upload || $upload->user_id !== $actor->id || ($upload->reimbursement_id !== null && $upload->reimbursement_id !== $request?->id) || ($upload->draft_id !== null && $upload->draft_id !== $draft?->id && $upload->reimbursement_id === null) || in_array($id, $allIds, true)) {
                         throw ValidationException::withMessages(["items.$index.attachments" => '发票不存在、重复使用或不属于此申请。']);
                     }
                     $stored = StoredAttachment::findOrFail($upload->stored_attachment_id);
@@ -107,7 +115,7 @@ class ReimbursementService
                     $files[] = ['id' => $upload->id, 'name' => $stored->original_name, 'mime' => $stored->mime_type, 'size' => (int) $stored->size];
                     $allIds[] = $id;
                 }
-                $items[] = ['description' => $item['description'], 'amount' => number_format($cents / 100, 2, '.', ''), 'cents' => $cents, 'attachments' => $files];
+                $items[] = ['invoice_date' => $item['invoice_date'] ?? null, 'description' => $item['description'], 'amount' => number_format($cents / 100, 2, '.', ''), 'cents' => $cents, 'attachments' => $files];
             }
             if (collect($items)->flatMap(fn ($item) => $item['attachments'])->sum('size') > 200 * 1024 * 1024) {
                 throw ValidationException::withMessages(['items' => '单次提交的发票合计不能超过 200 MB。']);
@@ -122,6 +130,7 @@ class ReimbursementService
                 'wechat_subscribed' => $bindingVersion !== null && ($data['wechat_subscribed'] ?? false), 'wechat_binding_version' => $bindingVersion,
             ]);
             ReimbursementUpload::whereIn('id', $allIds)->update(['reimbursement_id' => $request->id]);
+            $draft?->update(['version_id' => $version->id]);
             $this->grant($version, [$actor->id], 'owner');
             $this->grant($version, collect($flow['nodes'])->flatMap(fn ($node) => array_column($node['people'], 'id'))->unique()->all(), 'approver');
             $this->notifyCc($version, 'submitted');

@@ -25,6 +25,26 @@ class BusinessFileStorageTest extends TestCase
         config(['services.business_files.disk' => 'contract_tos']);
     }
 
+    public function test_timing_reports_failed_verification_without_bypassing_digest_check(): void
+    {
+        $stream = fopen('php://temp', 'w+b');
+        fwrite($stream, 'abc');
+        rewind($stream);
+        $stages = [];
+        try {
+            app(BusinessFileStorage::class)->writeVerified('attachments/test.pdf', $stream, 3, hash('sha256', 'different'), 'application/pdf', function ($stage, $duration, $success) use (&$stages): void {
+                $stages[$stage] = $success;
+                $this->assertGreaterThanOrEqual(0, $duration);
+            });
+            $this->fail('Invalid hash accepted');
+        } catch (RuntimeException) {
+            $this->assertSame(['storage_write' => true, 'storage_verify' => false], $stages);
+            $this->assertDatabaseCount('stored_attachments', 0);
+        } finally {
+            fclose($stream);
+        }
+    }
+
     public function test_signed_download_preserves_filename_type_and_expires_without_public_acl(): void
     {
         $this->freezeTime();

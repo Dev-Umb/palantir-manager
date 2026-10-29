@@ -3,6 +3,8 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import Show from './Show';
+import Drafts from './Drafts';
+import Draft from './Draft';
 import Index from './Index';
 import Workflow from './Workflow';
 import { router } from '@inertiajs/react';
@@ -76,4 +78,25 @@ it('restores prototype list hierarchy without dropping scope, dates, pagination 
     expect(router.get).toHaveBeenLastCalledWith('/reimbursements', { scope: 'review', from: '2026-10-01', to: '2026-10-31', status: 'approved' });
     fireEvent.click(screen.getByRole('button', { name: '重置' }));
     expect(router.get).toHaveBeenLastCalledWith('/reimbursements', { scope: 'review' });
+});
+
+it('displays invoice dates and preserves legacy expense details and approval controls', () => {
+    const dated = {...record, items: [{...record.items[0], invoice_date: '2026-10-29'}, {...record.items[0], description: '旧费用', attachments: []}]};
+    render(<Show record={dated} />);
+    expect(screen.getByText('开票日期：2026-10-29')).toBeVisible();
+    expect(screen.getByText('开票日期：未填写')).toBeVisible();
+    expect(screen.getByRole('button', {name: '预览 发票.pdf'})).toBeVisible();
+    expect(screen.getByRole('button', {name: '同意'})).toBeVisible();
+});
+
+it('draft list and read-only detail preserve incomplete fields without approval controls', () => {
+    const draft = { id: 'draft', url: '/reimbursements/drafts/draft', updated_at: '2026-10-29T08:00:00Z', payload: { title: '', type: '其他', note: '未完成说明', cc: [], items: [{ amount: '1.', description: '手工说明\n发票号码：12345678', invoice_date: '', attachments: [{ id: 'pdf', name: '发票.pdf', url: '/private-file' }] }] } };
+    const { unmount } = render(<Drafts records={{ data: [draft], links: [] }} />);
+    expect(screen.getByText('未命名报销')).toBeVisible();
+    expect(screen.getByRole('link', { name: '查看草稿' })).toHaveAttribute('href', draft.url);
+    unmount(); render(<Draft draft={draft} />);
+    expect(screen.getByText('金额：1.')).toBeVisible();
+    expect(screen.getByText('开票日期：未填写')).toBeVisible();
+    expect(screen.getByRole('link', { name: '发票.pdf' })).toHaveAttribute('href', '/private-file');
+    expect(screen.queryByRole('button', { name: /审批|提交/ })).toBeNull();
 });

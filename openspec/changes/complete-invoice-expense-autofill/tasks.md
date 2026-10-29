@@ -1,0 +1,11 @@
+- [x] Inspect current upload/recognition pipeline and online diagnostic evidence.
+- [x] Record scope, one-invoice-per-expense choice and preserved historical behavior.
+- [x] Obtain review approval of this OpenSpec proposal.
+- [x] Add optional validated invoice_date persistence and APP/Mini/PC rendering.
+- [x] Update mobile invoice allocation, confirmation, description merging and retry handling.
+- [x] Add scoped safe timing evidence for upload/storage/recognition without changing integrity guarantees.
+- [x] Test valid/invalid/missing dates, legacy inputs and historical resubmission.
+- [x] Test one-file-per-new-item, retry/idempotency, retained manual input, repeated apply, field limits and stale-state guards.
+- [x] Run focused backend, mobile and PC checks and actual UI review.
+- [x] Run strict OpenSpec validation and final quality gate.
+- [ ] After approved release, merge PR before deployment and verify real transfer timings before bandwidth recommendations.

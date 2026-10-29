@@ -16,7 +16,7 @@ export default function Index({ records, filters, capabilities, pending_count = 
             <div><h1>报销审批</h1><p>每一笔费用，清晰有据</p></div>
             <div className="oa-list-tools">
                 <span className="oa-pending" title="当前范围与筛选条件下的待审批单据，不代表全部需要由你处理">{pending_count} 笔待审批</span>
-                <div className="oa-actions"><Link href="/reimbursements/notices">报销通知</Link>{capabilities.configure && <Link href="/reimbursements/workflow">流程配置</Link>}</div>
+                <div className="oa-actions"><Link href="/reimbursements/drafts">我的草稿</Link><Link href="/reimbursements/notices">报销通知</Link>{capabilities.configure && <Link href="/reimbursements/workflow">流程配置</Link>}</div>
             </div>
         </header>
         <nav className="oa-tabs" aria-label="审批状态">
