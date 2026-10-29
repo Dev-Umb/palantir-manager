@@ -55,7 +55,7 @@ class ReimbursementBatchService
             $disk = Storage::disk($file->disk);
             $staging = $file->object_key.'.upload';
             abort_unless($disk->exists($staging) && $disk->size($staging) === $file->size, 422, '上传未完成或文件大小不符。');
-            abort_unless($disk->copy($staging, $file->object_key), 422, '文件确认失败，请重试。');
+            $disk->getDriver()->copy($staging, $file->object_key, ['visibility' => 'private']);
             $stream = $disk->readStream($file->object_key);
             abort_unless(is_resource($stream), 422);
             try {

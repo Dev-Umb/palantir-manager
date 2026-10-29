@@ -91,6 +91,7 @@ class ReimbursementBatchTest extends TestCase
         $s->confirm($file);
         $this->assertDatabaseCount('reimbursement_uploads', 1);
         $this->assertSame('uploaded', $file->fresh()->status);
+        $this->assertSame('private', Storage::disk('local')->getVisibility($file->object_key));
         Storage::disk('local')->put($file->object_key.'.upload', 'changed');
         $this->assertSame($bytes, Storage::disk('local')->get($file->object_key));
         $duplicate = $make();
