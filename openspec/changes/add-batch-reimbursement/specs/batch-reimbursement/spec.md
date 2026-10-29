@@ -33,3 +33,9 @@ The system SHALL retain all TOS invoice objects, including staging and unconfirm
 #### Scenario: Old upload remains
 - **WHEN** an upload is unconfirmed or older than one day
 - **THEN** reconciliation preserves both its original and staging TOS objects
+
+### Requirement: Grouped home shortcuts
+The mini program SHALL show manual and batch reimbursement together in one equally spaced home row, and project creation and project search together in a second row, preserving permissions and existing destination pages.
+#### Scenario: Authorized home entry
+- **WHEN** an authorized salesperson opens the home page
+- **THEN** both reimbursement shortcuts open their existing forms and project shortcuts remain independently available
