@@ -418,7 +418,6 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-              IconButton(tooltip: '报销 OA', onPressed: () => push(context, ReimbursementsPage(api: api)), icon: const Icon(Icons.receipt_long_outlined)),
               IconButton(
                 tooltip: '通知中心',
                 onPressed: () => push(context, NotificationsPage(api: api)),
@@ -446,6 +445,19 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   if (api.user?['is_password_changed'] == false)
                     note('请在“我的 → 账号与安全”修改初始密码。'),
+                  if (api.can('reimbursements.submit')) ...[
+                    FilledButton.icon(
+                      onPressed: () => push(context, ReimbursementForm(api: api)),
+                      icon: const Icon(Icons.add),
+                      label: const Text('发起报销'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(56),
+                        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                   Container(
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(

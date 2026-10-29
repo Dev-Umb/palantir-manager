@@ -1,7 +1,7 @@
 name: palantir_mobile
 description: "鑫源昌智造中枢安卓业务端"
 publish_to: 'none'
-version: 1.0.15+17
+version: 1.0.16+18
 
 environment:
   sdk: ^3.13.3

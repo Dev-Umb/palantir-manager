@@ -5,6 +5,7 @@ import 'ui.dart';
 import 'projects.dart';
 import 'attachments.dart';
 import 'updates.dart';
+import 'reimbursements.dart';
 
 class AccountPage extends StatelessWidget {
   final PalantirApi api;
@@ -64,6 +65,15 @@ class AccountPage extends StatelessWidget {
           title: const Text('通知中心'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => push(context, NotificationsPage(api: api)),
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.receipt_long_outlined),
+          title: const Text('我的报销'),
+          subtitle: const Text('查看申请、审批进度和知会'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => push(context, ReimbursementsPage(api: api)),
         ),
       ),
       const UpdateTile(),

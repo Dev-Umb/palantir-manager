@@ -12,6 +12,7 @@ use App\Models\Role;
 use App\Models\StoredAttachment;
 use App\Models\User;
 use App\Support\BusinessFileStorage;
+use App\Support\InvoicePdfRecognition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -56,6 +57,31 @@ class ReimbursementTest extends TestCase
         $user->roles()->attach($role);
 
         return $user;
+    }
+
+    public function test_invoice_recognition_is_owner_scoped_cached_and_does_not_submit(): void
+    {
+        $input = $this->input();
+        $upload = $input['items'][0]['attachments'][0];
+        $result = ['status' => 'recognized', 'fields' => ['total_cents' => 11300], 'warnings' => []];
+        $this->mock(InvoicePdfRecognition::class)->shouldReceive('recognize')->once()->andReturn($result);
+        $this->actingAs($this->reviewer)->postJson('/reimbursements/uploads/'.$upload.'/recognize')->assertForbidden();
+        $other = $this->person(['submit']);
+        $this->actingAs($other)->postJson('/reimbursements/uploads/'.$upload.'/recognize')->assertNotFound();
+        $this->actingAs($this->owner)->postJson('/reimbursements/uploads/'.$upload.'/recognize')->assertOk()->assertJsonPath('fields.total_cents', 11300);
+        $this->postJson('/reimbursements/uploads/'.$upload.'/recognize')->assertOk();
+        $this->assertDatabaseCount('reimbursement_versions', 0);
+        $this->assertDatabaseHas('reimbursement_uploads', ['id' => $upload]);
+    }
+
+    public function test_invoice_recognition_failure_keeps_attachment_and_manual_submission(): void
+    {
+        $input = $this->input();
+        $upload = $input['items'][0]['attachments'][0];
+        $this->mock(InvoicePdfRecognition::class)->shouldReceive('recognize')->once()->andThrow(new \RuntimeException('timeout'));
+        $this->actingAs($this->owner)->postJson('/reimbursements/uploads/'.$upload.'/recognize')->assertUnprocessable();
+        $this->postJson('/reimbursements', $input)->assertCreated();
+        $this->assertDatabaseHas('reimbursement_uploads', ['id' => $upload]);
     }
 
     private function flow(array $groups, string $mode = 'any', array $cc = [], array $triggers = []): void

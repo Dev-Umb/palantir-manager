@@ -5,6 +5,48 @@ import 'package:palantir_mobile/api.dart';
 import 'package:palantir_mobile/reimbursements.dart';
 
 void main() {
+  testWidgets(
+    'recognized invoice amount requires explicit confirmation and keeps manual amount on cancel',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 2200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final api = ReimbursementApi()..recognize = true;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('palantir/android'),
+            (call) async => {
+              'name': 'invoice.pdf',
+              'bytes': Uint8List.fromList([37, 80, 68, 70]),
+            },
+          );
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('palantir/android'),
+              null,
+            ),
+      );
+      await tester.pumpWidget(MaterialApp(home: ReimbursementForm(api: api)));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(3), '9.00');
+      await tester.tap(find.text('添加发票（图片 / PDF）'));
+      await tester.pumpAndSettle();
+      expect(find.text('合计 ¥9.00'), findsOneWidget);
+      expect(find.text('价税合计：113.00 元'), findsOneWidget);
+      await tester.tap(find.text('核对并填入金额'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(find.text('合计 ¥9.00'), findsOneWidget);
+      await tester.tap(find.text('核对并填入金额'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('确认填入'));
+      await tester.pumpAndSettle();
+      expect(find.text('合计 ¥113.00'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test('dates are readable and invalid dates have an explicit placeholder', () {
     expect(reimbursementDate('2026-10-28T09:32:00'), '2026-10-28 09:32');
     expect(reimbursementDate('invalid'), '—');
@@ -201,6 +243,7 @@ class ReimbursementApi extends PalantirApi {
   Map<String, dynamic>? payload;
   bool succeed = false;
   bool canResubmit = false;
+  bool recognize = false;
   @override
   Future<Map<String, dynamic>> get(String path) async =>
       path.endsWith('/options')
@@ -249,6 +292,13 @@ class ReimbursementApi extends PalantirApi {
     Map<String, dynamic> body, {
     String method = 'POST',
   }) async {
+    if (path.endsWith('/recognize') && recognize) {
+      return {
+        'status': 'recognized',
+        'fields': {'invoice_number': '12345678', 'total_cents': 11300},
+        'warnings': ['请核对原件'],
+      };
+    }
     payload = body;
     if (succeed) {
       return {

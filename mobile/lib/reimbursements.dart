@@ -624,6 +624,130 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
     super.dispose();
   }
 
+  Future<void> recognizeInvoice(
+    Map<String, dynamic> row,
+    Map<String, dynamic> attachment,
+  ) async {
+    if (busy || pending != null || attachment['recognizing'] == true) return;
+    final account = widget.api.user?['id'];
+    bool current() =>
+        mounted &&
+        widget.api.user?['id'] == account &&
+        rows.contains(row) &&
+        row['attachments'].contains(attachment);
+    setState(() {
+      attachment['recognizing'] = true;
+      attachment.remove('recognitionError');
+    });
+    try {
+      final result = await widget.api.send(
+        '/reimbursements/uploads/${attachment['id']}/recognize',
+        {},
+      );
+      if (current() && !busy && pending == null) {
+        setState(() => attachment['recognition'] = result);
+      }
+    } catch (_) {
+      if (current() && !busy && pending == null) {
+        setState(
+          () => attachment['recognitionError'] = '识别未完成，可重试或手动填写；附件已保留。',
+        );
+      }
+    } finally {
+      if (current()) setState(() => attachment['recognizing'] = false);
+    }
+  }
+
+  Future<void> applyInvoiceAmount(
+    Map<String, dynamic> row,
+    Map<String, dynamic> attachment,
+  ) async {
+    final cents = mapOf(
+      mapOf(attachment['recognition'])['fields'],
+    )['total_cents'];
+    if (cents is! int || cents <= 0 || busy || pending != null) return;
+    final account = widget.api.user?['id'];
+    final amount = row['amount'] as TextEditingController;
+    final previous = amount.text;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('核对并填入金额'),
+        content: Text(
+          '当前金额：${previous.isEmpty ? "未填写" : previous} 元\n发票价税合计：${reimbursementMoney(cents)} 元\n仅替换本项金额，不自动累加其他发票。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('确认填入'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true &&
+        mounted &&
+        widget.api.user?['id'] == account &&
+        !busy &&
+        pending == null &&
+        rows.contains(row) &&
+        row['attachments'].contains(attachment) &&
+        amount.text == previous) {
+      setState(() => amount.text = reimbursementMoney(cents));
+    }
+  }
+
+  Widget invoiceRecognition(
+    Map<String, dynamic> row,
+    Map<String, dynamic> attachment,
+  ) {
+    final result = mapOf(attachment['recognition']);
+    final fields = mapOf(result['fields']);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('上传成功'),
+        if (attachment['recognizing'] == true) const Text('正在识别发票…可继续填写'),
+        if (result.isNotEmpty) ...[
+          const Text('发票识别 · 待核对'),
+          for (final field in {
+            'invoice_number': '发票号码',
+            'invoice_code': '发票代码',
+            'invoice_date': '开票日期',
+            'buyer': '购买方',
+            'seller': '销售方',
+          }.entries)
+            if (fields[field.key] != null)
+              Text('${field.value}：${fields[field.key]}'),
+          if (fields['total_cents'] is int)
+            Text('价税合计：${reimbursementMoney(fields['total_cents'])} 元'),
+          for (final warning in (result['warnings'] as List? ?? []))
+            Text('$warning'),
+          if (fields['total_cents'] is int)
+            TextButton(
+              onPressed: busy || pending != null
+                  ? null
+                  : () => applyInvoiceAmount(row, attachment),
+              child: const Text('核对并填入金额'),
+            ),
+        ],
+        if (attachment['recognitionError'] != null)
+          Text(attachment['recognitionError']),
+        if (attachment['mime'] == 'application/pdf' &&
+            attachment['recognizing'] != true)
+          TextButton(
+            onPressed: busy || pending != null
+                ? null
+                : () => recognizeInvoice(row, attachment),
+            child: Text(result.isEmpty ? '识别发票' : '重新识别'),
+          ),
+      ],
+    );
+  }
+
   Future<void> upload(Map<String, dynamic> row, [UploadFile? retry]) async {
     if (busy || pending != null || uploading > 0) return;
     try {
@@ -649,6 +773,9 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
             row['attachments'].add(result['file']);
             row['failed'].remove(file);
           });
+          if (result['file']['mime'] == 'application/pdf') {
+            recognizeInvoice(row, result['file']);
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -835,7 +962,7 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
                       for (final a in [...r['attachments']])
                         ListTile(
                           title: Text(a['name']),
-                          subtitle: const Text('上传成功'),
+                          subtitle: invoiceRecognition(r, a),
                           trailing: IconButton(
                             tooltip: '移除附件',
                             onPressed: busy || pending != null || uploading > 0

@@ -12,8 +12,10 @@ use App\Models\ReimbursementWorkflow;
 use App\Models\StoredAttachment;
 use App\Models\User;
 use App\Support\BusinessFileStorage;
+use App\Support\InvoicePdfRecognition;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -103,6 +105,33 @@ class ReimbursementController extends Controller
     public function saveWorkflow(SaveReimbursementWorkflowRequest $request): JsonResponse
     {
         return response()->json(['workflow' => $this->service->saveWorkflow($request->user(), $request->validated())->only(['revision', 'definition'])]);
+    }
+
+    public function recognizeInvoice(Request $request, ReimbursementUpload $upload, InvoicePdfRecognition $recognizer): JsonResponse
+    {
+        abort_unless($request->user()->canDo('reimbursements.submit'), 403);
+        abort_unless($upload->user_id === $request->user()->id, 404);
+        $stored = StoredAttachment::findOrFail($upload->stored_attachment_id);
+        abort_unless($stored->mime_type === 'application/pdf', 422, '当前仅支持 PDF 发票识别。');
+        $key = 'invoice-recognition:v1:'.$request->user()->id.':'.$stored->sha256;
+        $cached = Cache::get($key);
+        if ($cached !== null) {
+            return response()->json($cached)->header('Cache-Control', 'private, no-store');
+        }
+        $lock = Cache::lock($key.':lock', 60);
+        if (! $lock->get()) {
+            return response()->json(['message' => '这张发票正在识别，请稍后重试。'], 409);
+        }
+        try {
+            $result = $recognizer->recognize($stored);
+            Cache::put($key, $result, now()->addMinutes(30));
+
+            return response()->json($result)->header('Cache-Control', 'private, no-store');
+        } catch (\Throwable $error) {
+            return response()->json(['message' => $error instanceof \UnexpectedValueException ? $error->getMessage().' 已上传附件不受影响。' : '发票识别未完成，请重试或手动填写；已上传附件不受影响。'], 422);
+        } finally {
+            $lock->release();
+        }
     }
 
     public function upload(Request $request): JsonResponse
