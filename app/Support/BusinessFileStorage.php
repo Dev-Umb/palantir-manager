@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\StoredAttachment;
+use Closure;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
@@ -18,12 +19,12 @@ class BusinessFileStorage
         return (string) config('services.business_files.disk', 'contract_tos');
     }
 
-    public function upload(UploadedFile $file): StoredAttachment
+    public function upload(UploadedFile $file, ?Closure $observe = null): StoredAttachment
     {
         $key = 'attachments/'.Str::uuid().($file->getClientOriginalExtension() !== '' ? '.'.$file->getClientOriginalExtension() : '');
         $stream = fopen($file->getRealPath(), 'rb');
         try {
-            $this->writeVerified($key, $stream, (int) filesize($file->getRealPath()), hash_file('sha256', $file->getRealPath()), $file->getMimeType() ?: 'application/octet-stream');
+            $this->writeVerified($key, $stream, (int) filesize($file->getRealPath()), hash_file('sha256', $file->getRealPath()), $file->getMimeType() ?: 'application/octet-stream', $observe);
 
             return StoredAttachment::create([
                 'logical_path' => $key, 'disk' => $this->diskName(), 'object_key' => $key,
@@ -60,12 +61,23 @@ class BusinessFileStorage
     }
 
     /** @param resource $stream */
-    public function writeVerified(string $key, mixed $stream, int $size, string $sha256, string $mime): void
+    public function writeVerified(string $key, mixed $stream, int $size, string $sha256, string $mime, ?Closure $observe = null): void
     {
-        if (! is_resource($stream) || ! Storage::disk($this->diskName())->put($key, $stream, ['visibility' => 'private', 'ContentType' => $mime])) {
-            throw new RuntimeException('业务文件上传失败。');
+        $started = hrtime(true);
+        $stage = 'storage_write';
+        $success = false;
+        try {
+            if (! is_resource($stream) || ! Storage::disk($this->diskName())->put($key, $stream, ['visibility' => 'private', 'ContentType' => $mime])) {
+                throw new RuntimeException('业务文件上传失败。');
+            }
+            $observe?->__invoke($stage, (hrtime(true) - $started) / 1e6, true);
+            $stage = 'storage_verify';
+            $started = hrtime(true);
+            $this->verify($this->diskName(), $key, $size, $sha256);
+            $success = true;
+        } finally {
+            $observe?->__invoke($stage, (hrtime(true) - $started) / 1e6, $success);
         }
-        $this->verify($this->diskName(), $key, $size, $sha256);
     }
 
     public function verify(string $diskName, string $key, int $size, string $sha256): void

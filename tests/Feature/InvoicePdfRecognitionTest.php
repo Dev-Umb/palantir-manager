@@ -42,7 +42,12 @@ class InvoicePdfRecognitionTest extends TestCase
     public function test_text_pdf_uses_fast_path_and_never_runs_ocr(): void
     {
         Process::fake(fn (PendingProcess $process) => Process::result(output: $process->command[0] === 'pdfinfo' ? "Pages: 1\n" : $this->invoice()));
-        $result = app(InvoicePdfRecognition::class)->recognize($this->attachment());
+        $timings = [];
+        $result = app(InvoicePdfRecognition::class)->recognize($this->attachment(), function ($stage, $duration, $success) use (&$timings): void {
+            $timings[$stage] = $success;
+            $this->assertGreaterThanOrEqual(0, $duration);
+        });
+        $this->assertSame(['invoice_read' => true, 'invoice_parse' => true], $timings);
         $this->assertSame('text', $result['method']);
         $this->assertSame(11300, $result['fields']['total_cents']);
         Process::assertDidntRun(fn (PendingProcess $process) => in_array($process->command[0], ['tesseract', 'pdftoppm']));

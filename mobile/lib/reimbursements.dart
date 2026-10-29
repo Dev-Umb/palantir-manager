@@ -21,6 +21,30 @@ int? reimbursementCents(String value) {
   return cents > 0 ? cents : null;
 }
 
+bool validInvoiceDate(String value) {
+  if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) return false;
+  final date = DateTime.tryParse(value);
+  return date != null && date.toIso8601String().substring(0, 10) == value;
+}
+
+String invoiceDescription(String previous, Map<String, dynamic> fields) {
+  final lines = previous.trim().isEmpty
+      ? <String>[]
+      : previous.trim().split('\n');
+  for (final field in {
+    'invoice_number': '发票号码',
+    'invoice_code': '发票代码',
+    'buyer': '购买方',
+    'seller': '销售方',
+  }.entries) {
+    final value = fields[field.key];
+    if (value is! String || value.trim().isEmpty) continue;
+    final line = '${field.value}：${value.trim()}';
+    if (!lines.contains(line)) lines.add(line);
+  }
+  return lines.join('\n');
+}
+
 String reimbursementDate(dynamic value) {
   final date = DateTime.tryParse('$value')?.toLocal();
   if (date == null) return '—';
@@ -453,6 +477,7 @@ class _ReimbursementDetailState extends State<ReimbursementDetail> {
                           item['description'],
                           '¥${reimbursementMoney(item['cents'])}',
                         ),
+                        kv('开票日期', item['invoice_date'] ?? '未填写'),
                         for (final file in maps(item['attachments']))
                           Row(
                             children: [
@@ -581,6 +606,7 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
   String type = reimbursementTypes.first, key = reimbursementKey(), error = '';
   bool busy = false;
   int uploading = 0;
+  Future<void> invoiceReviews = Future.value();
   @override
   void initState() {
     super.initState();
@@ -608,6 +634,7 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
       'key': reimbursementKey(),
       'description': TextEditingController(text: item?['description'] ?? ''),
       'amount': TextEditingController(text: item?['amount'] ?? ''),
+      'invoice_date': TextEditingController(text: item?['invoice_date'] ?? ''),
       'attachments': [...maps(item?['attachments'])],
       'failed': <UploadFile>[],
     });
@@ -620,6 +647,7 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
     for (final r in rows) {
       r['description'].dispose();
       r['amount'].dispose();
+      r['invoice_date'].dispose();
     }
     super.dispose();
   }
@@ -645,7 +673,17 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
         {},
       );
       if (current() && !busy && pending == null) {
-        setState(() => attachment['recognition'] = result);
+        setState(() {
+          attachment['recognition'] = result;
+          if (!mapOf(result['fields']).values.any((value) => value != null)) {
+            attachment['recognitionError'] = '未识别出可填写信息，请手动填写或重新识别。';
+          }
+        });
+        invoiceReviews = invoiceReviews.then((_) async {
+          if (current() && !busy && pending == null) {
+            await applyInvoiceAmount(row, attachment);
+          }
+        });
       }
     } catch (_) {
       if (current() && !busy && pending == null) {
@@ -662,19 +700,96 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
     Map<String, dynamic> row,
     Map<String, dynamic> attachment,
   ) async {
-    final cents = mapOf(
-      mapOf(attachment['recognition'])['fields'],
-    )['total_cents'];
-    if (cents is! int || cents <= 0 || busy || pending != null) return;
+    final fields = mapOf(mapOf(attachment['recognition'])['fields']);
+    if (!fields.values.any((value) => value != null) ||
+        busy ||
+        pending != null) {
+      return;
+    }
     final account = widget.api.user?['id'];
     final amount = row['amount'] as TextEditingController;
-    final previous = amount.text;
+    final date = row['invoice_date'] as TextEditingController;
+    final description = row['description'] as TextEditingController;
+    final previous = amount.text,
+        previousDate = date.text,
+        previousDescription = description.text;
+    final cents = fields['total_cents'];
+    final nextAmount = cents is int && cents > 0
+        ? reimbursementMoney(cents)
+        : previous;
+    final nextDate = validInvoiceDate('${fields['invoice_date']}')
+        ? fields['invoice_date'] as String
+        : previousDate;
+    final nextDescription = invoiceDescription(previousDescription, fields);
+    if (nextDescription.runes.length > 500) {
+      setState(() => error = '回填后费用说明超过 500 字，请先整理说明再重试。');
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('核对并填入金额'),
-        content: Text(
-          '当前金额：${previous.isEmpty ? "未填写" : previous} 元\n发票价税合计：${reimbursementMoney(cents)} 元\n仅替换本项金额，不自动累加其他发票。',
+        title: const Text('核对发票信息'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '金额（元）',
+                style: TextStyle(fontSize: 13, color: Color(0xff738297)),
+              ),
+              Text(
+                nextAmount.isEmpty ? '未识别' : nextAmount,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (previous.isNotEmpty && previous != nextAmount)
+                Text('原金额 $previous 元', style: const TextStyle(fontSize: 12)),
+              const SizedBox(height: 18),
+              const Text(
+                '开票日期',
+                style: TextStyle(fontSize: 13, color: Color(0xff738297)),
+              ),
+              Text(
+                nextDate.isEmpty ? '未识别' : nextDate,
+                style: const TextStyle(fontSize: 16),
+              ),
+              if (previousDate.isNotEmpty && previousDate != nextDate)
+                Text('原日期 $previousDate', style: const TextStyle(fontSize: 12)),
+              const SizedBox(height: 18),
+              const Text(
+                '费用说明',
+                style: TextStyle(fontSize: 13, color: Color(0xff738297)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                nextDescription.isEmpty ? '未识别，可手动填写' : nextDescription,
+                style: const TextStyle(fontSize: 15, height: 1.65),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                '请对照原件核对，填入后仍可修改。仅填入本张发票，不累加其他费用。',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.6,
+                  color: Color(0xff738297),
+                ),
+              ),
+              for (final warning
+                  in (mapOf(attachment['recognition'])['warnings'] as List? ??
+                      []))
+                Text(
+                  '$warning',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    height: 1.6,
+                    color: Color(0xff738297),
+                  ),
+                ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -695,8 +810,14 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
         pending == null &&
         rows.contains(row) &&
         row['attachments'].contains(attachment) &&
-        amount.text == previous) {
-      setState(() => amount.text = reimbursementMoney(cents));
+        amount.text == previous &&
+        date.text == previousDate &&
+        description.text == previousDescription) {
+      setState(() {
+        amount.text = nextAmount;
+        date.text = nextDate;
+        description.text = nextDescription;
+      });
     }
   }
 
@@ -711,29 +832,13 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
       children: [
         const Text('上传成功'),
         if (attachment['recognizing'] == true) const Text('正在识别发票…可继续填写'),
-        if (result.isNotEmpty) ...[
-          const Text('发票识别 · 待核对'),
-          for (final field in {
-            'invoice_number': '发票号码',
-            'invoice_code': '发票代码',
-            'invoice_date': '开票日期',
-            'buyer': '购买方',
-            'seller': '销售方',
-          }.entries)
-            if (fields[field.key] != null)
-              Text('${field.value}：${fields[field.key]}'),
-          if (fields['total_cents'] is int)
-            Text('价税合计：${reimbursementMoney(fields['total_cents'])} 元'),
-          for (final warning in (result['warnings'] as List? ?? []))
-            Text('$warning'),
-          if (fields['total_cents'] is int)
-            TextButton(
-              onPressed: busy || pending != null
-                  ? null
-                  : () => applyInvoiceAmount(row, attachment),
-              child: const Text('核对并填入金额'),
-            ),
-        ],
+        if (fields.values.any((value) => value != null))
+          TextButton(
+            onPressed: busy || pending != null
+                ? null
+                : () => applyInvoiceAmount(row, attachment),
+            child: const Text('核对发票'),
+          ),
         if (attachment['recognitionError'] != null)
           Text(attachment['recognitionError']),
         if (attachment['mime'] == 'application/pdf' &&
@@ -751,8 +856,16 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
   Future<void> upload(Map<String, dynamic> row, [UploadFile? retry]) async {
     if (busy || pending != null || uploading > 0) return;
     try {
+      final account = widget.api.user?['id'];
       final file = retry ?? await selectUpload();
-      if (file == null || !mounted) return;
+      if (file == null ||
+          !mounted ||
+          widget.api.user?['id'] != account ||
+          busy ||
+          pending != null ||
+          !rows.contains(row)) {
+        return;
+      }
       if (file.bytes.length > 20 * 1024 * 1024 ||
           !RegExp(
             r'\.(pdf|jpe?g|png)$',
@@ -760,6 +873,13 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
           ).hasMatch(file.name)) {
         throw ApiFailure('请选择 20 MB 以内的 PDF、JPG 或 PNG');
       }
+      if (retry == null &&
+          (row['attachments'].isNotEmpty || row['failed'].isNotEmpty)) {
+        if (rows.length >= 50) throw ApiFailure('每张发票独立一项费用，最多添加 50 项。');
+        setState(() => add());
+        row = rows.last;
+      }
+      final timer = Stopwatch()..start();
       setState(() {
         uploading++;
         error = '';
@@ -768,7 +888,12 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
         final result = await widget.api.multipart('/reimbursements/uploads', {
           'file': file,
         });
-        if (mounted) {
+        if (mounted &&
+            widget.api.user?['id'] == account &&
+            rows.contains(row)) {
+          debugPrint(
+            'reimbursement.upload_timing: total_ms=${timer.elapsedMilliseconds}, server=${result['timing']}',
+          );
           setState(() {
             row['attachments'].add(result['file']);
             row['failed'].remove(file);
@@ -778,7 +903,9 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
           }
         }
       } catch (e) {
-        if (mounted) {
+        if (mounted &&
+            widget.api.user?['id'] == account &&
+            rows.contains(row)) {
           setState(() {
             if (!row['failed'].contains(file)) row['failed'].add(file);
             error = '$e';
@@ -814,6 +941,9 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
               (r) => {
                 'description': r['description'].text.trim(),
                 'amount': r['amount'].text,
+                'invoice_date': r['invoice_date'].text.isEmpty
+                    ? null
+                    : r['invoice_date'].text,
                 'attachments': (r['attachments'] as List)
                     .map((a) => a['id'])
                     .toList(),
@@ -871,178 +1001,249 @@ class _ReimbursementFormState extends State<ReimbursementForm> {
           ),
         ),
       ),
-      body: Form(
-        key: form,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            panel(
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('申请信息', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: title,
-                    enabled: !busy && pending == null,
-                    maxLength: 120,
-                    decoration: const InputDecoration(labelText: '报销标题'),
-                    validator: (v) => v!.trim().isEmpty ? '请填写标题' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: type,
-                    decoration: const InputDecoration(labelText: '报销类型'),
-                    items: reimbursementTypes
-                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                        .toList(),
-                    onChanged: busy || pending != null
-                        ? null
-                        : (v) => setState(() => type = v!),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: note,
-                    enabled: !busy && pending == null,
-                    maxLength: 2000,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: '报销说明'),
-                    validator: (v) => v!.trim().isEmpty ? '请填写说明' : null,
-                  ),
-                ],
-              ),
+      body: Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
+            fillColor: const Color(0xfffafbfd),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Color(0xffe1e7ee)),
             ),
-            for (final (i, r) in rows.indexed)
-              Card(
-                key: ValueKey(r['key']),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(child: Text('费用 ${i + 1}')),
-                          IconButton(
-                            tooltip: '删除费用',
-                            onPressed:
-                                busy ||
-                                    pending != null ||
-                                    uploading > 0 ||
-                                    rows.length == 1
-                                ? null
-                                : () => setState(() {
-                                    rows.removeAt(i);
-                                    r['description'].dispose();
-                                    r['amount'].dispose();
-                                  }),
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-                        ],
-                      ),
-                      TextFormField(
-                        controller: r['description'],
-                        enabled: !busy && pending == null,
-                        maxLength: 500,
-                        decoration: const InputDecoration(labelText: '费用说明'),
-                        validator: (v) => v!.trim().isEmpty ? '请填写费用说明' : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: r['amount'],
-                        enabled: !busy && pending == null,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(labelText: '金额（元）'),
-                        validator: (v) => reimbursementCents(v ?? '') == null
-                            ? '请输入大于零、最多两位小数的金额'
-                            : null,
-                        onChanged: (_) => setState(() {}),
-                      ),
-                      for (final a in [...r['attachments']])
-                        ListTile(
-                          title: Text(a['name']),
-                          subtitle: invoiceRecognition(r, a),
-                          trailing: IconButton(
-                            tooltip: '移除附件',
-                            onPressed: busy || pending != null || uploading > 0
-                                ? null
-                                : () => setState(
-                                    () => r['attachments'].remove(a),
-                                  ),
-                            icon: const Icon(Icons.close),
-                          ),
-                        ),
-                      for (final f in [...r['failed']])
-                        ListTile(
-                          title: Text('${f.name} · 上传失败'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextButton(
-                                onPressed: uploading > 0
-                                    ? null
-                                    : () => upload(r, f),
-                                child: const Text('重试'),
-                              ),
-                              IconButton(
-                                onPressed: () =>
-                                    setState(() => r['failed'].remove(f)),
-                                icon: const Icon(Icons.close),
-                              ),
-                            ],
-                          ),
-                        ),
-                      OutlinedButton.icon(
-                        onPressed:
-                            busy ||
-                                pending != null ||
-                                uploading > 0 ||
-                                r['attachments'].length >= 10
-                            ? null
-                            : () => upload(r),
-                        icon: const Icon(Icons.attach_file),
-                        label: Text(uploading > 0 ? '上传中…' : '添加发票（图片 / PDF）'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            TextButton.icon(
-              onPressed:
-                  busy || pending != null || uploading > 0 || rows.length >= 50
-                  ? null
-                  : () => setState(() => add()),
-              icon: const Icon(Icons.add),
-              label: const Text('添加费用'),
+            labelStyle: const TextStyle(fontSize: 14, color: Color(0xff687586)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
             ),
-            Card(
-              child: ExpansionTile(
-                shape: const Border(),
-                collapsedShape: const Border(),
-                title: Text('追加知会人（${cc.length}）'),
-                children: [
-                  for (final p in people)
-                    CheckboxListTile(
-                      title: Text(p['name']),
-                      value: cc.contains(p['id']),
+          ),
+        ),
+        child: Form(
+          key: form,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              panel(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '申请信息',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: title,
+                      enabled: !busy && pending == null,
+                      maxLength: 120,
+                      decoration: const InputDecoration(labelText: '报销标题'),
+                      validator: (v) => v!.trim().isEmpty ? '请填写标题' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: type,
+                      decoration: const InputDecoration(labelText: '报销类型'),
+                      items: reimbursementTypes
+                          .map(
+                            (t) => DropdownMenuItem(value: t, child: Text(t)),
+                          )
+                          .toList(),
                       onChanged: busy || pending != null
                           ? null
-                          : (v) => setState(() {
-                              if (v!) {
-                                cc.add(p['id']);
-                              } else {
-                                cc.remove(p['id']);
-                              }
-                            }),
+                          : (v) => setState(() => type = v!),
                     ),
-                ],
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: note,
+                      enabled: !busy && pending == null,
+                      maxLength: 2000,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: '报销说明'),
+                      validator: (v) => v!.trim().isEmpty ? '请填写说明' : null,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            if (error.isNotEmpty)
-              Text(error, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 20),
-          ],
+              for (final (i, r) in rows.indexed)
+                Card(
+                  key: ValueKey(r['key']),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text('费用 ${i + 1}')),
+                            IconButton(
+                              tooltip: '删除费用',
+                              onPressed:
+                                  busy ||
+                                      pending != null ||
+                                      uploading > 0 ||
+                                      rows.length == 1
+                                  ? null
+                                  : () => setState(() {
+                                      rows.removeAt(i);
+                                      r['description'].dispose();
+                                      r['amount'].dispose();
+                                      r['invoice_date'].dispose();
+                                    }),
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                          ],
+                        ),
+                        TextFormField(
+                          controller: r['description'],
+                          enabled: !busy && pending == null,
+                          maxLength: 500,
+                          minLines: 3,
+                          maxLines: 6,
+                          style: const TextStyle(fontSize: 15, height: 1.65),
+                          decoration: const InputDecoration(labelText: '费用说明'),
+                          validator: (v) =>
+                              v!.trim().isEmpty ? '请填写费用说明' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: r['amount'],
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  height: 1.5,
+                                ),
+                                enabled: !busy && pending == null,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: '金额（元）',
+                                ),
+                                validator: (v) =>
+                                    reimbursementCents(v ?? '') == null
+                                    ? '请输入大于零、最多两位小数的金额'
+                                    : null,
+                                onChanged: (_) => setState(() {}),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: r['invoice_date'],
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  height: 1.5,
+                                ),
+                                enabled: !busy && pending == null,
+                                keyboardType: TextInputType.datetime,
+                                decoration: const InputDecoration(
+                                  labelText: '开票日期',
+                                  hintText: 'YYYY-MM-DD',
+                                ),
+                                validator: (value) =>
+                                    value == null ||
+                                        value.isEmpty ||
+                                        validInvoiceDate(value)
+                                    ? null
+                                    : '请输入有效日期，例如 2026-10-29',
+                              ),
+                            ),
+                          ],
+                        ),
+                        for (final a in [...r['attachments']])
+                          ListTile(
+                            title: Text(a['name']),
+                            subtitle: invoiceRecognition(r, a),
+                            trailing: IconButton(
+                              tooltip: '移除附件',
+                              onPressed:
+                                  busy || pending != null || uploading > 0
+                                  ? null
+                                  : () => setState(
+                                      () => r['attachments'].remove(a),
+                                    ),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ),
+                        for (final f in [...r['failed']])
+                          ListTile(
+                            title: Text('${f.name} · 上传失败'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextButton(
+                                  onPressed: uploading > 0
+                                      ? null
+                                      : () => upload(r, f),
+                                  child: const Text('重试'),
+                                ),
+                                IconButton(
+                                  onPressed: () =>
+                                      setState(() => r['failed'].remove(f)),
+                                  icon: const Icon(Icons.close),
+                                ),
+                              ],
+                            ),
+                          ),
+                        OutlinedButton.icon(
+                          onPressed:
+                              busy ||
+                                  pending != null ||
+                                  uploading > 0 ||
+                                  (rows.length >= 50 &&
+                                      (r['attachments'].isNotEmpty ||
+                                          r['failed'].isNotEmpty))
+                              ? null
+                              : () => upload(r),
+                          icon: const Icon(Icons.attach_file),
+                          label: Text(
+                            uploading > 0 ? '上传中…' : '添加发票（图片 / PDF）',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              TextButton.icon(
+                onPressed:
+                    busy ||
+                        pending != null ||
+                        uploading > 0 ||
+                        rows.length >= 50
+                    ? null
+                    : () => setState(() => add()),
+                icon: const Icon(Icons.add),
+                label: const Text('添加费用'),
+              ),
+              Card(
+                child: ExpansionTile(
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  title: Text('追加知会人（${cc.length}）'),
+                  children: [
+                    for (final p in people)
+                      CheckboxListTile(
+                        title: Text(p['name']),
+                        value: cc.contains(p['id']),
+                        onChanged: busy || pending != null
+                            ? null
+                            : (v) => setState(() {
+                                if (v!) {
+                                  cc.add(p['id']);
+                                } else {
+                                  cc.remove(p['id']);
+                                }
+                              }),
+                      ),
+                  ],
+                ),
+              ),
+              if (error.isNotEmpty)
+                Text(error, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

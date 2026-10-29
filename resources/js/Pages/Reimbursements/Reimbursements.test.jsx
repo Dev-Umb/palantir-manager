@@ -77,3 +77,12 @@ it('restores prototype list hierarchy without dropping scope, dates, pagination 
     fireEvent.click(screen.getByRole('button', { name: '重置' }));
     expect(router.get).toHaveBeenLastCalledWith('/reimbursements', { scope: 'review' });
 });
+
+it('displays invoice dates and preserves legacy expense details and approval controls', () => {
+    const dated = {...record, items: [{...record.items[0], invoice_date: '2026-10-29'}, {...record.items[0], description: '旧费用', attachments: []}]};
+    render(<Show record={dated} />);
+    expect(screen.getByText('开票日期：2026-10-29')).toBeVisible();
+    expect(screen.getByText('开票日期：未填写')).toBeVisible();
+    expect(screen.getByRole('button', {name: '预览 发票.pdf'})).toBeVisible();
+    expect(screen.getByRole('button', {name: '同意'})).toBeVisible();
+});

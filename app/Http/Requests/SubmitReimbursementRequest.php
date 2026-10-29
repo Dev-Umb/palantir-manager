@@ -22,6 +22,7 @@ class SubmitReimbursementRequest extends FormRequest
             'type' => ['required', Rule::in(['差旅交通', '客户招待', '办公采购', '其他'])],
             'note' => ['required', 'string', 'max:4000'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
+            'items.*.invoice_date' => ['nullable', 'date_format:Y-m-d'],
             'items.*.description' => ['required', 'string', 'max:500'],
             'items.*.amount' => ['required', 'regex:/^(?:0|[1-9][0-9]{0,6})(?:\.[0-9]{1,2})?$/'],
             'items.*.attachments' => ['required', 'array', 'min:1', 'max:10'],

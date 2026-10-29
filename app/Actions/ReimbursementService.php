@@ -107,7 +107,7 @@ class ReimbursementService
                     $files[] = ['id' => $upload->id, 'name' => $stored->original_name, 'mime' => $stored->mime_type, 'size' => (int) $stored->size];
                     $allIds[] = $id;
                 }
-                $items[] = ['description' => $item['description'], 'amount' => number_format($cents / 100, 2, '.', ''), 'cents' => $cents, 'attachments' => $files];
+                $items[] = ['invoice_date' => $item['invoice_date'] ?? null, 'description' => $item['description'], 'amount' => number_format($cents / 100, 2, '.', ''), 'cents' => $cents, 'attachments' => $files];
             }
             if (collect($items)->flatMap(fn ($item) => $item['attachments'])->sum('size') > 200 * 1024 * 1024) {
                 throw ValidationException::withMessages(['items' => '单次提交的发票合计不能超过 200 MB。']);

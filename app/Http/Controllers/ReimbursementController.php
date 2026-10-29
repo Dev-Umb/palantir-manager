@@ -16,7 +16,9 @@ use App\Support\InvoicePdfRecognition;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -122,14 +124,21 @@ class ReimbursementController extends Controller
         if (! $lock->get()) {
             return response()->json(['message' => '这张发票正在识别，请稍后重试。'], 409);
         }
+        $started = hrtime(true);
+        $success = false;
+        $trace = (string) Str::uuid();
         try {
-            $result = $recognizer->recognize($stored);
+            $result = $recognizer->recognize($stored, function (string $stage, float $duration, bool $success) use ($trace, $stored): void {
+                Log::info('reimbursement.invoice_timing', ['trace' => $trace, 'stage' => $stage, 'bytes' => $stored->size, 'duration_ms' => round($duration, 1), 'success' => $success]);
+            });
+            $success = true;
             Cache::put($key, $result, now()->addMinutes(30));
 
             return response()->json($result)->header('Cache-Control', 'private, no-store');
         } catch (\Throwable $error) {
             return response()->json(['message' => $error instanceof \UnexpectedValueException ? $error->getMessage().' 已上传附件不受影响。' : '发票识别未完成，请重试或手动填写；已上传附件不受影响。'], 422);
         } finally {
+            Log::info('reimbursement.invoice_timing', ['trace' => $trace, 'stage' => 'recognition', 'bytes' => $stored->size, 'duration_ms' => round((hrtime(true) - $started) / 1e6, 1), 'success' => $success]);
             $lock->release();
         }
     }
@@ -138,7 +147,14 @@ class ReimbursementController extends Controller
     {
         abort_unless($request->user()->canDo('reimbursements.submit'), 403);
         $request->validate(['file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'mimetypes:application/pdf,image/jpeg,image/png', 'max:20480']]);
-        $stored = $this->files->upload($request->file('file'));
+        $started = hrtime(true);
+        $trace = (string) Str::uuid();
+        $timings = [];
+        $bytes = $request->file('file')->getSize();
+        $stored = $this->files->upload($request->file('file'), function (string $stage, float $duration, bool $success) use (&$timings, $trace, $bytes): void {
+            $timings[$stage] = round($duration, 1);
+            Log::info('reimbursement.invoice_timing', ['trace' => $trace, 'stage' => $stage, 'bytes' => $bytes, 'duration_ms' => $timings[$stage], 'success' => $success]);
+        });
         try {
             $upload = ReimbursementUpload::create(['user_id' => $request->user()->id, 'stored_attachment_id' => $stored->id]);
         } catch (\Throwable $error) {
@@ -146,7 +162,7 @@ class ReimbursementController extends Controller
             throw $error;
         }
 
-        return response()->json(['file' => ['id' => $upload->id, 'name' => $stored->original_name, 'mime' => $stored->mime_type, 'size' => $stored->size]], 201);
+        return response()->json(['file' => ['id' => $upload->id, 'name' => $stored->original_name, 'mime' => $stored->mime_type, 'size' => $stored->size], 'timing' => ['trace' => $trace, 'server_ms' => round((hrtime(true) - $started) / 1e6, 1), ...$timings]], 201);
     }
 
     private function attachment(ReimbursementVersion $version, string $upload): StoredAttachment

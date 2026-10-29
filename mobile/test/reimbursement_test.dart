@@ -5,6 +5,24 @@ import 'package:palantir_mobile/api.dart';
 import 'package:palantir_mobile/reimbursements.dart';
 
 void main() {
+  test(
+    'invoice date validation and description merge preserve manual text',
+    () {
+      expect(validInvoiceDate('2024-02-29'), isTrue);
+      for (final date in ['2026-02-29', '2026-02-30', '2026-1-01', '']) {
+        expect(validInvoiceDate(date), isFalse);
+      }
+      final fields = {
+        'invoice_number': '12345678',
+        'buyer': '测试购买方',
+        'invoice_date': '2026-10-29',
+      };
+      final text = invoiceDescription('手写说明', fields);
+      expect(invoiceDescription(text, fields), text);
+      expect(text, contains('手写说明'));
+      expect(text, isNot(contains('2026-10-29')));
+    },
+  );
   testWidgets(
     'recognized invoice amount requires explicit confirmation and keeps manual amount on cancel',
     (tester) async {
@@ -28,24 +46,81 @@ void main() {
       );
       await tester.pumpWidget(MaterialApp(home: ReimbursementForm(api: api)));
       await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(2), '手写说明');
       await tester.enterText(find.byType(TextFormField).at(3), '9.00');
       await tester.tap(find.text('添加发票（图片 / PDF）'));
       await tester.pumpAndSettle();
       expect(find.text('合计 ¥9.00'), findsOneWidget);
-      expect(find.text('价税合计：113.00 元'), findsOneWidget);
-      await tester.tap(find.text('核对并填入金额'));
-      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('发票识别 · 待核对'), findsNothing);
       await tester.tap(find.text('取消'));
       await tester.pumpAndSettle();
       expect(find.text('合计 ¥9.00'), findsOneWidget);
-      await tester.tap(find.text('核对并填入金额'));
+      await tester.tap(find.text('核对发票'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('确认填入'));
       await tester.pumpAndSettle();
       expect(find.text('合计 ¥113.00'), findsOneWidget);
+      expect(find.text('2026-10-29'), findsOneWidget);
+      expect(find.textContaining('手写说明\n发票号码：12345678'), findsOneWidget);
+      await tester.tap(find.text('核对发票'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('确认填入'));
+      await tester.pumpAndSettle();
+      final description = tester
+          .widget<TextFormField>(find.byType(TextFormField).at(2))
+          .controller!
+          .text;
+      expect('12345678'.allMatches(description).length, 1);
+      await tester.ensureVisible(find.text('添加发票（图片 / PDF）'));
+      await tester.tap(find.text('添加发票（图片 / PDF）'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      await tester.tap(find.text('取消'));
+      await tester.pumpAndSettle();
+      expect(find.text('费用 2'), findsOneWidget);
+      expect(find.text('合计 ¥113.00'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('expense date and amount stay aligned on a narrow screen', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReimbursementForm(
+          api: ReimbursementApi(),
+          previous: {
+            'title': '差旅',
+            'note': '测试',
+            'type': '差旅交通',
+            'cc': [],
+            'items': [
+              {
+                'description': '手写说明\n发票号码：12345678',
+                'amount': '113.00',
+                'invoice_date': '2026-10-29',
+                'attachments': [],
+              },
+            ],
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final fields = find.byType(TextFormField);
+    await tester.ensureVisible(fields.at(3));
+    await tester.pumpAndSettle();
+    final amount = tester.getRect(fields.at(3)),
+        date = tester.getRect(fields.at(4));
+    expect(amount.top, date.top);
+    expect(amount.right, lessThan(date.left));
+    expect(date.right, lessThanOrEqualTo(320));
+    expect(tester.takeException(), isNull);
+  });
 
   test('dates are readable and invalid dates have an explicit placeholder', () {
     expect(reimbursementDate('2026-10-28T09:32:00'), '2026-10-28 09:32');
@@ -225,6 +300,7 @@ void main() {
       await tester.enterText(fields.at(1), '差旅说明');
       await tester.enterText(fields.at(2), '车票');
       await tester.enterText(fields.at(3), '0.10');
+      await tester.enterText(fields.at(4), '2026-10-29');
       await tester.tap(find.text('添加发票（图片 / PDF）'));
       await tester.pumpAndSettle();
       expect(find.text('上传成功'), findsOneWidget);
@@ -232,6 +308,7 @@ void main() {
       await tester.tap(find.text('提交申请'));
       await tester.pumpAndSettle();
       expect(api.payload?['items'][0]['amount'], '0.10');
+      expect(api.payload?['items'][0]['invoice_date'], '2026-10-29');
       expect(api.payload?['items'][0]['attachments'], ['invoice']);
       expect(find.textContaining('再次提交将重试同一申请'), findsOneWidget);
     },
@@ -295,7 +372,12 @@ class ReimbursementApi extends PalantirApi {
     if (path.endsWith('/recognize') && recognize) {
       return {
         'status': 'recognized',
-        'fields': {'invoice_number': '12345678', 'total_cents': 11300},
+        'fields': {
+          'invoice_number': '12345678',
+          'invoice_date': '2026-10-29',
+          'buyer': '测试购买方',
+          'total_cents': 11300,
+        },
         'warnings': ['请核对原件'],
       };
     }

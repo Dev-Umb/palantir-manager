@@ -11,7 +11,42 @@ test('empty expenses and changed account cannot submit a retained draft',async()
 test('mobile cards retain status and amount hierarchy, form keeps persistent field labels',()=>{const list=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/index.wxml'),'utf8');for(const text of ['record-footer','record-amount','item.status','item.reimbursement_id','data-scope="cc"','bindtap="open"'])assert.ok(list.includes(text),text);const form=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/form.wxml'),'utf8');for(const label of ['报销标题','报销类型','报销说明','费用说明','金额（元）'])assert.ok(form.includes('<view class="field-label">'+label+'</view>'));assert.match(form,/合计金额/);});
 test('notice dates are human readable with an invalid-date fallback',()=>{assert.equal(common().timestamp('2026-10-28T09:32:00'),'2026-10-28 09:32');assert.equal(common().timestamp('bad'),'—');});
 test('invoice recognition preserves manual amount until confirmation and rejects stale results',async()=>{
- let epoch=1,confirm;const api={onClear(){},epoch:()=>epoch,request:async()=>({fields:{invoice_number:'12345678',total_cents:11300},warnings:[]})};const p=load('form',api,{showModal:o=>confirm=o.success});const file={id:'a'},row={amount:'9.00',attachments:[file]};p.data.items=[row];await p.recognizeFile(file);assert.equal(row.amount,'9.00');p.applyInvoice({currentTarget:{dataset:{i:0,j:0}}});confirm({confirm:false});assert.equal(row.amount,'9.00');p.applyInvoice({currentTarget:{dataset:{i:0,j:0}}});confirm({confirm:true});assert.equal(row.amount,'113.00');assert.equal(p.data.total,'113.00');p.applyInvoice({currentTarget:{dataset:{i:0,j:0}}});epoch=2;row.amount='8.00';confirm({confirm:true});assert.equal(row.amount,'8.00');
+ let epoch=1,confirm;const api={onClear(){},epoch:()=>epoch,request:async()=>({fields:{invoice_number:'12345678',total_cents:11300},warnings:[]})};const p=load('form',api,{showModal:o=>confirm=o.success});const file={id:'a'},row={amount:'9.00',description:'手写说明',invoice_date:'',attachments:[file]};p.data.items=[row];await p.recognizeFile(file);assert.ok(p.data.invoiceReview);assert.equal(row.amount,'9.00');p.cancelInvoiceReview();p.applyInvoice({currentTarget:{dataset:{i:0,j:0}}});p.cancelInvoiceReview();assert.equal(row.amount,'9.00');p.applyInvoice({currentTarget:{dataset:{i:0,j:0}}});p.confirmInvoiceReview();assert.equal(row.amount,'113.00');assert.equal(p.data.total,'113.00');p.applyInvoice({currentTarget:{dataset:{i:0,j:0}}});epoch=2;row.amount='8.00';p.confirmInvoiceReview();assert.equal(row.amount,'8.00');
  let done;api.request=()=>new Promise(r=>done=r);const pending=p.recognizeFile(file);p.data.items=[];done({fields:{total_cents:500},warnings:[]});await pending;assert.equal(file.recognition.fields.total_cents,11300);
 });
-test('failed recognition keeps the uploaded attachment and supports retry',async()=>{let fail=true;const api={onClear(){},epoch:()=>1,request:async()=>{if(fail)throw Error('暂不可用');return {fields:{total_cents:100},warnings:[]};}};const p=load('form',api),file={id:'a'};p.data.items=[{amount:'2.00',attachments:[file]}];await p.recognizeFile(file);assert.equal(file.recognitionError,'暂不可用');assert.equal(p.data.items[0].attachments.length,1);fail=false;await p.recognizeFile(file);assert.equal(file.recognition.fields.total_cents,100);assert.equal(p.data.items[0].amount,'2.00');});
+test('failed recognition keeps the uploaded attachment and supports retry',async()=>{let fail=true;const api={onClear(){},epoch:()=>1,request:async()=>{if(fail)throw Error('暂不可用');return {fields:{total_cents:100},warnings:[]};}};const p=load('form',api),file={id:'a'};p.data.items=[{amount:'2.00',description:'手写内容',attachments:[file]}];await p.recognizeFile(file);assert.equal(file.recognitionError,'暂不可用');assert.equal(p.data.items[0].attachments.length,1);fail=false;await p.recognizeFile(file);assert.equal(file.recognition.fields.total_cents,100);assert.equal(p.data.items[0].amount,'2.00');});
+
+test('invoice dates and descriptions preserve manual notes and do not duplicate recognized lines',()=>{
+ const c=common();assert.equal(c.validInvoiceDate('2024-02-29'),true);for(const d of ['2026-02-29','2026-02-30','2026-1-01','',null])assert.equal(c.validInvoiceDate(d),false);
+ const fields={invoice_number:'12345678',buyer:'测试购买方',seller:'测试销售方',invoice_date:'2026-10-29',total_cents:100};
+ const first=c.invoiceDescription('手写说明',fields);assert.equal(c.invoiceDescription(first,fields),first);assert.match(first,/手写说明/);assert.match(first,/购买方：测试购买方/);assert.doesNotMatch(first,/2026-10-29|100/);
+});
+test('review applies complete fields, missing data preserves input and oversized notes apply nothing',()=>{
+ let confirm;const p=load('form',{onClear(){},epoch:()=>1},{showModal:o=>confirm=o.success});
+ const file={id:'a',recognition:{fields:{total_cents:11300,invoice_date:'2026-10-29',invoice_number:'12345678'}}};
+ const row={description:'手写说明',amount:'9.00',invoice_date:'2026-10-28',attachments:[file]};p.data.items=[row];const e={currentTarget:{dataset:{i:0,j:0}}};
+ p.applyInvoice(e);p.confirmInvoiceReview();assert.equal(row.invoice_date,'2026-10-29');assert.equal(row.amount,'113.00');assert.match(row.description,/手写说明\n发票号码：12345678/);
+ p.applyInvoice(e);p.confirmInvoiceReview();assert.equal(row.description.split('12345678').length,2);
+ file.recognition.fields={buyer:'购买方'};p.applyInvoice(e);p.confirmInvoiceReview();assert.equal(row.invoice_date,'2026-10-29');assert.equal(row.amount,'113.00');
+ p.applyInvoice(e);row.description='更新的手写内容';p.confirmInvoiceReview();assert.equal(row.description,'更新的手写内容');
+ row.description='长'.repeat(500);file.recognition.fields={total_cents:200,invoice_date:'2026-10-20',seller:'新销售方'};p.applyInvoice(e);assert.match(p.data.error,/500/);assert.equal(row.amount,'113.00');assert.equal(row.invoice_date,'2026-10-29');
+});
+test('each added invoice gets its own expense and failed retry does not add another row',async()=>{
+ let fail=false,n=0;const api={onClear(){},epoch:()=>1,upload:async()=>{if(fail)throw Error('上传失败');return {file:{id:String(++n),mime:'image/png',name:'票.png'}};}};const p=load('form',api);const f={path:'one',name:'票.png',size:20};
+ await p.upload(0,f);p.data.items[0].amount='10.00';p.data.items[0].description='原费用';
+ fail=true;await p.upload(0,{...f,path:'two'});assert.equal(p.data.items.length,2);assert.equal(p.data.items[0].amount,'10.00');assert.equal(p.data.items[1].failed.length,1);
+ fail=false;await p.upload(1,{...f,path:'two'});assert.equal(p.data.items.length,2);assert.equal(p.data.items[1].attachments.length,1);assert.equal(p.data.items[1].failed.length,0);
+ p.data.items=Array.from({length:50},()=>({attachments:[{id:'old'}],failed:[]}));await p.upload(0,{...f,path:'three'});assert.equal(p.data.items.length,50);assert.equal(n,2);assert.match(p.data.error,/50/);
+});
+
+test('recognition reviews open automatically in sequence and results are not repeated under files',async()=>{
+ const api={onClear(){},epoch:()=>1,request:async()=>({fields:{total_cents:100,invoice_date:'2026-10-29'},warnings:[]})};
+ const p=load('form',api);const first={id:'a',name:'第一张.pdf'},second={id:'b',name:'第二张.pdf'};
+ p.data.items=[{amount:'',invoice_date:'',description:'第一项',attachments:[first]},{amount:'',invoice_date:'',description:'第二项',attachments:[second]}];
+ await p.recognizeFile(first);await p.recognizeFile(second);assert.equal(p.data.invoiceReview.name,'第一张.pdf');p.confirmInvoiceReview();await new Promise(resolve=>setImmediate(resolve));assert.equal(p.data.invoiceReview.name,'第二张.pdf');p.cancelInvoiceReview();await p.invoiceReviews;assert.equal(p.data.items[0].invoice_date,'2026-10-29');assert.equal(p.data.items[1].invoice_date,'');
+ const template=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/form.wxml'),'utf8');assert.doesNotMatch(template,/发票识别 · 待核对|wx:for="{{file.recognitionLines}}"/);assert.match(template,/expense-fields/);assert.match(template,/review-description/);assert.match(template,/invoiceReview.descriptionLines/);
+});
+
+test('leaving the form resolves the review queue and prevents late review dialogs',async()=>{
+ const api={onClear(){},epoch:()=>1,request:async()=>({fields:{total_cents:100},warnings:[]})};const p=load('form',api);const first={id:'a'},second={id:'b'};p.data.items=[{description:'a',amount:'',attachments:[first]},{description:'b',amount:'',attachments:[second]}];await p.recognizeFile(first);await p.recognizeFile(second);p.onUnload();await p.invoiceReviews;assert.equal(p.data.invoiceReview,null);assert.equal(p.data.items[0].amount,'');
+});

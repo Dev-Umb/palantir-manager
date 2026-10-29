@@ -18,6 +18,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -57,6 +58,50 @@ class ReimbursementTest extends TestCase
         $user->roles()->attach($role);
 
         return $user;
+    }
+
+    public function test_invoice_date_is_validated_and_preserved_with_historical_attachments(): void
+    {
+        $input = $this->input();
+        foreach (['2026-02-30', '29/10/2026', '2026-1-01', 'invalid'] as $date) {
+            $input['items'][0]['invoice_date'] = $date;
+            $this->actingAs($this->owner)->postJson('/reimbursements', $input)->assertUnprocessable()->assertJsonValidationErrors('items.0.invoice_date');
+        }
+        $input['items'][0]['invoice_date'] = '2026-10-29';
+        $extra = $this->input();
+        $input['items'][0]['attachments'][] = $extra['items'][0]['attachments'][0];
+        $record = $this->submit($input);
+        $this->assertSame('2026-10-29', $record['items'][0]['invoice_date']);
+        $this->assertCount(2, $record['items'][0]['attachments']);
+        $this->decision($this->reviewer, $record, 'reject', note: '补充说明')->assertOk();
+        $input = [...$input, 'submission_key' => (string) Str::uuid(), 'reimbursement_id' => $record['reimbursement_id'], 'expected_version' => 1];
+        $input['items'][0]['invoice_date'] = '2026-10-28';
+        $next = $this->submit($input);
+        $this->assertSame('2026-10-28', $next['items'][0]['invoice_date']);
+        $this->assertCount(2, $next['items'][0]['attachments']);
+        $this->assertSame(10, $next['items'][0]['cents']);
+        $this->actingAs($this->owner)->getJson($record['url'])->assertJsonPath('record.items.0.invoice_date', '2026-10-29');
+        $legacy = $this->submit($this->input());
+        $this->assertNull($legacy['items'][0]['invoice_date']);
+    }
+
+    public function test_upload_timing_contains_only_stage_metrics_and_keeps_private_file(): void
+    {
+        Log::spy();
+        $response = $this->actingAs($this->owner)->postJson('/reimbursements/uploads', ['file' => UploadedFile::fake()->image('private-invoice.png')])->assertCreated();
+        $timing = $response->json('timing');
+        $this->assertEqualsCanonicalizing(['trace', 'server_ms', 'storage_write', 'storage_verify'], array_keys($timing));
+        $this->assertTrue(Str::isUuid($timing['trace']));
+        $this->assertGreaterThanOrEqual(0, $timing['storage_write']);
+        $this->assertGreaterThanOrEqual(0, $timing['storage_verify']);
+        Log::shouldHaveReceived('info')->withArgs(function ($message, $context): bool {
+            $this->assertSame(['trace', 'stage', 'bytes', 'duration_ms', 'success'], array_keys($context));
+
+            return $message === 'reimbursement.invoice_timing' && $context['success'];
+        })->twice();
+        $stored = StoredAttachment::firstOrFail();
+        $this->assertSame(hash('sha256', Storage::disk('local')->get($stored->object_key)), $stored->sha256);
+        $this->assertDatabaseHas('reimbursement_uploads', ['id' => $response->json('file.id'), 'user_id' => $this->owner->id]);
     }
 
     public function test_invoice_recognition_is_owner_scoped_cached_and_does_not_submit(): void

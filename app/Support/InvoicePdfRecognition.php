@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\StoredAttachment;
+use Closure;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -14,13 +15,16 @@ class InvoicePdfRecognition
     public function __construct(private StandardInvoiceParser $parser) {}
 
     /** @return array<string, mixed> */
-    public function recognize(StoredAttachment $attachment): array
+    public function recognize(StoredAttachment $attachment, ?Closure $observe = null): array
     {
         $directory = sys_get_temp_dir().'/invoice-'.Str::uuid();
         if (! mkdir($directory, 0700)) {
             throw new UnexpectedValueException('无法创建识别工作目录，请稍后重试。');
         }
         $deadline = microtime(true) + 16;
+        $stage = 'invoice_read';
+        $started = hrtime(true);
+        $success = false;
         try {
             $source = Storage::disk($attachment->disk)->readStream($attachment->object_key);
             if (! is_resource($source)) {
@@ -37,6 +41,9 @@ class InvoicePdfRecognition
             if ($bytes !== $attachment->size || ! hash_equals($attachment->sha256, hash_file('sha256', $file))) {
                 throw new UnexpectedValueException('发票文件完整性校验失败，请重新上传。');
             }
+            $observe?->__invoke($stage, (hrtime(true) - $started) / 1e6, true);
+            $stage = 'invoice_parse';
+            $started = hrtime(true);
             $info = $this->run(['pdfinfo', $file], $deadline);
             if (! preg_match('/^Pages:\s+(\d+)$/m', $info, $pages) || (int) $pages[1] < 1 || (int) $pages[1] > 5) {
                 throw new UnexpectedValueException('仅支持 1–5 页的单张发票 PDF，请拆分后重试。');
@@ -59,6 +66,8 @@ class InvoicePdfRecognition
                 $result['warnings'][] = '扫描识别的文字与数字可能有误，请逐项核对原件。';
             }
 
+            $success = true;
+
             return [...$result, 'method' => $method];
         } catch (\Throwable $error) {
             if ($error instanceof UnexpectedValueException && ! $error instanceof ExceptionInterface) {
@@ -66,6 +75,7 @@ class InvoicePdfRecognition
             }
             throw new UnexpectedValueException('识别超时或工具不可用，请重试或手动填写。');
         } finally {
+            $observe?->__invoke($stage, (hrtime(true) - $started) / 1e6, $success);
             foreach (glob($directory.'/*') as $temporary) {
                 unlink($temporary);
             }
