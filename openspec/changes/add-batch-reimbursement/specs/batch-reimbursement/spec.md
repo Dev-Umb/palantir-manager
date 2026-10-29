@@ -27,3 +27,9 @@ The system SHALL retain manual reimbursement, owner-only drafts, existing approv
 #### Scenario: New category submission
 - **WHEN** a user confirms and submits a new-category draft
 - **THEN** the current approval flow applies and draft creation alone has not notified approvers
+
+### Requirement: Preserve TOS files
+The system SHALL retain all TOS invoice objects, including staging and unconfirmed uploads. Batch reconciliation SHALL only remove local temporary memory files, never TOS objects.
+#### Scenario: Old upload remains
+- **WHEN** an upload is unconfirmed or older than one day
+- **THEN** reconciliation preserves both its original and staging TOS objects

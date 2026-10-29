@@ -59,6 +59,17 @@ class ReimbursementBatchTest extends TestCase
         $this->assertSame('processing', $batch->fresh()->status);
     }
 
+    public function test_reconciliation_preserves_all_tos_objects_including_unconfirmed_uploads(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id]);
+        $file = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'disk' => 'local', 'status' => 'uploading', 'created_at' => now()->subDays(2), 'updated_at' => now()->subDays(2)]);
+        Storage::disk('local')->put($file->object_key, 'original');
+        Storage::disk('local')->put($file->object_key.'.upload', 'staging');
+        $this->artisan('reimbursements:reconcile-batches')->assertSuccessful();
+        Storage::disk('local')->assertExists([$file->object_key, $file->object_key.'.upload']);
+        $this->assertSame('uploading', $file->fresh()->status);
+    }
+
     public function test_owner_only_create_and_retained_options(): void
     {
         $id = (string) Str::uuid();
