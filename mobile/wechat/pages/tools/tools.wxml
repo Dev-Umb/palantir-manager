@@ -1,7 +1,7 @@
 
-<navigation-bar title="{{title}}" back="{{true}}" color="#192b42" background="#ffffff" />
+<navigation-bar title="{{title}}" back="{{true}}" color="#192b42" background="#ffffff" delta="{{kind==='procurement' && notice?0:1}}" bindback="procurementBack" />
 <view wx:if="{{kind==='ai' || kind==='quote'}}" class="chat-toolbar"><text>鑫源昌 · 业务助手</text><button bindtap="newConversation" disabled="{{busy || aiActive}}">＋ 新对话</button></view>
-<scroll-view class="scrollarea" scroll-y type="list"><view class="content {{kind==='ai' || kind==='quote'?'chat-content':''}} {{kind==='notifications'?'notification-content':''}}">
+<scroll-view class="scrollarea" scroll-y type="list" scroll-top="{{procurementScrollTop}}" bindscroll="procurementScroll"><view class="content {{kind==='ai' || kind==='quote'?'chat-content':''}} {{kind==='notifications'?'notification-content':''}}">
  <view wx:if="{{error}}" class="error">{{error}}<button bindtap="refresh" disabled="{{busy}}">刷新状态</button><button wx:if="{{error==='登录已失效，请重新登录'}}" bindtap="login">重新登录</button></view>
  <view wx:if="{{busy && kind!=='ai' && kind!=='quote'}}" class="loading">正在处理…</view>
  <block wx:if="{{kind==='notifications'}}"><include src="notifications.wxml"/></block>
@@ -15,3 +15,6 @@
  <button wx:else class="send-button" bindtap="sendAi" loading="{{busy}}" disabled="{{busy || !prompt}}" aria-label="发送消息">↑</button></view>
  <view class="composer-note">AI 结果请核对 · 数据修改需你确认</view>
 </view>
+
+<view wx:if="{{kind==='procurement' && notice}}" class="procurement-actions"><button bindtap="copyProcurementSource">复制原文链接</button><button wx:if="{{canAnalyzeProcurement}}" class="primary" bindtap="analyzeProcurement">AI 分析</button></view>
+<view wx:if="{{kind==='procurement' && procurementSheet}}" class="procurement-overlay"><view class="procurement-sheet"><view class="procurement-title">筛选招采信息</view><view class="procurement-muted">采购方式</view><picker range="{{procurementMethods}}" data-key="method" bindchange="editProcurementFilter"><view class="procurement-select">{{procurementDraft.method || '全部采购方式'}}</view></picker><view class="procurement-muted">优先级</view><picker range="{{['全部','P1','P2','P3','待核实']}}" data-key="priority" bindchange="editProcurementFilter"><view class="procurement-select">{{procurementDraft.priority || '全部'}}</view></picker><view class="procurement-muted">时间口径</view><picker range="{{['公告发布时间','报名 / 文件获取','报价 / 投标截止']}}" data-key="time" bindchange="editProcurementFilter"><view class="procurement-select">{{procurementDraft.time==='deadline'?'报价 / 投标截止':procurementDraft.time==='registration'?'报名 / 文件获取':'公告发布时间'}}</view></picker><view class="row"><picker mode="date" value="{{procurementDraft.start}}" data-key="start" bindchange="editProcurementFilter"><view class="procurement-select">{{procurementDraft.start || '开始日期'}}</view></picker><picker mode="date" value="{{procurementDraft.end}}" data-key="end" bindchange="editProcurementFilter"><view class="procurement-select">{{procurementDraft.end || '结束日期'}}</view></picker></view><view class="error" wx:if="{{procurementFilterError}}">{{procurementFilterError}}</view><view class="row"><button bindtap="closeProcurementFilters">取消</button><button bindtap="resetProcurementFilters">重置</button><button class="primary" bindtap="applyProcurementFilters" disabled="{{busy}}">应用筛选</button></view></view></view>

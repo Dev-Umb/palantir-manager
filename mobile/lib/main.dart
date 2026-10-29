@@ -1,5 +1,6 @@
 import 'attachments.dart';
 import 'reimbursements.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -273,48 +274,82 @@ class BusinessShell extends StatefulWidget {
   State<BusinessShell> createState() => _BusinessShellState();
 }
 
-class _BusinessShellState extends State<BusinessShell> with WidgetsBindingObserver {
+class _BusinessShellState extends State<BusinessShell>
+    with WidgetsBindingObserver {
   bool fetchingReimbursements = false;
   String reimbursementAccount = '';
-  @override void initState() {
-    super.initState(); WidgetsBinding.instance.addObserver(this);
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.api.addListener(reimbursementSessionChanged);
     reimbursementSessionChanged();
-    WidgetsBinding.instance.addPostFrameCallback((_) => fetchReimbursementResults());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => fetchReimbursementResults(),
+    );
   }
+
   void reimbursementSessionChanged() {
     final account = widget.api.user?['id']?.toString() ?? '';
     if (account != reimbursementAccount) {
       reimbursementAccount = account;
-      android.invokeMethod('reimbursementAccount', {'account': account}).catchError((_) => null);
+      android
+          .invokeMethod('reimbursementAccount', {'account': account})
+          .catchError((_) => null);
     }
   }
-  @override void dispose() {
-    WidgetsBinding.instance.removeObserver(this); widget.api.removeListener(reimbursementSessionChanged);
-    android.invokeMethod('reimbursementAccount', {'account': ''}).catchError((_) => null);
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.api.removeListener(reimbursementSessionChanged);
+    android
+        .invokeMethod('reimbursementAccount', {'account': ''})
+        .catchError((_) => null);
     super.dispose();
   }
-  @override void didChangeAppLifecycleState(AppLifecycleState state) {
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) fetchReimbursementResults();
   }
+
   Future<void> fetchReimbursementResults() async {
     if (fetchingReimbursements || reimbursementAccount.isEmpty) return;
-    fetchingReimbursements = true; final account = reimbursementAccount;
+    fetchingReimbursements = true;
+    final account = reimbursementAccount;
     try {
       String? path = '/reimbursements/notices?unread=1';
       while (path != null) {
         final data = mapOf((await widget.api.get(path))['notices']);
         if (!mounted || reimbursementAccount != account) return;
-        await android.invokeMethod('reimbursementNotifications', {'account': account, 'notices': maps(data['data'])});
+        await android.invokeMethod('reimbursementNotifications', {
+          'account': account,
+          'notices': maps(data['data']),
+        });
         path = data['next_page_url'];
       }
       if (!mounted || reimbursementAccount != account) return;
-      final version = await android.invokeMethod<int>('consumeReimbursementNotification', {'account': account});
-      if (version != null && mounted && reimbursementAccount == account) await push(context, ReimbursementDetail(api: widget.api, path: '/reimbursements/versions/$version'));
+      final version = await android.invokeMethod<int>(
+        'consumeReimbursementNotification',
+        {'account': account},
+      );
+      if (version != null && mounted && reimbursementAccount == account) {
+        await push(
+          context,
+          ReimbursementDetail(
+            api: widget.api,
+            path: '/reimbursements/versions/$version',
+          ),
+        );
+      }
     } catch (_) {
       // The durable in-app list remains available when local notification permission or networking fails.
-    } finally { fetchingReimbursements = false; }
+    } finally {
+      fetchingReimbursements = false;
+    }
   }
+
   int index = 0;
   final visited = <int>{0};
   void select(int next) => setState(() {
@@ -445,19 +480,19 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   if (api.user?['is_password_changed'] == false)
                     note('请在“我的 → 账号与安全”修改初始密码。'),
-                  if (api.can('reimbursements.submit')) ...[
-                    FilledButton.icon(
-                      onPressed: () => push(context, ReimbursementForm(api: api)),
-                      icon: const Icon(Icons.add),
-                      label: const Text('发起报销'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(56),
-                        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  if (api.canProcurement)
+                    Card(
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.newspaper_outlined,
+                          color: steel,
+                        ),
+                        title: const Text('招采信息'),
+                        subtitle: const Text('按采购方式筛选 · 查看完整公告'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => push(context, ProcurementPage(api: api)),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                  ],
                   Container(
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
@@ -510,28 +545,57 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 22),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    key: const ValueKey('home-business-actions'),
+                    spacing: 10,
                     children: [
                       if (api.can('object.project.create'))
-                        _shortcut(Icons.add, '新建项目', () async {
-                          await push(context, ProjectEditor(api: api));
-                          if (mounted) setState(() => revision++);
-                        }),
-                      _shortcut(Icons.search, '查项目', widget.onProjects),
-                      if (api.canUpload)
-                        _shortcut(
-                          Icons.upload_file_outlined,
-                          '上传合同',
-                          () => push(context, ContractIntakePage(api: api)),
+                        Expanded(
+                          child: _shortcut(Icons.add, '新建项目', () async {
+                            await push(context, ProjectEditor(api: api));
+                            if (mounted) setState(() => revision++);
+                          }),
                         ),
-                      if (api.can('ai.harness.view'))
-                        _shortcut(
-                          Icons.auto_awesome_outlined,
-                          'AI 助手',
-                          () => push(context, AssistantPage(api: api)),
+                      Expanded(
+                        child: _shortcut(
+                          Icons.search,
+                          '查找项目',
+                          widget.onProjects,
+                        ),
+                      ),
+                      if (api.can('reimbursements.submit'))
+                        Expanded(
+                          child: _shortcut(
+                            Icons.receipt_long_outlined,
+                            '发起报销',
+                            () => push(context, ReimbursementForm(api: api)),
+                          ),
                         ),
                     ],
                   ),
+                  if (api.canUpload || api.can('ai.harness.view')) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      spacing: 10,
+                      children: [
+                        if (api.canUpload)
+                          Expanded(
+                            child: _shortcut(
+                              Icons.upload_file_outlined,
+                              '上传合同',
+                              () => push(context, ContractIntakePage(api: api)),
+                            ),
+                          ),
+                        if (api.can('ai.harness.view'))
+                          Expanded(
+                            child: _shortcut(
+                              Icons.auto_awesome_outlined,
+                              'AI 助手',
+                              () => push(context, AssistantPage(api: api)),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 22),
                   _heading(
                     '需要关注',
@@ -563,19 +627,6 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
-                  if (api.canProcurement)
-                    Card(
-                      child: ListTile(
-                        leading: const Icon(
-                          Icons.newspaper_outlined,
-                          color: steel,
-                        ),
-                        title: const Text('招采参考'),
-                        subtitle: const Text('查看机会、截止时间与公开资料'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => push(context, ProcurementPage(api: api)),
-                      ),
-                    ),
                   _heading('最近项目', widget.onProjects),
                   if (projects.isEmpty) note('还没有可查看的项目。'),
                   ...projects.map(
@@ -601,25 +652,25 @@ class _HomePageState extends State<HomePage> {
       ),
     ],
   );
-  Widget _shortcut(IconData icon, String label, VoidCallback tap) => InkWell(
-    onTap: tap,
+  Widget _shortcut(IconData icon, String label, VoidCallback tap) => Material(
+    color: Colors.white,
     borderRadius: BorderRadius.circular(12),
-    child: Padding(
-      padding: const EdgeInsets.all(4),
-      child: Column(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+    child: InkWell(
+      onTap: tap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+        child: Column(
+          children: [
+            Icon(icon, color: steel),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12, color: steel),
             ),
-            child: Icon(icon, color: steel),
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
+          ],
+        ),
       ),
     ),
   );

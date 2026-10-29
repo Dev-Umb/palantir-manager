@@ -9,3 +9,6 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# Preserve the checksummed baseline bytes across fresh checkouts.
+/resources/support-library/baseline.json text eol=crlf

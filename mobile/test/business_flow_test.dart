@@ -89,6 +89,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('发起报销'), findsOneWidget);
     expect(find.byTooltip('报销 OA'), findsNothing);
+    final row = find.byKey(const ValueKey('home-business-actions'));
+    final cells = find.descendant(of: row, matching: find.byType(Expanded));
+    expect(cells, findsNWidgets(3));
+    final boxes = [for (var i = 0; i < 3; i++) tester.getRect(cells.at(i))];
+    expect(boxes[0].width, closeTo(boxes[1].width, 0.1));
+    expect(boxes[1].width, closeTo(boxes[2].width, 0.1));
+    expect(boxes[1].left - boxes[0].right, closeTo(10, 0.1));
+    expect(boxes[2].left - boxes[1].right, closeTo(10, 0.1));
     await tester.tap(find.text('发起报销'));
     await tester.pumpAndSettle();
     expect(find.byType(ReimbursementForm), findsOneWidget);
@@ -110,7 +118,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: HomePage(api: api, onProjects: () {}))));
     await tester.pumpAndSettle();
     expect(find.text('发起报销'), findsNothing);
-    expect(find.text('查项目'), findsOneWidget);
+    expect(find.text('查找项目'), findsOneWidget);
   });
 
   test('canonical amount keeps missing, zero and negatives distinct', () {

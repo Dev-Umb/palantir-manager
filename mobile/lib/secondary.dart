@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'assistant.dart';
 
 import 'api.dart';
 import 'ui.dart';
@@ -307,87 +310,315 @@ class ProcurementPage extends StatefulWidget {
 
 class _ProcurementPageState extends State<ProcurementPage> {
   String search = '';
-  bool history = false;
   int page = 1;
+  Map<String, String> filters = {
+    'method': '',
+    'priority': '',
+    'time': 'published',
+    'start': '',
+    'end': '',
+  };
+  List<String> methods = [];
+  Future<void> filter() async {
+    final draft = Map<String, String>.from(filters);
+    String? error;
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            20 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  '筛选招采信息',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                ),
+                for (final field in ['method', 'priority', 'time']) ...[
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('$field-${draft[field]}'),
+                    initialValue: draft[field],
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: {
+                        'method': '采购方式',
+                        'priority': '优先级',
+                        'time': '时间口径',
+                      }[field],
+                    ),
+                    items:
+                        (field == 'method'
+                                ? {'': '全部采购方式', for (final m in methods) m: m}
+                                : field == 'priority'
+                                ? {
+                                    '': '全部',
+                                    'P1': '优先对接 P1',
+                                    'P2': '条件匹配 P2',
+                                    'P3': 'P3',
+                                    '待核实': '待核实',
+                                  }
+                                : {
+                                    'published': '公告发布时间',
+                                    'registration': '报名 / 文件获取',
+                                    'deadline': '报价 / 投标截止',
+                                  })
+                            .entries
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e.key,
+                                child: Text(e.value),
+                              ),
+                            )
+                            .toList(),
+                    onChanged: (v) => update(() => draft[field] = v ?? ''),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                for (final field in ['start', 'end'])
+                  TextButton.icon(
+                    icon: const Icon(Icons.calendar_today_outlined),
+                    label: Text(
+                      '${field == 'start' ? '开始日期' : '结束日期'}：${draft[field]!.isEmpty ? '不限' : draft[field]}',
+                    ),
+                    onPressed: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate:
+                            DateTime.tryParse(draft[field]!) ?? DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (date != null) {
+                        update(
+                          () => draft[field] = date.toIso8601String().substring(
+                            0,
+                            10,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                if (error != null)
+                  Text(error!, style: const TextStyle(color: Colors.red)),
+                Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('取消'),
+                    ),
+                    TextButton(
+                      onPressed: () => update(() {
+                        draft.updateAll(
+                          (k, v) => k == 'time' ? 'published' : '',
+                        );
+                        error = null;
+                      }),
+                      child: const Text('重置'),
+                    ),
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: () {
+                        if (draft['start']!.isNotEmpty &&
+                            draft['end']!.isNotEmpty &&
+                            draft['start']!.compareTo(draft['end']!) > 0) {
+                          update(() => error = '开始日期不能晚于结束日期');
+                          return;
+                        }
+                        Navigator.pop(context, draft);
+                      },
+                      child: const Text('应用筛选'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        filters = result;
+        page = 1;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('招采参考')),
+    appBar: AppBar(title: const Text('招采信息')),
     body: Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: TextField(
-            decoration: const InputDecoration(
-              hintText: '搜索项目、采购单位、产品',
-              prefixIcon: Icon(Icons.search),
-            ),
-            onSubmitted: (s) => setState(() {
-              search = s;
-              page = 1;
-            }),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    hintText: '搜索项目、单位、编号',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                  onSubmitted: (v) => setState(() {
+                    search = v;
+                    page = 1;
+                  }),
+                ),
+              ),
+              IconButton(
+                onPressed: filter,
+                tooltip: '筛选',
+                icon: const Icon(Icons.tune),
+              ),
+            ],
           ),
-        ),
-        SwitchListTile(
-          title: const Text('包含已截止公告'),
-          value: history,
-          onChanged: (v) => setState(() {
-            history = v;
-            page = 1;
-          }),
         ),
         Expanded(
           child: AsyncPage(
-            key: ValueKey('$search-$history-$page'),
+            key: ValueKey('$search-$filters-$page'),
             load: () => widget.api.page(
-              '/procurement-hub?q=${Uri.encodeQueryComponent(search)}&history=${history ? 1 : 0}&page=$page',
+              Uri(
+                path: '/procurement-hub',
+                queryParameters: {...filters, 'q': search, 'page': '$page'},
+              ).toString(),
             ),
             builder: (data) {
               final pagination = mapOf(data['notices']);
               final items = maps(pagination['data']);
+              final totals = mapOf(data['totals']);
+              final priorities = mapOf(totals['priority']);
+              methods = (data['methods'] as List? ?? [])
+                  .map((x) => x.toString())
+                  .toList();
               return ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  if (items.isEmpty) note('暂无匹配公告，请调整搜索条件。'),
-                  ...items.map(
-                    (n) => Card(
+                  panel(
+                    Row(
+                      children: [
+                        for (final entry in {
+                          '匹配公告': totals['count'] ?? pagination['total'] ?? 0,
+                          '优先对接 P1': priorities['P1'] ?? 0,
+                          '条件匹配 P2': priorities['P2'] ?? 0,
+                          '待核实': priorities['待核实'] ?? 0,
+                        }.entries)
+                          Expanded(
+                            child: Column(
+                              children: [
+                                Text(
+                                  '${entry.value}',
+                                  style: const TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  entry.key,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.blueGrey,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final entry in {
+                        '': '全部',
+                        'P1': '优先对接 P1',
+                        '待核实': '待核实',
+                      }.entries)
+                        ChoiceChip(
+                          label: Text(entry.value),
+                          selected: filters['priority'] == entry.key,
+                          onSelected: (_) => setState(() {
+                            filters = {...filters, 'priority': entry.key};
+                            page = 1;
+                          }),
+                        ),
+                    ],
+                  ),
+                  if (items.isEmpty) note('暂无匹配公告，请调整筛选条件。'),
+                  ...items.map((n) {
+                    final p = mapOf(n['payload']);
+                    return Card(
                       child: InkWell(
                         onTap: () => push(
                           context,
                           NoticeDetail(api: widget.api, id: n['id'].toString()),
                         ),
+                        borderRadius: BorderRadius.circular(16),
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(18),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              tag(
-                                const {
-                                      'notice': '采购公告',
-                                      'award': '成交公告',
-                                      'result': '结果公告',
-                                    }[n['kind']] ??
-                                    textOf(n['kind']),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  tag(textOf(n['priority'] ?? p['priority'])),
+                                  tag(textOf(n['method'] ?? p['nature'])),
+                                  if (n['invited'] == true) tag('定向采购'),
+                                ],
                               ),
                               const SizedBox(height: 12),
                               Text(
                                 textOf(n['title']),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   fontSize: 19,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              kv('采购单位', n['buyer']),
-                              kv('投标截止', n['deadline']),
+                              const SizedBox(height: 8),
                               Text(
-                                '${textOf(n['region'])} · ${textOf(n['product'])}',
+                                textOf(p['unit']),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(color: Colors.blueGrey),
+                              ),
+                              Text(
+                                '${textOf(p['category'])} · ${textOf(p['platform'])}',
+                                style: const TextStyle(
+                                  color: Colors.blueGrey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const Divider(height: 24),
+                              kv('采购规模', p['quantity']),
+                              kv('报价 / 投标截止', p['deadline']),
+                              if (n['has_issues'] == true ||
+                                  procurementHasIssues(p['issues']))
+                                note('核实提示 · ${textOf(p['issues'])}'),
+                              const SizedBox(height: 8),
+                              const Text(
+                                '查看完整详情 →',
+                                style: TextStyle(color: steel),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -406,6 +637,7 @@ class _ProcurementPageState extends State<ProcurementPage> {
                       ),
                     ],
                   ),
+                  note('优先级为采集端初判，具体条件请以原公告为准。'),
                 ],
               );
             },
@@ -415,6 +647,10 @@ class _ProcurementPageState extends State<ProcurementPage> {
     ),
   );
 }
+
+bool procurementHasIssues(dynamic value) => value is List
+    ? value.isNotEmpty
+    : value != null && value.toString().trim().isNotEmpty;
 
 class NoticeDetail extends StatelessWidget {
   final PalantirApi api;
@@ -426,88 +662,133 @@ class NoticeDetail extends StatelessWidget {
     body: AsyncPage(
       load: () => api.page('/procurement-hub/notices/$id'),
       builder: (data) {
-        final n = mapOf(data['notice']), facts = mapOf(n['facts']);
-        return ListView(
-          padding: const EdgeInsets.all(20),
+        final n = mapOf(data['notice']);
+        final p = mapOf(n['payload']);
+        final url = Uri.tryParse(textOf(p['url']));
+        final valid =
+            url != null &&
+            ['http', 'https'].contains(url.scheme) &&
+            url.host.isNotEmpty;
+        return Column(
           children: [
-            Text(
-              textOf(n['title']),
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 20),
-            panel(
-              Column(
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(20),
                 children: [
-                  kv('采购单位', n['buyer']),
-                  kv('地区', n['region']),
-                  kv('产品', n['product']),
-                  kv('发布时间', n['published_at']),
-                  kv('投标截止', n['deadline']),
-                  kv('报名开始', facts['registration_start']),
-                  kv('报名截止', facts['registration_end']),
-                  kv('币种', facts['currency']),
-                  if (facts['amount_type'] == 'candidate')
-                    kv('候选人报价（非成交）', facts['amount']),
-                  if (facts['amount_type'] == 'award')
-                    kv('成交金额', facts['amount']),
-                  kv(
-                    '预算（原币种）',
-                    facts['budget'] ??
-                        facts['budget_amount'] ??
-                        (facts['amount_type'] == 'budget'
-                            ? facts['amount']
-                            : null),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      tag(textOf(n['priority'] ?? p['priority'])),
+                      tag(textOf(n['method'] ?? p['nature'])),
+                      if (n['invited'] == true) tag('定向采购'),
+                    ],
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    textOf(n['title']),
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(textOf(p['unit'])),
+                  if (procurementHasIssues(p['issues']))
+                    note('核实提示：${textOf(p['issues'])}'),
+                  ...((data['warnings'] as List?) ?? [])
+                      .where((w) => w != p['issues'])
+                      .map((w) => note(textOf(w))),
+                  panel(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final entry in const {
+                          'quantity': '采购规模',
+                          'deadline': '报价 / 投标截止',
+                          'registration': '报名 / 文件获取',
+                          'published': '公告发布时间',
+                          'code': '项目编号',
+                          'category': '产品分类',
+                          'subtype': '采购性质',
+                          'material': '材料与规格',
+                          'terms': '采购条款',
+                          'contacts': '联系方式',
+                          'judgment': '采集端判断',
+                          'platform': '来源平台',
+                          'status': '公告状态',
+                          'framework': '框架协议',
+                          'evidence': '证据文件（未上传）',
+                        }.entries)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  entry.value,
+                                  style: const TextStyle(
+                                    color: Colors.blueGrey,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                SelectableText(
+                                  p[entry.key] is bool
+                                      ? (p[entry.key] == true ? '是' : '否')
+                                      : textOf(p[entry.key]),
+                                  style: const TextStyle(height: 1.6),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (valid)
+                    TextButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(
+                          ClipboardData(text: url.toString()),
+                        );
+                        if (context.mounted) toast(context, '原文链接已复制');
+                      },
+                      icon: const Icon(Icons.copy_outlined),
+                      label: const Text('复制原文链接'),
+                    ),
+                  note('采集端判断尚未经平台原文核验；未知时间不作推断。'),
                 ],
               ),
             ),
-            note('截止时间与资格条件请以原公告为准。'),
-            if ((n['missing'] as List? ?? []).isNotEmpty)
-              note('待核实：${textOf(n['missing'])}'),
-            if (mapOf(data['screening']).isNotEmpty)
-              panel(
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
                   children: [
-                    Text(
-                      textOf(mapOf(data['screening'])['label']),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: valid
+                            ? () => openExternal(context, url)
+                            : null,
+                        child: const Text('查看原公告'),
                       ),
                     ),
-                    ...((mapOf(data['screening'])['reasons'] as List?) ?? [])
-                        .map((r) => note(textOf(r))),
-                    note(textOf(mapOf(data['screening'])['limitation'])),
-                  ],
-                ),
-              ),
-            const Text(
-              '已有分析与证据',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-            ),
-            if (maps(data['reports']).isEmpty) note('暂无已发布分析，当前仅供公告参考。'),
-            ...maps(data['reports'])
-                .map((r) => PublishedReport(api: api, report: r)),
-            const Text(
-              '公开资料',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-            ),
-            if (maps(n['evidence']).isEmpty) note('尚无可查看的原文资料。'),
-            ...maps(n['evidence']).map(
-              (e) => panel(
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SelectableText(
-                      textOf(e['text']),
-                      style: const TextStyle(height: 1.6),
-                    ),
-                    TextButton.icon(
-                      onPressed: () =>
-                          openExternal(context, Uri.parse(e['url'])),
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('查看原公告'),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: api.can('ai.harness.view')
+                            ? () => push(
+                                context,
+                                AssistantPage(
+                                  api: api,
+                                  initialPrompt:
+                                      '请分析招采记录 ID $id，核对采购规模、资格条件、截止时间和待核实事项，并给出跟进建议。',
+                                ),
+                              )
+                            : null,
+                        child: const Text('AI 分析'),
+                      ),
                     ),
                   ],
                 ),

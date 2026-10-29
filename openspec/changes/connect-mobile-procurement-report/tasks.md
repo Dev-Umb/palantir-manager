@@ -1,0 +1,4 @@
+- [x] Inspect current clients and approved prototype; map retained fields and actions.
+- [x] Implement both mobile clients using current endpoint contracts.
+- [x] Add behavior tests and run focused plus complete required checks.
+- [x] Compile and walk actual mobile rendering; fix discovered defects and capture evidence.

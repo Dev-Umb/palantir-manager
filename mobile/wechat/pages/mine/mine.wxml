@@ -5,6 +5,6 @@
  <view class="line row" data-kind="ai" bindtap="openTool"><text>AI 助手</text><text class="arrow">›</text></view>
  <view class="line row" data-kind="quote" bindtap="openTool"><text>报价单</text><text class="arrow">›</text></view>
  <view class="line row" data-kind="upload" bindtap="openTool"><text>上传合同</text><text class="arrow">›</text></view>
- <view class="line row" data-kind="procurement" bindtap="openTool"><text>招采参考</text><text class="arrow">›</text></view>
+ <view wx:if="{{canProcurement}}" class="line row" data-kind="procurement" bindtap="openTool"><text>招采信息</text><text class="arrow">›</text></view>
 </view><button class="logout" bindtap="logout">退出登录</button><view class="hint center">连接平台 · 权限以当前账号为准</view>
 </block></view></scroll-view>
