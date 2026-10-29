@@ -1,0 +1,24 @@
+[Unit]
+Description=Palantir invoice batch worker %i
+After=network-online.target postgresql.service
+RequiresMountsFor=/run/palantir-invoices
+
+[Service]
+Type=simple
+User=ubuntu
+Group=www-data
+WorkingDirectory=/var/www/palantir
+ExecStart=/usr/bin/php -d memory_limit=256M artisan queue:work invoice_batches --queue=invoice-batches --sleep=2 --tries=3 --timeout=180 --max-time=3600
+Restart=always
+RestartSec=5
+TimeoutStopSec=195
+KillMode=control-group
+MemoryMax=384M
+MemorySwapMax=0
+CPUQuota=75%
+NoNewPrivileges=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

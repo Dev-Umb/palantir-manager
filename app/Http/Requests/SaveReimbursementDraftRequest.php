@@ -23,7 +23,7 @@ class SaveReimbursementDraftRequest extends FormRequest
             'revision' => ['required', 'integer', 'min:0'],
             'payload' => ['required', 'array:title,type,note,items,cc,reimbursement_id,expected_version'],
             'payload.title' => ['nullable', 'string', 'max:120'],
-            'payload.type' => ['nullable', Rule::in(['差旅交通', '客户招待', '办公采购', '其他'])],
+            'payload.type' => ['nullable', Rule::in(config('reimbursements.types'))],
             'payload.note' => ['nullable', 'string', 'max:4000'],
             'payload.items' => ['present', 'array', 'max:50'],
             'payload.items.*' => ['array:description,amount,invoice_date,attachments'],

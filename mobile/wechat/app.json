@@ -12,7 +12,8 @@
     "pages/reimbursements/index",
     "pages/reimbursements/form",
     "pages/reimbursements/detail",
-    "pages/reimbursements/notices"
+    "pages/reimbursements/notices",
+    "pages/reimbursements/batch"
   ],
   "window": {
     "navigationBarTextStyle": "black",

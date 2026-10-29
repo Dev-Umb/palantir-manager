@@ -75,7 +75,7 @@ class ReimbursementController extends Controller
 
     public function options(Request $request): JsonResponse
     {
-        return response()->json(['users' => User::whereDoesntHave('roles', fn ($q) => $q->where('name', 'timebook_operator'))->orderBy('name')->get(['id', 'name']), 'types' => ['差旅交通', '客户招待', '办公采购', '其他'], 'wechat_template' => config('reimbursements.wechat_template'), ...$this->capabilities($request)]);
+        return response()->json(['users' => User::whereDoesntHave('roles', fn ($q) => $q->where('name', 'timebook_operator'))->orderBy('name')->get(['id', 'name']), 'types' => config('reimbursements.types'), 'batch_enabled' => (bool) config('reimbursements.batch_enabled'), 'wechat_template' => config('reimbursements.wechat_template'), ...$this->capabilities($request)]);
     }
 
     public function show(Request $request, ReimbursementVersion $version): JsonResponse|Response
@@ -83,7 +83,12 @@ class ReimbursementController extends Controller
         $this->service->authorizeVersion($request->user(), $version);
         ReimbursementNotice::where('version_id', $version->id)->where('user_id', $request->user()->id)->whereNull('read_at')->update(['read_at' => now()]);
 
-        return $this->page($request, 'Show', ['record' => $this->service->present($request->user(), $version)]);
+        $record = $this->service->present($request->user(), $version);
+        if (str_starts_with($request->userAgent() ?? '', 'Dart/') && ! in_array($version->type, ['差旅交通', '客户招待', '办公采购', '其他'], true)) {
+            $record['can_resubmit'] = false;
+        }
+
+        return $this->page($request, 'Show', ['record' => $record]);
     }
 
     public function submit(SubmitReimbursementRequest $request): JsonResponse

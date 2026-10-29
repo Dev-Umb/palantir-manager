@@ -10,7 +10,7 @@ class ReimbursementDraft extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['id', 'user_id', 'payload', 'revision', 'version_id'];
+    protected $fillable = ['id', 'user_id', 'payload', 'revision', 'version_id', 'batch_id'];
 
     protected $attributes = ['revision' => 0];
 

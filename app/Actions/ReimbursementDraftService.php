@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Models\Reimbursement;
+use App\Models\ReimbursementBatchFile;
 use App\Models\ReimbursementDraft;
 use App\Models\ReimbursementUpload;
 use App\Models\ReimbursementVersion;
@@ -76,6 +77,6 @@ class ReimbursementDraftService
             }, $item['attachments']);
         }
 
-        return ['source_version_id' => empty($payload['reimbursement_id']) ? null : ReimbursementVersion::where('reimbursement_id', $payload['reimbursement_id'])->where('number', $payload['expected_version'])->value('id'), 'id' => $draft->id, 'revision' => $draft->revision, 'payload' => $payload, 'updated_at' => $draft->updated_at->toISOString(), 'url' => route('reimbursements.drafts.show', $draft->id, false)];
+        return ['batch_issues' => $draft->batch_id ? ReimbursementBatchFile::whereIn('upload_id', $ids)->where('reviewed', false)->get()->flatMap(fn ($f) => collect($f->issues ?? [])->map(fn ($issue) => $f->name.'：'.$issue))->all() : [], 'batch_id' => $draft->batch_id, 'batch_pending_review' => $draft->batch_id ? ReimbursementBatchFile::where('draft_id', $draft->id)->where('status', 'recognized')->where('reviewed', false)->count() : 0, 'source_version_id' => empty($payload['reimbursement_id']) ? null : ReimbursementVersion::where('reimbursement_id', $payload['reimbursement_id'])->where('number', $payload['expected_version'])->value('id'), 'id' => $draft->id, 'revision' => $draft->revision, 'payload' => $payload, 'updated_at' => $draft->updated_at->toISOString(), 'url' => route('reimbursements.drafts.show', $draft->id, false)];
     }
 }

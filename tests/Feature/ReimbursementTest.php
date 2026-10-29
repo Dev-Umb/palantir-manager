@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Actions\ReimbursementDraftService;
 use App\Jobs\SendReimbursementWechatNotice;
 use App\Models\Permission;
+use App\Models\ReimbursementBatch;
+use App\Models\ReimbursementBatchFile;
 use App\Models\ReimbursementNotice;
 use App\Models\ReimbursementUpload;
 use App\Models\ReimbursementVersion;
@@ -230,6 +232,20 @@ class ReimbursementTest extends TestCase
     private function decision(User $actor, array $record, string $decision = 'approve', int $node = 0, string $note = ''): TestResponse
     {
         return $this->actingAs($actor)->postJson($record['url'].'/decision', ['decision' => $decision, 'node_index' => $node, 'note' => $note]);
+    }
+
+    public function test_batch_review_blocks_submission_but_confirmed_new_type_uses_existing_flow(): void
+    {
+        $input = $this->input();
+        $input['type'] = '住宿费';
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id]);
+        $file = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'upload_id' => $input['items'][0]['attachments'][0], 'status' => 'recognized', 'reviewed' => false]);
+        $this->actingAs($this->owner)->postJson('/reimbursements', $input)->assertUnprocessable();
+        $this->assertDatabaseCount('reimbursement_versions', 0);
+        $file->update(['reviewed' => true]);
+        $record = $this->submit($input);
+        $this->assertSame('住宿费', $record['type']);
+        $this->assertSame($this->reviewer->id, $record['flow']['nodes'][0]['people'][0]['id']);
     }
 
     public function test_money_idempotency_upload_ownership_and_adjacent_permissions(): void

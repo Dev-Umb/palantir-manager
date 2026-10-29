@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
 import './reimbursements.css';
 export { request } from '../SupportLibrary/api';
-export const types = ['差旅交通', '客户招待', '办公采购', '其他'];
+export const types = ['住宿费', '加油费', '话费', '高速费', '差旅交通', '客户招待', '办公采购', '其他'];
 export const statuses = { pending: '审批中', approved: '审批通过', rejected: '已驳回' };
 export const money = (cents) => (cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export function Status({ value }) { return <span className={`oa-status ${value}`}>{statuses[value] || value}</span>; }

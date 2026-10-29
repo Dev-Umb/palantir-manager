@@ -1,0 +1,2 @@
+@import "./common.wxss";
+.batch-page{padding-bottom:64rpx}.add-files{margin:28rpx 0;border:2rpx dashed #b9cddd;background:#f4f8fc;color:#286b97}.filename{font-size:28rpx;line-height:1.5;word-break:break-all;flex:1;min-width:0}.upload-item{padding:20rpx 0;border-bottom:1rpx solid #edf0f5}.batch-page>.primary{margin-top:24rpx;background:#2864bd;color:#fff}.batch-page>.sub{line-height:1.7}

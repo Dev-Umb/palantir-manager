@@ -73,7 +73,7 @@ test('PDF upload includes current draft snapshot and idempotent operation, then 
 
 test('new form offers draft recovery, starting new retains saved drafts and direct restore includes original fields',async()=>{
  const draft={id:'draft',revision:2,updated_at:'2026-10-29T08:00:00Z',payload:{title:'保留的报销',note:'说明',type:'其他',cc:[],items:[{description:'未完成',amount:'1.',invoice_date:'',attachments:[{id:'pdf'}]}]}};
- const api={onClear:()=>()=>{},epoch:()=>1,request:async(path)=>path.endsWith('/options')?{capabilities:{submit:true},users:[]}:path==='/reimbursements/drafts'?{records:{data:[draft]}}:{draft}};
+ const api={onClear:()=>()=>{},epoch:()=>1,request:async(path)=>path.endsWith('/options')?{types:['差旅交通','客户招待','办公采购','其他'],capabilities:{submit:true},users:[]}:path==='/reimbursements/drafts'?{records:{data:[draft]}}:{draft}};
  let prompts=0;const fresh=load('form',api,{showModal:o=>{prompts++;o.success({confirm:false});}});fresh.onLoad({});await fresh.loaded;assert.equal(prompts,1);assert.equal(fresh.data.title,'');assert.equal(fresh.draftRevision,0);fresh.onUnload();
  const resumed=load('form',api,{showModal:o=>o.success({confirm:true})});resumed.onLoad({});await resumed.loaded;assert.equal(resumed.data.title,'保留的报销');assert.equal(resumed.data.items[0].amount,'1.');assert.equal(resumed.data.items[0].attachments[0].id,'pdf');clearTimeout(resumed.draftTimer);resumed.closed=true;
 });
