@@ -1,4 +1,5 @@
 <navigation-bar title="工作台" back="{{false}}" color="#182331" background="#ffffff" /><scroll-view class="scrollarea" scroll-y type="list"><view class="content preview-screen"><view wx:if="{{error}}" class="error">{{error}}<button class="small" bindtap="refresh">重试</button></view><view wx:if="{{loading}}" class="loading">正在加载…</view><block wx:if="{{user}}">
+<button wx:if="{{canReimburse}}" class="primary reimbursement-create" bindtap="createReimbursement">＋ 发起报销</button>
 <view class="overview box">
  <view class="row"><text class="label">未回款 · 元</text><button class="text-button" bindtap="projects">查看项目 ›</button></view>
  <view class="hero-money">{{unpaid}}</view>
@@ -9,7 +10,7 @@
   <view class="stat"><view class="label">项目</view><view class="stat-value">{{projectCount}}</view></view>
  </view>
 </view>
-<view class="quick"><button bindtap="reimbursement">报销 OA</button><button wx:if="{{canCreate}}" bindtap="create">＋ 新建项目</button><button bindtap="projects">⌕ 查找项目</button></view>
+<view class="quick"><button wx:if="{{canCreate}}" bindtap="create">＋ 新建项目</button><button bindtap="projects">⌕ 查找项目</button></view>
 <view class="section row"><text class="heading">待处理</text><button class="text-button" data-kind="notifications" bindtap="openTool">全部通知 {{count}} ›</button></view>
 <view class="box group">
  <view wx:for="{{notices}}" wx:key="id" class="line row" data-kind="notifications" bindtap="openTool"><view class="grow"><view class="name">{{item.type_label}}</view><view class="sub ellipsis">{{item.project_name}}</view></view><text class="arrow">›</text></view>

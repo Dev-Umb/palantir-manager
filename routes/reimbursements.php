@@ -8,6 +8,7 @@ Route::middleware(['auth', 'reimbursement-access'])->prefix('reimbursements')->n
     Route::get('/options', [ReimbursementController::class, 'options'])->name('options');
     Route::post('/', [ReimbursementController::class, 'submit'])->middleware('throttle:30,1')->name('submit');
     Route::post('/uploads', [ReimbursementController::class, 'upload'])->middleware('throttle:30,1')->name('upload');
+    Route::post('/uploads/{upload}/recognize', [ReimbursementController::class, 'recognizeInvoice'])->middleware('throttle:12,1')->name('uploads.recognize');
     Route::get('/workflow', [ReimbursementController::class, 'workflow'])->name('workflow');
     Route::put('/workflow', [ReimbursementController::class, 'saveWorkflow'])->name('workflow.save');
     Route::get('/notices', [ReimbursementController::class, 'notices'])->name('notices');

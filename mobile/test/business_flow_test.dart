@@ -7,6 +7,8 @@ import 'package:palantir_mobile/main.dart';
 import 'package:palantir_mobile/assistant.dart';
 import 'package:palantir_mobile/projects.dart';
 import 'package:palantir_mobile/ui.dart';
+import 'package:palantir_mobile/reimbursements.dart';
+import 'package:palantir_mobile/secondary.dart';
 
 class TestApi extends PalantirApi {
   TestApi() : super('http://127.0.0.1:8765') {
@@ -78,6 +80,39 @@ void useBusinessPhone(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets('home creates directly and personal page opens the reimbursement list', (tester) async {
+    useBusinessPhone(tester);
+    final api = TestApi();
+    addTearDown(api.dispose);
+    api.session['permissions'] = ['reimbursements.submit', 'object.project.create'];
+    await tester.pumpWidget(MaterialApp(theme: appTheme(), home: Scaffold(body: HomePage(api: api, onProjects: () {}))));
+    await tester.pumpAndSettle();
+    expect(find.text('发起报销'), findsOneWidget);
+    expect(find.byTooltip('报销 OA'), findsNothing);
+    await tester.tap(find.text('发起报销'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReimbursementForm), findsOneWidget);
+    expect(find.byType(ReimbursementsPage), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(MaterialApp(theme: appTheme(), home: Scaffold(body: AccountPage(api: api))));
+    await tester.pumpAndSettle();
+    expect(find.text('账号与安全'), findsOneWidget);
+    expect(find.text('通知中心'), findsOneWidget);
+    await tester.ensureVisible(find.text('我的报销'));
+    await tester.tap(find.text('我的报销'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReimbursementsPage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('without submit permission home keeps project access without create reimbursement', (tester) async {
+    final api = TestApi();
+    addTearDown(api.dispose);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: HomePage(api: api, onProjects: () {}))));
+    await tester.pumpAndSettle();
+    expect(find.text('发起报销'), findsNothing);
+    expect(find.text('查项目'), findsOneWidget);
+  });
+
   test('canonical amount keeps missing, zero and negatives distinct', () {
     expect(amount(null), '未填写');
     expect(amount(0), '0.00');
