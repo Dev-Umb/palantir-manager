@@ -12,7 +12,8 @@ import 'quotation.dart';
 
 class AssistantPage extends StatefulWidget {
   final PalantirApi api;
-  const AssistantPage({super.key, required this.api});
+  final String? initialPrompt;
+  const AssistantPage({super.key, required this.api, this.initialPrompt});
   @override
   State<AssistantPage> createState() => _AssistantPageState();
 }
@@ -27,7 +28,10 @@ class _AssistantPageState extends State<AssistantPage> {
   @override
   void initState() {
     super.initState();
-    input.text = widget.api.assistantState["draft"] ?? "";
+    input.text = [
+      widget.api.assistantState["draft"] ?? "",
+      widget.initialPrompt ?? "",
+    ].where((text) => text.isNotEmpty).join("\n\n");
     messages = maps(widget.api.assistantState["messages"]);
     conversation = widget.api.assistantState["conversation"];
     load();
