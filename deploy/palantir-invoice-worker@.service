@@ -8,6 +8,7 @@ Type=simple
 User=ubuntu
 Group=www-data
 WorkingDirectory=/var/www/palantir
+ExecStartPre=/usr/bin/test -r /usr/share/poppler/cMap/Adobe-GB1/GBK-EUC-H
 ExecStart=/usr/bin/php -d memory_limit=256M artisan queue:work invoice_batches --queue=invoice-batches --sleep=2 --tries=3 --timeout=180 --max-time=3600
 Restart=always
 RestartSec=5
