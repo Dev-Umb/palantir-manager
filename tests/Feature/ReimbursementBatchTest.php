@@ -48,6 +48,28 @@ class ReimbursementBatchTest extends TestCase
         return ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'status' => 'recognized', 'upload_id' => $upload->id, 'reviewed' => $reviewed, 'result' => ['type' => $type, 'amount' => '100.01', 'invoice_date' => '2026-10-29', 'description' => '测试发票'], 'issues' => $reviewed ? [] : ['请核对']]);
     }
 
+    public function test_reconciliation_keeps_waiting_files_in_large_batches(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        $waiting = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'status' => 'queued', 'updated_at' => now()->subHour()]);
+        $stuck = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'status' => 'processing', 'updated_at' => now()->subHour()]);
+        $this->artisan('reimbursements:reconcile-batches')->assertSuccessful();
+        $this->assertSame('queued', $waiting->fresh()->status);
+        $this->assertSame('failed', $stuck->fresh()->status);
+        $this->assertSame('processing', $batch->fresh()->status);
+    }
+
+    public function test_reconciliation_preserves_all_tos_objects_including_unconfirmed_uploads(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id]);
+        $file = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'disk' => 'local', 'status' => 'uploading', 'created_at' => now()->subDays(2), 'updated_at' => now()->subDays(2)]);
+        Storage::disk('local')->put($file->object_key, 'original');
+        Storage::disk('local')->put($file->object_key.'.upload', 'staging');
+        $this->artisan('reimbursements:reconcile-batches')->assertSuccessful();
+        Storage::disk('local')->assertExists([$file->object_key, $file->object_key.'.upload']);
+        $this->assertSame('uploading', $file->fresh()->status);
+    }
+
     public function test_owner_only_create_and_retained_options(): void
     {
         $id = (string) Str::uuid();
@@ -91,6 +113,7 @@ class ReimbursementBatchTest extends TestCase
         $s->confirm($file);
         $this->assertDatabaseCount('reimbursement_uploads', 1);
         $this->assertSame('uploaded', $file->fresh()->status);
+        $this->assertSame('private', Storage::disk('local')->getVisibility($file->object_key));
         Storage::disk('local')->put($file->object_key.'.upload', 'changed');
         $this->assertSame($bytes, Storage::disk('local')->get($file->object_key));
         $duplicate = $make();
