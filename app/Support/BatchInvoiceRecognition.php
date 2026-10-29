@@ -72,6 +72,7 @@ class BatchInvoiceRecognition
             if (! $r['supported'] || $r['invoice_count'] !== 1) {
                 throw new UnexpectedValueException('未识别为单张人民币发票，合并 PDF 请拆分后上传。');
             }
+            $r['amount'] = $r['amount'] === null ? null : (string) $r['amount'];
             $lines = [$r['description']];
             foreach (['invoice_number' => '发票号码', 'invoice_code' => '发票代码', 'buyer' => '购买方', 'seller' => '销售方'] as $key => $label) {
                 if ($r[$key]) {

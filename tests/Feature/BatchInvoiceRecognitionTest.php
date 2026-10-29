@@ -50,6 +50,12 @@ class BatchInvoiceRecognitionTest extends TestCase
         BatchInvoiceAgent::assertPrompted(fn ($prompt) => $prompt->contains('单张发票'));
     }
 
+    public function test_numeric_amount_is_normalized_for_draft_validation(): void
+    {
+        BatchInvoiceAgent::fake([json_encode($this->response(['amount' => 100.01]))]);
+        $this->assertSame('100.01', $this->recognize($this->file())['amount']);
+    }
+
     public function test_uncertain_category_becomes_other(): void
     {
         BatchInvoiceAgent::fake([json_encode($this->response(['uncertain' => true]))]);
