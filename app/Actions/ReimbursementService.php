@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Models\AuditLog;
 use App\Models\Reimbursement;
+use App\Models\ReimbursementBatchFile;
 use App\Models\ReimbursementDraft;
 use App\Models\ReimbursementNotice;
 use App\Models\ReimbursementUpload;
@@ -109,6 +110,11 @@ class ReimbursementService
                     $upload = ReimbursementUpload::whereKey($id)->lockForUpdate()->first();
                     if (! $upload || $upload->user_id !== $actor->id || ($upload->reimbursement_id !== null && $upload->reimbursement_id !== $request?->id) || ($upload->draft_id !== null && $upload->draft_id !== $draft?->id && $upload->reimbursement_id === null) || in_array($id, $allIds, true)) {
                         throw ValidationException::withMessages(["items.$index.attachments" => '发票不存在、重复使用或不属于此申请。']);
+                    }
+                    $batchFile = ReimbursementBatchFile::where('upload_id', $upload->id)->first();
+                    if ($batchFile) {
+                        abort_unless($batchFile->status === 'recognized' && ($batchFile->reviewed || ($draft?->batch_id && ($data['batch_review_confirmed'] ?? false))), 422, '请在小程序草稿中核对批量发票后提交。');
+                        $batchFile->update(['reviewed' => true]);
                     }
                     $stored = StoredAttachment::findOrFail($upload->stored_attachment_id);
                     app(BusinessFileStorage::class)->verify($stored->disk, $stored->object_key, $stored->size, $stored->sha256);

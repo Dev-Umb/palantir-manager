@@ -100,3 +100,10 @@ it('draft list and read-only detail preserve incomplete fields without approval 
     expect(screen.getByRole('link', { name: '发票.pdf' })).toHaveAttribute('href', '/private-file');
     expect(screen.queryByRole('button', { name: /审批|提交/ })).toBeNull();
 });
+
+it('new reimbursement categories coexist with historical filters', () => {
+    render(<Index records={{ data: [], total: 0, current_page: 1 }} filters={{ scope: 'mine' }} capabilities={{ manage: false, configure: false }} />);
+    for (const name of ['住宿费', '加油费', '话费', '高速费', '差旅交通', '客户招待', '办公采购', '其他']) {
+        expect(screen.getByRole('option', { name })).toBeInTheDocument();
+    }
+});

@@ -30,6 +30,7 @@ return [
     */
 
     'connections' => [
+        'invoice_batches' => ['driver' => 'database', 'connection' => env('DB_QUEUE_CONNECTION'), 'table' => 'jobs', 'queue' => 'invoice-batches', 'retry_after' => 240, 'after_commit' => true],
 
         'sync' => [
             'driver' => 'sync',
@@ -93,6 +94,7 @@ return [
         'failover' => [
             'driver' => 'failover',
             'connections' => [
+                'invoice_batches' => ['driver' => 'database', 'connection' => env('DB_QUEUE_CONNECTION'), 'table' => 'jobs', 'queue' => 'invoice-batches', 'retry_after' => 240, 'after_commit' => true],
                 'database',
                 'deferred',
             ],

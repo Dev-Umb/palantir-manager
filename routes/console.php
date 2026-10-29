@@ -28,3 +28,5 @@ Schedule::call(function (): void {
         SendReimbursementWechatNotice::dispatch($id)->afterCommit();
     });
 })->name('reimbursements:deliver-notices')->everyMinute()->withoutOverlapping();
+
+Schedule::command('reimbursements:reconcile-batches')->everyFiveMinutes()->withoutOverlapping();

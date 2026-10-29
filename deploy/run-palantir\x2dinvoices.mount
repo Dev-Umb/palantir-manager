@@ -1,0 +1,12 @@
+[Unit]
+Description=Bounded non-swappable invoice memory workspace
+Before=palantir-invoice-worker@1.service palantir-invoice-worker@2.service
+
+[Mount]
+What=tmpfs
+Where=/run/palantir-invoices
+Type=tmpfs
+Options=size=256M,noswap,nodev,nosuid,noexec,mode=0700,uid=1000,gid=33
+
+[Install]
+WantedBy=multi-user.target

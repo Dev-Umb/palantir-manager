@@ -21,7 +21,7 @@ class ReimbursementDraftController extends Controller
 
     public function index(Request $request): JsonResponse|Response
     {
-        $records = ReimbursementDraft::where('user_id', $request->user()->id)->whereNull('version_id')->latest('updated_at')->paginate(20)->through(fn ($d) => $this->drafts->present($d));
+        $records = ReimbursementDraft::where('user_id', $request->user()->id)->whereNull('version_id')->where(fn ($q) => $q->whereNull('batch_id')->orWhereJsonLength('payload->items', '>', 0))->latest('updated_at')->paginate(20)->through(fn ($d) => $this->drafts->present($d));
 
         return $request->expectsJson() && ! $request->header('X-Inertia') ? response()->json(['records' => $records]) : Inertia::render('Reimbursements/Drafts', ['records' => $records]);
     }
@@ -30,6 +30,7 @@ class ReimbursementDraftController extends Controller
     {
         $this->drafts->authorize($request->user(), $draft);
         abort_if($draft->version_id !== null, 409, '草稿已提交，请查看报销清单。');
+        abort_if(str_starts_with($request->userAgent() ?? '', 'Dart/') && ! in_array($draft->payload['type'] ?? '', ['差旅交通', '客户招待', '办公采购', '其他', ''], true), 409, '此草稿使用新增报销类型，请在小程序中编辑并提交。');
         $record = $this->drafts->present($draft);
 
         return $request->expectsJson() && ! $request->header('X-Inertia') ? response()->json(['draft' => $record]) : Inertia::render('Reimbursements/Draft', ['draft' => $record]);

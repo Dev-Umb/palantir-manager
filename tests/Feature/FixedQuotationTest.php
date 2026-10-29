@@ -198,7 +198,7 @@ class FixedQuotationTest extends TestCase
         $this->assertSame($bytes, Storage::disk('local')->get($storagePath));
         $this->get($this->path($run).'/download?format=exe')->assertUnprocessable();
         $this->mock(FixedQuotationPdf::class, function ($mock) use ($black): void {
-            $mock->shouldReceive('convert')->once()->with($black)->andReturn("%PDF-1.7\nquotation\n%%EOF");
+            $mock->shouldReceive('convert')->once()->with(\Mockery::on(fn ($bytes) => $this->package($bytes) === $this->package($black)))->andReturn("%PDF-1.7\nquotation\n%%EOF");
         });
         $this->get($this->path($run).'/download?format=pdf')->assertOk()->assertDownload('quotation.pdf')->assertHeader('Content-Type', 'application/pdf');
         $this->assertSame($bytes, Storage::disk('local')->get($storagePath));

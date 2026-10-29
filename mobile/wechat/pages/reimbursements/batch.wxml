@@ -1,0 +1,9 @@
+<navigation-bar title="批量报销" back="{{true}}" color="#182331" background="#ffffff"/>
+<scroll-view scroll-y class="scrollarea" type="list"><view class="oa batch-page">
+ <view class="box"><view class="heading">选择需要报销的发票</view><view class="sub">上传后 AI 自动识别、按类型整理成草稿。完成后到“我的草稿”核对并提交。</view><button class="add-files" bindtap="choose" disabled="{{busy}}">＋ 选择发票</button><view class="sub">PDF / JPG / PNG，每份不超过 20 MB<br/>每批最多 300 份，可多次添加</view></view>
+ <view wx:if="{{error}}" class="error">{{error}}</view>
+ <view class="box" wx:if="{{local.length}}"><view class="row"><text class="heading">已选择 {{local.length}} 份</text><text class="sub">已上传 {{completed}} 份</text></view><view class="upload-item" wx:for="{{local}}" wx:key="id"><view class="row"><text class="filename">{{item.name}}</text><button wx:if="{{!item.reserved}}" class="text-button" data-id="{{item.id}}" bindtap="remove" disabled="{{busy}}">移除</button></view><view class="sub">{{item.state}}</view><view wx:if="{{item.error}}" class="error">{{item.error}}</view></view></view>
+ <view class="sub">上传时请保持小程序前台。上传完成后可离开，AI 会在后台继续处理。</view>
+ <button wx:if="{{local.length}}" class="primary" bindtap="upload" loading="{{busy}}" disabled="{{busy}}">{{busy?'正在上传':'上传并交给 AI'}}</button>
+ <button wx:if="{{task.files.length && !busy}}" class="text-button" bindtap="partial">仅处理已上传文件</button>
+</view></scroll-view>
