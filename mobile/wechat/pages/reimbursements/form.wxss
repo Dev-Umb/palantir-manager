@@ -44,3 +44,5 @@
 .review-actions{display:flex;flex-direction:row;padding:20rpx 32rpx 28rpx;border-top:1rpx solid #eef1f5;flex:none}
 .review-actions button{flex:1;font-size:28rpx;font-weight:500;padding:24rpx 12rpx;border-radius:14rpx;background:#f0f3f7;color:#596a7e;margin:0}
 .review-actions button.review-confirm{margin-left:20rpx;background:#2864bd;color:#fff}
+
+.draft-save{padding:20rpx 32rpx;color:#62758a;font-size:24rpx;}

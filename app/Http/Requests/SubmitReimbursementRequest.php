@@ -15,6 +15,8 @@ class SubmitReimbursementRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'draft_id' => ['nullable', 'uuid'],
+            'draft_revision' => ['required_with:draft_id', 'integer', 'min:1'],
             'submission_key' => ['required', 'uuid'],
             'reimbursement_id' => ['nullable', 'integer'],
             'expected_version' => ['required_with:reimbursement_id', 'integer', 'min:1'],

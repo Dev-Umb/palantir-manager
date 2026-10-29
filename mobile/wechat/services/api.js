@@ -30,7 +30,7 @@ function request(path, method = 'GET', data, inertia = false, binary = false, up
   const target = url(path), epoch = generation;
   const pathname = path.split('?')[0];
   const cookie = cookies.filter(c => c.expires > Date.now() && (pathname === c.path || pathname.startsWith(c.path.endsWith('/') ? c.path : c.path + '/'))).sort((a,b)=>b.path.length-a.path.length).map(c=>c.name+'='+c.value).join('; ');
-  const send = options => {if (!uploadPath) return wx.request(options);delete options.header['Content-Type'];delete options.responseType;delete options.data;delete options.method;return wx.uploadFile({...options,filePath:uploadPath,name:'file',timeout:120000});};
+  const send = options => {if (!uploadPath) return wx.request(options);delete options.header['Content-Type'];delete options.responseType;delete options.data;delete options.method;return wx.uploadFile({...options,filePath:uploadPath,name:'file',formData:data||{},timeout:120000});};
   return new Promise((resolve, reject) => send({
     url: target, method, data, timeout: 20000, responseType: binary ? 'arraybuffer' : 'text',
     header: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...(cookie ? { Cookie: cookie } : {}), ...(csrfToken ? {'X-CSRF-TOKEN': csrfToken} : {}), ...(inertia ? {'X-Inertia':'true', ...(version ? {'X-Inertia-Version':version} : {})} : {}) },
@@ -92,4 +92,4 @@ async function page(path) {
   }
 }
 function query(values) {return Object.entries(values).filter(([,v])=>v!=='' && v!==undefined).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');}
-module.exports = {upload:(path,filePath)=>request(path,'POST',undefined,false,false,filePath),request, page, session, login, wechatLogin, wechatConfigured:()=>wechatConfigured, logout, clear, query, dashboard:()=>page(dashboardPath), user:()=>user, epoch:()=>generation, onClear(fn){listeners.add(fn); return ()=>listeners.delete(fn);}};
+module.exports = {upload:(path,filePath,fields)=>request(path,'POST',fields,false,false,filePath),request, page, session, login, wechatLogin, wechatConfigured:()=>wechatConfigured, logout, clear, query, dashboard:()=>page(dashboardPath), user:()=>user, epoch:()=>generation, onClear(fn){listeners.add(fn); return ()=>listeners.delete(fn);}};

@@ -1,10 +1,84 @@
 import 'package:flutter/material.dart';
+
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:palantir_mobile/api.dart';
 import 'package:palantir_mobile/reimbursements.dart';
 
 void main() {
+  testWidgets(
+    'restore prompt keeps old draft when starting new and autosaves restored incomplete input',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final api = DraftApi();
+      await tester.pumpWidget(MaterialApp(home: ReimbursementForm(api: api)));
+      await tester.pumpAndSettle();
+      expect(find.text('有未完成的报销草稿'), findsOneWidget);
+      await tester.tap(find.text('继续编辑'));
+      await tester.pumpAndSettle();
+      expect(find.text('草稿差旅'), findsOneWidget);
+      final titleField = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == '报销标题',
+      );
+      await tester.enterText(titleField, '继续填写');
+      await tester.pump(const Duration(milliseconds: 1300));
+      await tester.pumpAndSettle();
+      expect(api.saves.last['payload']['title'], '继续填写');
+      expect(api.saves.last['payload']['items'][0]['amount'], '1.');
+      expect(api.saves.last['payload']['items'][0]['attachments'], ['pdf']);
+      expect(find.text('已保存 · 仅自己可见'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      api.saves.clear();
+      await tester.pumpWidget(MaterialApp(home: ReimbursementForm(api: api)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('新建报销'));
+      await tester.pumpAndSettle();
+      expect(find.text('草稿差旅'), findsNothing);
+      expect(api.saves, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets(
+    'draft save failure preserves fields and retry, conflicts cannot silently overwrite',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final api = DraftApi()..fail = true;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReimbursementForm(api: api, draftId: 'draft'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final titleField = find.byWidgetPredicate(
+        (w) => w is TextField && w.decoration?.labelText == '报销标题',
+      );
+      await tester.enterText(titleField, '保留输入');
+      await tester.pump(const Duration(milliseconds: 1300));
+      await tester.pumpAndSettle();
+      expect(find.text('保留输入'), findsOneWidget);
+      expect(find.text('保存失败，点击重试 · 仅自己可见'), findsOneWidget);
+      api.fail = false;
+      await tester.tap(find.text('保存失败，点击重试 · 仅自己可见'));
+      await tester.pumpAndSettle();
+      expect(jsonEncode(api.saves[0]), jsonEncode(api.saves[1]));
+      api.conflict = true;
+      await tester.enterText(titleField, '另一版本');
+      await tester.pump(const Duration(milliseconds: 1300));
+      await tester.pumpAndSettle();
+      expect(find.text('重新打开最新草稿'), findsOneWidget);
+      final count = api.saves.length;
+      await tester.tap(find.text('保存失败，点击重试 · 仅自己可见'));
+      await tester.pumpAndSettle();
+      expect(api.saves.length, count);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+  );
   test(
     'invoice date validation and description merge preserve manual text',
     () {
@@ -411,4 +485,64 @@ class ListReviewApi extends PalantirApi {
       'next_page_url': null,
     },
   };
+}
+
+class DraftApi extends ReimbursementApi {
+  bool fail = false, conflict = false;
+  final saves = <Map<String, dynamic>>[];
+  Map<String, dynamic> get draft => {
+    'id': 'draft',
+    'revision': 2,
+    'updated_at': '2026-10-29T08:00:00Z',
+    'payload': {
+      'title': '草稿差旅',
+      'type': '差旅交通',
+      'note': '未完成',
+      'cc': <int>[],
+      'items': [
+        {
+          'description': '手写说明',
+          'amount': '1.',
+          'invoice_date': '',
+          'attachments': [
+            {
+              'id': 'pdf',
+              'name': '发票.pdf',
+              'mime': 'application/pdf',
+              'size': 4,
+            },
+          ],
+        },
+      ],
+    },
+  };
+  @override
+  Future<Map<String, dynamic>> get(String path) async {
+    if (path == '/reimbursements/drafts') {
+      return {
+        'records': {
+          'data': [draft],
+        },
+      };
+    }
+    if (path == '/reimbursements/drafts/draft') return {'draft': draft};
+    return super.get(path);
+  }
+
+  @override
+  Future<Map<String, dynamic>> send(
+    String path,
+    Map<String, dynamic> body, {
+    String method = 'POST',
+  }) async {
+    if (method == 'PUT') {
+      saves.add(jsonDecode(jsonEncode(body)));
+      if (conflict) throw ApiFailure('版本冲突', status: 409);
+      if (fail) throw ApiFailure('断网');
+      return {
+        'draft': {'revision': body['revision'] + 1},
+      };
+    }
+    return super.send(path, body, method: method);
+  }
 }
