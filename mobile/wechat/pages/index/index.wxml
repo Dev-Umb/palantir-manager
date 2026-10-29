@@ -10,7 +10,8 @@
   <view class="stat"><view class="label">项目</view><view class="stat-value">{{projectCount}}</view></view>
  </view>
 </view>
-<view class="quick business-actions"><button wx:if="{{canCreate}}" bindtap="create">＋ 新建项目</button><button bindtap="projects">⌕ 查找项目</button><button wx:if="{{canReimburse}}" bindtap="createReimbursement">发起报销</button></view>
+<view wx:if="{{canReimburse}}" class="quick business-actions reimbursement-actions"><button class="manual-reimbursement" bindtap="createReimbursement">发起报销</button><button class="batch-reimbursement" bindtap="batchReimbursement">批量报销</button></view>
+<view class="quick business-actions project-actions"><button class="new-project" wx:if="{{canCreate}}" bindtap="create">＋ 新建项目</button><button class="search-project" bindtap="projects">⌕ 查询项目</button></view>
 <view class="section row"><text class="heading">待处理</text><button class="text-button" data-kind="notifications" bindtap="openTool">全部通知 {{count}} ›</button></view>
 <view class="box group">
  <view wx:for="{{notices}}" wx:key="id" class="line row" data-kind="notifications" bindtap="openTool"><view class="grow"><view class="name">{{item.type_label}}</view><view class="sub ellipsis">{{item.project_name}}</view></view><text class="arrow">›</text></view>

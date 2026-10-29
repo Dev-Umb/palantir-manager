@@ -7,6 +7,7 @@ Page({
  onUnload:u.unload,onShow(){if(u.requireLogin())this.refresh();},
  refresh(){return u.run(this,async()=>{if(!api.user())return {};const p=await api.dashboard();return {...b.home(p),canProcurement:(p.nav||[]).some(n=>n.key==='hub'&&n.visible===true),canCreate:(api.user().permissions||[]).includes('object.project.create'),canReimburse:(api.user().permissions||[]).includes('reimbursements.submit')};});},
  createReimbursement(){if((api.user()?.permissions||[]).includes('reimbursements.submit'))u.navigate('/pages/reimbursements/form');},
+ batchReimbursement(){if((api.user()?.permissions||[]).includes('reimbursements.submit'))u.navigate('/pages/reimbursements/batch');},
  login:u.login,openProject:u.openProject,openTool:u.openTool,
  projects(){wx.switchTab({url:'/pages/projects/projects'});},
  create(){u.navigate('/pages/edit/edit');}
