@@ -1,4 +1,13 @@
-<view class="notice-intro"><view class="chat-title">待处理消息</view><view class="chat-description">项目提醒与招采动态，集中查看</view></view>
+<view class="notice-intro"><view class="chat-title">待处理消息</view><view class="chat-description">报销审批、AI识别与业务提醒，集中查看</view></view>
+<view wx:if="{{reimbursementNoticesError}}" class="error">{{reimbursementNoticesError}}<button bindtap="refresh">重试</button></view>
+<view class="notice-section"><view class="notice-section-title">报销审批</view></view>
+<view wx:for="{{reimbursementNotices}}" wx:key="id" class="notice-card" data-id="{{item.version_id}}" bindtap="openReimbursementNotice"><view class="notice-top"><view class="notice-kind"><view wx:if="{{!item.read_at}}" class="unread-dot"/><text>报销通知</text></view><text class="notice-time">{{item.displayDate}}</text></view><view class="notice-message">{{item.message}}</view><view class="notice-actions">查看申请 ›</view></view>
+<view wx:if="{{!busy && !reimbursementNoticesError && !reimbursementNotices.length}}" class="notice-empty">暂无报销审批通知</view>
+<view wx:if="{{reimbursementLast>1}}" class="row pagination"><button data-kind="oa" data-step="-1" bindtap="noticePage" disabled="{{busy || reimbursementPage<=1}}">上一页</button><text>{{reimbursementPage}} / {{reimbursementLast}}</text><button data-kind="oa" data-step="1" bindtap="noticePage" disabled="{{busy || reimbursementPage>=reimbursementLast}}">下一页</button></view>
+<view class="notice-section"><view class="notice-section-title">AI识别完成</view></view>
+<view wx:for="{{aiDraftNotices}}" wx:key="id" class="notice-card" data-id="{{item.id}}" data-version="{{item.version_id}}" bindtap="openAiDraftNotice"><view class="notice-top"><view class="notice-kind"><view wx:if="{{!item.read_at}}" class="unread-dot"/><text>AI批量识别创建</text></view><text class="notice-time">{{item.displayDate}}</text></view><view class="notice-message">{{item.title}}</view><view class="notice-actions">{{item.version_id?'查看申请':'查看草稿'}} ›</view></view>
+<view wx:if="{{!busy && !reimbursementNoticesError && !aiDraftNotices.length}}" class="notice-empty">暂无AI识别完成通知</view>
+<view wx:if="{{aiNoticeLast>1}}" class="row pagination"><button data-kind="ai" data-step="-1" bindtap="noticePage" disabled="{{busy || aiNoticePage<=1}}">上一页</button><text>{{aiNoticePage}} / {{aiNoticeLast}}</text><button data-kind="ai" data-step="1" bindtap="noticePage" disabled="{{busy || aiNoticePage>=aiNoticeLast}}">下一页</button></view>
 <view class="notice-section"><view class="notice-section-title">项目通知</view><text class="notice-section-caption">未读消息</text></view>
 <view wx:for="{{items}}" wx:key="id" class="notice-card">
  <view class="notice-top"><view class="notice-kind"><view wx:if="{{!item.read_at}}" class="unread-dot"/><text>{{item.type_label}}</text></view><text class="notice-time">{{item.displayDate}}</text></view>

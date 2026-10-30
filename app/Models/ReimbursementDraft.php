@@ -16,6 +16,6 @@ class ReimbursementDraft extends Model
 
     protected function casts(): array
     {
-        return ['payload' => 'array', 'user_id' => 'integer', 'revision' => 'integer', 'version_id' => 'integer'];
+        return ['viewed_at' => 'datetime', 'payload' => 'array', 'user_id' => 'integer', 'revision' => 'integer', 'version_id' => 'integer'];
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Permission;
 use App\Models\ReimbursementBatch;
 use App\Models\ReimbursementBatchFile;
 use App\Models\ReimbursementDraft;
+use App\Models\ReimbursementNotice;
 use App\Models\ReimbursementUpload;
 use App\Models\ReimbursementWorkflow;
 use App\Models\Role;
@@ -46,6 +47,48 @@ class ReimbursementBatchTest extends TestCase
         $upload = ReimbursementUpload::factory()->create(['user_id' => $batch->user_id]);
 
         return ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'status' => 'recognized', 'upload_id' => $upload->id, 'reviewed' => $reviewed, 'result' => ['type' => $type, 'amount' => '100.01', 'invoice_date' => '2026-10-29', 'description' => '测试发票'], 'issues' => $reviewed ? [] : ['请核对']]);
+    }
+
+    public function test_ai_draft_read_marker_is_owner_scoped_and_does_not_edit_or_approve(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        $file = $this->recognized($batch, reviewed: false);
+        app(ReimbursementBatchService::class)->finish($batch);
+        $draft = ReimbursementDraft::where('batch_id', $batch->id)->firstOrFail();
+        $before = $draft->only(['payload', 'revision', 'updated_at']);
+        $this->actingAs($this->owner)->getJson('/reimbursements/drafts')->assertJsonPath('records.data.0.unread', true);
+        $this->getJson('/reimbursements/notices')->assertJsonPath('aiDraftNotices.data.0.id', $draft->id)->assertJsonPath('aiDraftNotices.data.0.read_at', null);
+        $this->actingAs(User::factory()->create())->getJson('/reimbursements/drafts/'.$draft->id)->assertForbidden();
+        $this->getJson('/reimbursements/notices')->assertJsonCount(0, 'aiDraftNotices.data');
+        $this->assertNull($draft->fresh()->viewed_at);
+        $this->travel(1)->minutes();
+        $this->actingAs($this->owner)->getJson('/reimbursements/drafts/'.$draft->id)->assertOk()->assertJsonPath('draft.unread', false)->assertJsonPath('draft.batch_pending_review', 1);
+        $viewedAt = $draft->fresh()->viewed_at;
+        $this->assertNotNull($viewedAt);
+        $this->assertEquals($before, $draft->fresh()->only(['payload', 'revision', 'updated_at']));
+        $this->assertFalse($file->fresh()->reviewed);
+        $this->assertDatabaseCount('reimbursement_notices', 0);
+        $this->getJson('/reimbursements/drafts')->assertJsonPath('records.data.0.unread', false);
+        $this->getJson('/reimbursements/notices?unread=1')->assertJsonCount(0, 'aiDraftNotices.data');
+        $this->travel(1)->minutes();
+        $this->getJson('/reimbursements/drafts/'.$draft->id)->assertOk();
+        $this->assertEquals($viewedAt, $draft->fresh()->viewed_at);
+        app(ReimbursementBatchService::class)->finish($batch);
+        $this->getJson('/reimbursements/notices')->assertJsonCount(1, 'aiDraftNotices.data');
+    }
+
+    public function test_ai_result_notifications_keep_approval_notices_and_exclude_manual_drafts(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        $this->recognized($batch);
+        app(ReimbursementBatchService::class)->finish($batch);
+        $draft = ReimbursementDraft::where('batch_id', $batch->id)->firstOrFail();
+        ReimbursementDraft::create(['id' => (string) Str::uuid(), 'user_id' => $this->owner->id, 'payload' => $draft->payload]);
+        $notice = ReimbursementNotice::factory()->create(['user_id' => $this->owner->id, 'event' => 'approved']);
+        $this->actingAs($this->owner)->getJson('/reimbursements/notices')->assertOk()->assertJsonCount(1, 'aiDraftNotices.data')->assertJsonPath('notices.data.0.id', $notice->id);
+        $draft->update(['version_id' => $notice->version_id]);
+        $this->getJson('/reimbursements/notices')->assertJsonPath('aiDraftNotices.data.0.version_id', $notice->version_id);
+        $this->getJson('/reimbursements/notices?unread=1')->assertJsonCount(0, 'aiDraftNotices.data')->assertJsonCount(1, 'notices.data');
     }
 
     public function test_reconciliation_keeps_waiting_files_in_large_batches(): void
