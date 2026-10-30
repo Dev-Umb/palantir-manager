@@ -77,3 +77,28 @@ test('new form offers draft recovery, starting new retains saved drafts and dire
  let prompts=0;const fresh=load('form',api,{showModal:o=>{prompts++;o.success({confirm:false});}});fresh.onLoad({});await fresh.loaded;assert.equal(prompts,1);assert.equal(fresh.data.title,'');assert.equal(fresh.draftRevision,0);fresh.onUnload();
  const resumed=load('form',api,{showModal:o=>o.success({confirm:true})});resumed.onLoad({});await resumed.loaded;assert.equal(resumed.data.title,'保留的报销');assert.equal(resumed.data.items[0].amount,'1.');assert.equal(resumed.data.items[0].attachments[0].id,'pdf');clearTimeout(resumed.draftTimer);resumed.closed=true;
 });
+
+function deletionPage(confirm=true){
+ let dialog,calls=[],epoch=1;
+ const api={onClear(){},epoch:()=>epoch,request:async(...args)=>{calls.push(args);}};
+ const p=load('index',api,{showModal:o=>{dialog=o;},showToast(){}});
+ p.visible=true;Object.assign(p.data,{scope:'drafts',rows:[{id:'draft',revision:3,title:'差旅报销'}],page:2});
+ let refreshed=0;p.refresh=async()=>{refreshed++;};
+ return {p,api,calls,event:{currentTarget:{dataset:{id:'draft'}}},confirm:()=>dialog.success({confirm}),changeAccount:()=>epoch++,refreshed:()=>refreshed};
+}
+test('draft trash confirms and preserves cancellation and continue-edit',async()=>{
+ const x=deletionPage(false);const pending=x.p.deleteDraft(x.event);assert.equal(x.calls.length,0);x.confirm();await pending;assert.equal(x.p.data.rows.length,1);assert.equal(x.calls.length,0);
+ const wxml=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/index.wxml'),'utf8');assert.match(wxml,/catchtap="deleteDraft"/);assert.match(wxml,/继续编辑/);assert.match(wxml,/aria-label="删除草稿/);assert.match(wxml,/wx:if="{{scope==='drafts'}}" class="draft-delete delete-icon-button"/);
+});
+test('draft deletion removes only after success and adjusts an emptied last page',async()=>{
+ const x=deletionPage();let finish;x.api.request=(...args)=>{x.calls.push(args);return new Promise(r=>finish=r);};const pending=x.p.deleteDraft(x.event);x.confirm();await Promise.resolve();assert.equal(x.p.data.rows.length,1);await x.p.deleteDraft(x.event);assert.equal(x.calls.length,1);finish({});await pending;assert.equal(x.p.data.rows.length,0);assert.equal(x.p.data.page,1);assert.equal(x.refreshed(),1);assert.equal(x.calls[0][1],'DELETE');assert.equal(x.calls[0][2].revision,3);assert.equal(x.p.data.deleting,'');
+});
+test('failed delete retains card; account switch or non-draft scope sends no delete',async()=>{
+ const x=deletionPage();x.api.request=async()=>{throw Error('草稿已更新');};let pending=x.p.deleteDraft(x.event);x.confirm();await pending;assert.equal(x.p.data.rows.length,1);assert.match(x.p.data.error,/草稿已更新/);
+ const y=deletionPage();pending=y.p.deleteDraft(y.event);y.changeAccount();y.confirm();await pending;assert.equal(y.calls.length,0);y.p.data.scope='mine';await y.p.deleteDraft(y.event);assert.equal(y.calls.length,0);
+});
+
+test('expense red trash keeps removal, upload protection and remaining expense amounts',()=>{
+ const p=load('form',{onClear(){}});p.data.items=[{amount:'113.00',attachments:[{id:'first'}]},{amount:'20.50',attachments:[{id:'second'}]}];const e={currentTarget:{dataset:{i:0}}};p.data.uploading=true;p.remove(e);assert.equal(p.data.items.length,2);p.data.uploading=false;p.remove(e);assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].attachments[0].id,'second');assert.equal(p.data.total,'20.50');
+ const w=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/form.wxml'),'utf8');assert.match(w,/class="delete-icon-button" aria-label="删除费用/);assert.match(w,/wx:if="{{items.length>1}}"/);assert.match(w,/bindtap="removeFile">移除/);const css=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/common.wxss'),'utf8');assert.match(css,/color:#d93025/);
+});

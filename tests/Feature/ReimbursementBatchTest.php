@@ -49,6 +49,23 @@ class ReimbursementBatchTest extends TestCase
         return ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'status' => 'recognized', 'upload_id' => $upload->id, 'reviewed' => $reviewed, 'result' => ['type' => $type, 'amount' => '100.01', 'invoice_date' => '2026-10-29', 'description' => '测试发票'], 'issues' => $reviewed ? [] : ['请核对']]);
     }
 
+    public function test_deleted_batch_draft_stays_deleted_and_keeps_invoice_links(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        $file = $this->recognized($batch);
+        $service = app(ReimbursementBatchService::class);
+        $service->finish($batch);
+        $draft = ReimbursementDraft::where('batch_id', $batch->id)->firstOrFail();
+        $this->actingAs($this->owner)->deleteJson('/reimbursements/drafts/'.$draft->id, ['revision' => $draft->revision])->assertOk();
+        $service->finish($batch);
+        $this->getJson('/reimbursements/drafts')->assertJsonCount(0, 'records.data');
+        $this->getJson('/reimbursements/notices')->assertJsonCount(0, 'aiDraftNotices.data');
+        $this->assertSame(0, $service->present($batch)['draft_count']);
+        $this->assertSame(1, ReimbursementDraft::withTrashed()->where('batch_id', $batch->id)->count());
+        $this->assertSame($draft->id, $file->fresh()->draft_id);
+        $this->assertSame($draft->id, ReimbursementUpload::findOrFail($file->upload_id)->draft_id);
+    }
+
     public function test_ai_draft_read_marker_is_owner_scoped_and_does_not_edit_or_approve(): void
     {
         $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);

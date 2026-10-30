@@ -45,6 +45,14 @@ class ReimbursementDraftController extends Controller
         return response()->json(['draft' => $this->drafts->present($this->drafts->save($request->user(), $draft, $request->validated()))]);
     }
 
+    public function destroy(Request $request, ReimbursementDraft $draft): JsonResponse
+    {
+        $data = $request->validate(['revision' => ['required', 'integer', 'min:1']]);
+        $this->drafts->delete($request->user(), $draft->id, (int) $data['revision']);
+
+        return response()->json(['deleted' => true]);
+    }
+
     public function file(Request $request, ReimbursementDraft $draft, string $upload): HttpResponse
     {
         $this->drafts->authorize($request->user(), $draft);

@@ -18,6 +18,7 @@ Route::middleware(['auth', 'reimbursement-access'])->prefix('reimbursements')->n
     Route::get('/drafts', [ReimbursementDraftController::class, 'index'])->name('drafts.index');
     Route::get('/drafts/{draft}', [ReimbursementDraftController::class, 'show'])->whereUuid('draft')->name('drafts.show');
     Route::put('/drafts/{draft}', [ReimbursementDraftController::class, 'update'])->whereUuid('draft')->middleware('throttle:120,1')->name('drafts.update');
+    Route::delete('/drafts/{draft}', [ReimbursementDraftController::class, 'destroy'])->whereUuid('draft')->middleware('throttle:30,1')->name('drafts.destroy');
     Route::get('/drafts/{draft}/files/{upload}', [ReimbursementDraftController::class, 'file'])->whereUuid('draft')->name('drafts.file');
     Route::get('/options', [ReimbursementController::class, 'options'])->name('options');
     Route::post('/', [ReimbursementController::class, 'submit'])->middleware('throttle:30,1')->name('submit');

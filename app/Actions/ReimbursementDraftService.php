@@ -32,9 +32,10 @@ class ReimbursementDraftService
     {
         return DB::transaction(function () use ($actor, $id, $data, $create): ReimbursementDraft {
             User::whereKey($actor->id)->lockForUpdate()->firstOrFail();
-            $draft = ReimbursementDraft::lockForUpdate()->find($id);
+            $draft = ReimbursementDraft::withTrashed()->lockForUpdate()->find($id);
             if ($draft) {
                 $this->authorize($actor, $draft);
+                abort_if($draft->trashed(), 409, '草稿已删除，请返回草稿清单。');
                 abort_if($draft->version_id !== null, 409, '草稿已提交，请查看报销清单。');
                 // Retrying an acknowledged-lost save is safe only for the exact same payload.
                 if ($draft->revision === (int) $data['revision'] + 1 && $draft->payload === $data['payload']) {
@@ -59,6 +60,18 @@ class ReimbursementDraftService
             ReimbursementUpload::whereIn('id', $ids)->whereNull('draft_id')->update(['draft_id' => $id]);
 
             return $draft;
+        });
+    }
+
+    public function delete(User $actor, string $id, int $revision): void
+    {
+        DB::transaction(function () use ($actor, $id, $revision): void {
+            User::whereKey($actor->id)->lockForUpdate()->firstOrFail();
+            $draft = ReimbursementDraft::lockForUpdate()->findOrFail($id);
+            $this->authorize($actor, $draft);
+            abort_if($draft->version_id !== null, 409, '草稿已提交，不能删除。');
+            abort_unless($draft->revision === $revision, 409, '草稿已更新，请刷新后再删除。');
+            $draft->delete();
         });
     }
 
