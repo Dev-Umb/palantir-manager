@@ -1,0 +1,4 @@
+- [x] Implement confirmed deletion and permission/state protection.
+- [x] Verify cancellation, failure, stale state, retained editing and batch behavior.
+- [x] Run quality gate.
+- [ ] Verify WeChat template/style compilation and real-device UI (developer tool currently returns INVALID_TOKEN).

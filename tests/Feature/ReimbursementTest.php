@@ -63,6 +63,36 @@ class ReimbursementTest extends TestCase
         return $user;
     }
 
+    public function test_draft_delete_is_owner_only_revision_checked_and_preserves_files_and_other_drafts(): void
+    {
+        $input = $this->input();
+        $payload = array_intersect_key($input, array_flip(['title', 'type', 'note', 'items', 'cc']));
+        $service = app(ReimbursementDraftService::class);
+        $draft = $service->save($this->owner, (string) Str::uuid(), ['revision' => 0, 'payload' => $payload], true);
+        $otherPayload = $payload;
+        $otherPayload['items'][0]['attachments'] = [];
+        $other = $service->save($this->owner, (string) Str::uuid(), ['revision' => 0, 'payload' => $otherPayload], true);
+        $url = '/reimbursements/drafts/'.$draft->id;
+        $this->actingAs($this->admin)->deleteJson($url, ['revision' => 1])->assertForbidden();
+        $this->actingAs($this->owner)->deleteJson($url, ['revision' => 2])->assertConflict();
+        $this->deleteJson($url, [])->assertUnprocessable();
+        $this->getJson($url)->assertOk();
+        $this->deleteJson($url, ['revision' => 1])->assertOk();
+        $this->assertSoftDeleted('reimbursement_drafts', ['id' => $draft->id]);
+        $this->getJson($url)->assertNotFound();
+        $this->deleteJson($url, ['revision' => 1])->assertNotFound();
+        $this->putJson($url, ['revision' => 1, 'payload' => $payload])->assertConflict();
+        $this->postJson('/reimbursements', [...$input, 'draft_id' => $draft->id, 'draft_revision' => 1])->assertNotFound();
+        $context = ['id' => $draft->id, 'revision' => 0, 'operation' => (string) Str::uuid(), 'item' => 0, 'payload' => $otherPayload];
+        $this->postJson('/reimbursements/uploads', ['draft_context' => json_encode($context), 'file' => UploadedFile::fake()->createWithContent('invoice.pdf', "%PDF-1.4\ninvoice")])->assertConflict();
+        $this->getJson('/reimbursements/drafts')->assertJsonCount(1, 'records.data')->assertJsonPath('records.data.0.id', $other->id);
+        $this->putJson('/reimbursements/drafts/'.$other->id, ['revision' => 1, 'payload' => $otherPayload])->assertOk();
+        $this->assertSame(1, ReimbursementUpload::count());
+        $file = StoredAttachment::findOrFail(ReimbursementUpload::firstOrFail()->stored_attachment_id);
+        Storage::disk($file->disk)->assertExists($file->object_key);
+        $this->assertSame(0, ReimbursementVersion::count());
+    }
+
     public function test_pdf_upload_atomically_saves_incomplete_draft_and_retry_does_not_duplicate(): void
     {
         $id = (string) Str::uuid();
@@ -104,6 +134,7 @@ class ReimbursementTest extends TestCase
         $this->actingAs($this->owner)->postJson('/reimbursements', $input)->assertCreated()->assertJsonPath('record.id', $record['id']);
         $this->getJson('/reimbursements/drafts')->assertJsonCount(0, 'records.data');
         $this->putJson('/reimbursements/drafts/'.$id, ['revision' => 2, 'payload' => $payload])->assertConflict();
+        $this->deleteJson('/reimbursements/drafts/'.$id, ['revision' => 2])->assertConflict();
         $this->assertSame(1, ReimbursementVersion::count());
     }
 
