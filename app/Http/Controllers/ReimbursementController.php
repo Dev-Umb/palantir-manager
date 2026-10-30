@@ -326,7 +326,19 @@ class ReimbursementController extends Controller
         }
         $notices = $query->latest('id')->paginate(50)->withQueryString()->through(fn ($notice) => [...$notice->only(['id', 'version_id', 'event', 'message', 'read_at', 'created_at']), 'url' => route('reimbursements.show', $notice->version_id, false)]);
 
-        return $this->page($request, 'Notices', ['notices' => $notices]);
+        $drafts = ReimbursementDraft::where('user_id', $request->user()->id)->whereNotNull('batch_id')->whereJsonLength('payload->items', '>', 0);
+        if ($request->boolean('unread')) {
+            $drafts->whereNull('viewed_at')->whereNull('version_id');
+        }
+        $aiDraftNotices = $drafts->latest('created_at')->orderByDesc('id')->paginate(20, ['*'], 'ai_page')->withQueryString()->through(fn ($draft) => [
+            'id' => $draft->id,
+            'version_id' => $draft->version_id,
+            'title' => $draft->payload['title'] ?? '报销草稿',
+            'read_at' => $draft->viewed_at ?? ($draft->version_id ? $draft->updated_at : null),
+            'created_at' => $draft->created_at,
+        ]);
+
+        return $this->page($request, 'Notices', ['notices' => $notices, 'aiDraftNotices' => $aiDraftNotices]);
     }
 
     public function readNotice(Request $request, ReimbursementNotice $notice): JsonResponse

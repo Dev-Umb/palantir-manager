@@ -1,3 +1,5 @@
 @import "./common.wxss";
 
 .create-row{display:flex;gap:20rpx}.create-row button{flex:1;margin:0}.batch-row{padding:22rpx 0;border-bottom:1rpx solid #edf0f5;font-size:28rpx}
+
+.draft-source{display:flex;align-items:center;gap:12rpx;color:#788797;font-size:24rpx;margin-top:16rpx}.draft-unread-dot{width:12rpx;height:12rpx;border-radius:50%;background:#e5484d;flex-shrink:0}

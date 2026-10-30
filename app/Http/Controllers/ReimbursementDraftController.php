@@ -32,6 +32,10 @@ class ReimbursementDraftController extends Controller
         abort_if($draft->version_id !== null, 409, '草稿已提交，请查看报销清单。');
         abort_if(str_starts_with($request->userAgent() ?? '', 'Dart/') && ! in_array($draft->payload['type'] ?? '', ['差旅交通', '客户招待', '办公采购', '其他', ''], true), 409, '此草稿使用新增报销类型，请在小程序中编辑并提交。');
         $record = $this->drafts->present($draft);
+        if ($draft->batch_id !== null && $draft->viewed_at === null) {
+            ReimbursementDraft::withoutTimestamps(fn () => ReimbursementDraft::whereKey($draft->id)->whereNull('viewed_at')->update(['viewed_at' => now()]));
+            $record['unread'] = false;
+        }
 
         return $request->expectsJson() && ! $request->header('X-Inertia') ? response()->json(['draft' => $record]) : Inertia::render('Reimbursements/Draft', ['draft' => $record]);
     }
