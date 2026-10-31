@@ -129,6 +129,7 @@ class HandleInertiaRequests extends Middleware
             ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
             ...($can('timebook.view') ? [['key' => 'timebook', 'label' => '工日簿', 'href' => route('timebook.index'), 'visible' => true, 'mobile_priority' => 25]] : []),
             ['key' => 'material-arrivals', 'label' => '原材进场', 'href' => route('material-arrivals.index'), 'visible' => $can('material-arrivals.view'), 'mobile_priority' => 66],
+            ['key' => 'template-accessories', 'label' => '模板与配件', 'href' => route('template-accessories.index'), 'visible' => $can('template-accessories.view'), 'mobile_priority' => 65],
             ['key' => 'support-library', 'label' => '钢箱梁工作台', 'href' => route('support-library.index'), 'visible' => $can('support-library.view'), 'mobile_priority' => 64],
             ['key' => 'quotations', 'label' => '参考报价', 'href' => route('quotations.index'), 'visible' => QuotationAccess::allows($request->user()), 'mobile_priority' => 62],
         ];

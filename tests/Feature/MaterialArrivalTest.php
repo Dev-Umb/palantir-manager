@@ -56,6 +56,10 @@ class MaterialArrivalTest extends TestCase
         $this->getJson('/material-arrivals/export')->assertForbidden();
         $html = $this->get('/material-arrivals/workbench')->assertOk()->getContent();
         $this->assertStringContainsString('型材与板材汇总', $html);
+        $this->assertStringContainsString('href="'.e(route('dashboard')).'" target="_top"', $html);
+        $this->assertStringContainsString('返回 Palantir 面板', $html);
+        $this->assertStringNotContainsString('__PLATFORM_HOME__', $html);
+        $this->get(route('dashboard'))->assertForbidden();
         $this->assertStringNotContainsString('seed-39', $html);
         $this->assertStringNotContainsString('indexedDB.open', $html);
         $this->assertStringNotContainsString('localStorage.', $html);
