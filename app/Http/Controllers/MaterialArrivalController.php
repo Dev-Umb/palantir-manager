@@ -5,18 +5,18 @@ namespace App\Http\Controllers;
 use App\Actions\SaveMaterialArrivals;
 use App\Http\Requests\MaterialArrivalMutationRequest;
 use App\Http\Requests\MaterialArrivalPreferenceRequest;
+use App\Support\WorkbenchDocument;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
-use Inertia\Response as InertiaResponse;
 
 class MaterialArrivalController extends Controller
 {
-    public function index(): InertiaResponse
+    public function index(): RedirectResponse
     {
-        return Inertia::render('MaterialArrivals/Index', ['workbenchUrl' => route('material-arrivals.workbench')]);
+        return redirect()->route('production-workbench', ['module' => 'material']);
     }
 
     public function workbench(Request $request): Response
@@ -30,8 +30,8 @@ class MaterialArrivalController extends Controller
             e(route('dashboard')),
         ], file_get_contents(resource_path('material-arrivals/workbench.html')));
 
-        return response($html)->header('Content-Type', 'text/html; charset=UTF-8')->header('Cache-Control', 'private, no-store')
-            ->header('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
+        return response(WorkbenchDocument::prepare($html, $request))->header('Content-Type', 'text/html; charset=UTF-8')->header('Cache-Control', 'private, no-store')
+            ->header('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
     }
 
     public function state(Request $request, SaveMaterialArrivals $service): JsonResponse

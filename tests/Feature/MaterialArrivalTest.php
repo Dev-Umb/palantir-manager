@@ -7,7 +7,6 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class MaterialArrivalTest extends TestCase
@@ -50,7 +49,7 @@ class MaterialArrivalTest extends TestCase
         $this->actingAs($this->user([]))->getJson('/material-arrivals/state')->assertForbidden();
         $this->actingAs($this->user(['view']));
         $this->withoutVite();
-        $this->get('/material-arrivals')->assertInertia(fn (Assert $page) => $page->component('MaterialArrivals/Index')->where('nav', fn ($nav) => collect($nav)->contains(fn ($item) => $item['key'] === 'material-arrivals' && $item['visible'])));
+        $this->get('/material-arrivals')->assertRedirect(route('production-workbench', ['module' => 'material']));
         $this->getJson('/material-arrivals/state')->assertOk()->assertJsonPath('dataset.records', [])->assertJsonPath('dataset.revision', 0);
         $this->postJson('/material-arrivals/mutate', $this->input())->assertForbidden();
         $this->getJson('/material-arrivals/export')->assertForbidden();

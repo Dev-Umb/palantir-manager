@@ -112,8 +112,8 @@ async function openEditor(record,resume=false){
  if(!$('progress-editor').open)$('progress-editor').showModal();$('pf-project').focus();
 }
 function resumeDraft(){try{const p=JSON.parse(TemplateDatabase.privateState.getItem(draftKey));if(!p?.record||!P.kinds.includes(p.record.kind))throw Error('草稿格式异常');const r={...p.record,newRecord:p.newRecord,version:p.expected};openEditor(r,true);dirty=true;updateSaveButton();}catch(e){B.error(e);}}
-async function exportExcel(){if(!await B.ensureSaved('导出报表'))return;await B.refreshExport();const list=rows();if(filter.trash||!list.length)throw Error('没有可导出的正常项目。');const book=await F.workbook(kind,list);B.download(new Blob([await book.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`山西路桥模板进度一览表-${kind}.xlsx`);B.toast('已导出当前筛选项目，含自动小计和合计。');}
-async function importExcel(file){requireSavedInline();
+async function exportExcel(){if(!await B.ensureSaved('导出报表'))return;await B.refreshExport();const list=rows();if(filter.trash||!list.length)throw Error('没有可导出的正常项目。');await WorkbenchExcel.write();const book=await F.workbook(kind,list);B.download(new Blob([await book.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`山西路桥模板进度一览表-${kind}.xlsx`);B.toast('已导出当前筛选项目，含自动小计和合计。');}
+async function importExcel(file){requireSavedInline();await WorkbenchExcel.read();
  if(file.size>30*1024*1024)throw Error('Excel文件不能超过30MB。');const importingKind=kind,bytes=await file.arrayBuffer(),hash=await MaterialHash.hash(bytes),parsed=F.parse(bytes,importingKind),current=await B.store.read(),plan=P.plan(current,parsed,hash,importingKind);
  if(plan.sameFile){B.toast('这份Excel已经导入，没有重复添加。');return;}
  if(plan.ambiguous.length)throw Error('存在无法区分的同名项目，本次未导入：'+plan.ambiguous.slice(0,5).map(r=>r.project).join('、')+'。请核对项目类型及数量。');

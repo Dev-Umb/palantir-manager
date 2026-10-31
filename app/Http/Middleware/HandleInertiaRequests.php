@@ -21,10 +21,20 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
         $permissions = $user ? $user->permissionKeys() : [];
         $passwordOnly = $user?->isTimebookOperator() ?? false;
+        $workbenchOnly = $user?->isWorkbenchTechnician() ?? false;
+        if ($workbenchOnly) {
+            abort_unless($request->routeIs('home', 'dashboard', 'visualization',
+                'production-workbench', 'material-arrivals.*', 'template-accessories.*', 'settings.*', 'logout', 'login', 'login.store'), 403);
+        }
         if ($passwordOnly) {
             abort_unless($request->routeIs('timebook.*', 'ai.index', 'ai.messages', 'ai.conversations.show',
                 'ai.runs.store', 'ai.runs.show', 'ai.runs.events', 'ai.runs.cancel',
                 'settings.index', 'settings.email', 'settings.password', 'logout', 'miniapp.session.*'), 403);
+        }
+
+        if ($request->routeIs('material-arrivals.workbench', 'material-arrivals.state', 'material-arrivals.mutate', 'material-arrivals.preferences', 'material-arrivals.export',
+            'template-accessories.workbench', 'template-accessories.state', 'template-accessories.mutate', 'template-accessories.preferences', 'template-accessories.export')) {
+            return parent::share($request);
         }
 
         if ($request->is('procurement-hub', 'procurement-hub/*')) {
@@ -48,7 +58,7 @@ class HandleInertiaRequests extends Middleware
                 'settings_url' => $user ? route('settings.index') : null,
             ],
             'nav' => $navigation ?? ($user ? $this->navigation($request, $permissions) : []),
-            'notificationUnreadCount' => fn () => $user && ! $passwordOnly
+            'notificationUnreadCount' => fn () => $user && ! $passwordOnly && ! $workbenchOnly
                 ? $this->unreadNotificationCount($user->id)
                 : 0,
             'flash' => ['status' => fn () => $request->session()->get('status')],
@@ -80,6 +90,13 @@ class HandleInertiaRequests extends Middleware
                 ['key' => 'timebook', 'label' => '工日簿', 'href' => route('timebook.index'), 'visible' => $can('timebook.view'), 'mobile_priority' => 25],
                 ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
                 ['key' => 'settings', 'label' => '用户设置', 'href' => route('settings.index'), 'visible' => true, 'mobile_priority' => 90],
+            ];
+        }
+        if ($request->user()?->isWorkbenchTechnician()) {
+            return [
+                ['key' => 'dashboard', 'label' => '主面板', 'href' => route('dashboard'), 'visible' => $can('material-arrivals.view') || $can('template-accessories.view'), 'mobile_priority' => 10],
+                ['key' => 'production-workbench', 'label' => '生产管理工作台', 'href' => route('production-workbench'), 'visible' => $can('material-arrivals.view') || $can('template-accessories.view'), 'mobile_priority' => 20],
+                ['key' => 'settings', 'label' => '账号设置', 'href' => route('settings.index'), 'visible' => true, 'mobile_priority' => 90],
             ];
         }
         $objects = BusinessObject::query()
@@ -128,8 +145,7 @@ class HandleInertiaRequests extends Middleware
             ['key' => 'hub', 'exact' => true, 'label' => '招采信息中心', 'href' => route('hub.index'), 'visible' => HubAccess::canRead($request->user()), 'mobile_priority' => 65],
             ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
             ...($can('timebook.view') ? [['key' => 'timebook', 'label' => '工日簿', 'href' => route('timebook.index'), 'visible' => true, 'mobile_priority' => 25]] : []),
-            ['key' => 'material-arrivals', 'label' => '原材进场', 'href' => route('material-arrivals.index'), 'visible' => $can('material-arrivals.view'), 'mobile_priority' => 66],
-            ['key' => 'template-accessories', 'label' => '模板与配件', 'href' => route('template-accessories.index'), 'visible' => $can('template-accessories.view'), 'mobile_priority' => 65],
+            ['key' => 'production-workbench', 'label' => '生产管理工作台', 'href' => route('production-workbench'), 'visible' => $can('material-arrivals.view') || $can('template-accessories.view'), 'mobile_priority' => 20],
             ['key' => 'support-library', 'label' => '钢箱梁工作台', 'href' => route('support-library.index'), 'visible' => $can('support-library.view'), 'mobile_priority' => 64],
             ['key' => 'quotations', 'label' => '参考报价', 'href' => route('quotations.index'), 'visible' => QuotationAccess::allows($request->user()), 'mobile_priority' => 62],
         ];
