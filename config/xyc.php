@@ -37,6 +37,10 @@ return [
     ],
 
     'permissions' => [
+        ['key' => 'template-accessories.view', 'module' => 'template-accessories', 'action' => 'view', 'label' => '查看模板与配件进场工作台'],
+        ['key' => 'template-accessories.manage', 'module' => 'template-accessories', 'action' => 'manage', 'label' => '维护模板与配件进场台账'],
+        ['key' => 'template-accessories.export', 'module' => 'template-accessories', 'action' => 'export', 'label' => '导出模板与配件报表与备份'],
+        ['key' => 'template-accessories.recover', 'module' => 'template-accessories', 'action' => 'recover', 'label' => '恢复模板与配件工程备份'],
         ['key' => 'material-arrivals.view', 'module' => 'material-arrivals', 'action' => 'view', 'label' => '查看原材进场工作台'],
         ['key' => 'material-arrivals.manage', 'module' => 'material-arrivals', 'action' => 'manage', 'label' => '维护原材进场台账'],
         ['key' => 'material-arrivals.export', 'module' => 'material-arrivals', 'action' => 'export', 'label' => '导出原材报表与备份'],

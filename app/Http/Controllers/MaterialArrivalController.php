@@ -24,9 +24,10 @@ class MaterialArrivalController extends Controller
         $boot = ['csrf' => csrf_token(), 'userId' => $request->user()->id,
             'urls' => collect(['state', 'mutate', 'preferences', 'export'])->mapWithKeys(fn (string $name): array => [$name => route('material-arrivals.'.$name)])->all(),
             'capabilities' => collect(['manage', 'export', 'recover'])->mapWithKeys(fn (string $action): array => [$action => $request->user()->canDo('material-arrivals.'.$action)])->all()];
-        $html = str_replace(['__MATERIAL_BOOT__', '__MATERIAL_ADAPTER__'], [
+        $html = str_replace(['__MATERIAL_BOOT__', '__MATERIAL_ADAPTER__', '__PLATFORM_HOME__'], [
             json_encode($boot, JSON_THROW_ON_ERROR | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT),
             file_get_contents(resource_path('material-arrivals/database-adapter.js')),
+            e(route('dashboard')),
         ], file_get_contents(resource_path('material-arrivals/workbench.html')));
 
         return response($html)->header('Content-Type', 'text/html; charset=UTF-8')->header('Cache-Control', 'private, no-store')
