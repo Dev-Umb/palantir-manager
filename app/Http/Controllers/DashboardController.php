@@ -13,6 +13,10 @@ class DashboardController extends Controller
 
     public function __invoke(Request $request): Response
     {
+        if ($request->user()->isWorkbenchTechnician()) {
+            return Inertia::render('WorkbenchPanel');
+        }
+
         return Inertia::render('Dashboard', $this->dashboard->handle($request->user()));
     }
 }

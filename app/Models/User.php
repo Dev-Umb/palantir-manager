@@ -65,6 +65,11 @@ class User extends Authenticatable
         return in_array($permission, $this->permissionKeys(), true);
     }
 
+    public function isWorkbenchTechnician(): bool
+    {
+        return $this->roles->contains('name', 'workbench_technician');
+    }
+
     public function isTimebookOperator(): bool
     {
         return $this->roles->contains('name', 'timebook_operator');
