@@ -37,6 +37,10 @@ return [
     ],
 
     'permissions' => [
+        ['key' => 'material-arrivals.view', 'module' => 'material-arrivals', 'action' => 'view', 'label' => '查看原材进场工作台'],
+        ['key' => 'material-arrivals.manage', 'module' => 'material-arrivals', 'action' => 'manage', 'label' => '维护原材进场台账'],
+        ['key' => 'material-arrivals.export', 'module' => 'material-arrivals', 'action' => 'export', 'label' => '导出原材报表与备份'],
+        ['key' => 'material-arrivals.recover', 'module' => 'material-arrivals', 'action' => 'recover', 'label' => '恢复原材工程备份'],
         ['key' => 'reimbursements.submit', 'module' => 'reimbursements', 'action' => 'submit', 'label' => '提交报销申请'],
         ['key' => 'reimbursements.manage', 'module' => 'reimbursements', 'action' => 'manage', 'label' => '查看全部报销'],
         ['key' => 'reimbursements.configure', 'module' => 'reimbursements', 'action' => 'configure', 'label' => '配置报销审批流程'],

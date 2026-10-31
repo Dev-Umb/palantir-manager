@@ -129,3 +129,5 @@ require __DIR__.'/quotations.php';
 require __DIR__.'/support_library.php';
 
 require __DIR__.'/reimbursements.php';
+
+require __DIR__.'/material_arrivals.php';
