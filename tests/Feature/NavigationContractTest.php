@@ -22,12 +22,14 @@ class NavigationContractTest extends TestCase
 
         $this->actingAs($admin)->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->has('auth')->has('flash')->has('notificationUnreadCount')
-            ->has('nav', 12)
+            ->has('nav', 13)
             ->where('nav.2.key', 'reimbursements')
             ->where('nav.2.visible', true)
-            ->where('nav.10.key', 'support-library')
-            ->where('nav.10.label', '钢箱梁工作台')
+            ->where('nav.10.key', 'material-arrivals')
             ->where('nav.10.visible', true)
+            ->where('nav.11.key', 'support-library')
+            ->where('nav.11.label', '钢箱梁工作台')
+            ->where('nav.11.visible', true)
             ->where('nav.5.key', 'settings')
             ->where('nav.7.key', 'hub')
             ->where('nav.8.key', 'ai')
