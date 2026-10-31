@@ -13,13 +13,13 @@ function updateSaveStatus(){
 function confirmBox(title,message,label='确认'){
  return new Promise(resolve=>{const d=$('confirm-dialog');$('confirm-title').textContent=title;$('confirm-body').textContent=message;$('confirm-body').style.whiteSpace='pre-wrap';$('confirm-yes').textContent=label;const finish=v=>{d.close();resolve(v);};$('confirm-no').onclick=()=>finish(false);$('confirm-yes').onclick=()=>finish(true);d.oncancel=e=>{e.preventDefault();finish(false);};d.showModal();});
 }
-async function run(fn){if(busy)return;busy=true;try{await fn();}catch(e){error(e);}finally{busy=false;}}
+async function run(fn){if(busy)return;busy=true;try{await fn();}catch(e){error(e);document.documentElement.dataset.workbenchReady='error';}finally{busy=false;}}
 async function refresh(){data=await store.read();window.dispatchEvent(new Event('dataset-updated'));updateSaveStatus();}
 async function refreshExport(){data=await store.export();window.dispatchEvent(new Event('dataset-updated'));}
 async function ensureSaved(action){if(window.ProgressUI?.hasDraft()){if(!await confirmBox(action,'有未保存修改，是否保存后继续？','保存后继续'))return false;await ProgressUI.savePending();}await D.privateState.flush();return true;}
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 try{
- await D.ready;data=await store.read();
+ await D.ready;data=await store.read(true);
  window.MaterialBridge={getData:()=>data,store,run,error,toast,confirmBox,refresh,refreshExport,ensureSaved,download,updateSaveStatus};
  $('backup').hidden=!TEMPLATE_BOOT.capabilities.export;for(const id of ['restore','undo-restore'])$(id).hidden=!TEMPLATE_BOOT.capabilities.recover;
  $('backup').onclick=()=>run(async()=>{if(!await ensureSaved('保存工程备份'))return;const dataset=await store.export(),checksum=await MaterialHash.hash(JSON.stringify(dataset));download(new Blob([JSON.stringify({format:'xyc-template-accessory-project',version:1,checksum,dataset},null,2)],{type:'application/json'}),'模板与配件工程.json');D.privateState.setItem('backup',JSON.stringify({at:new Date().toISOString(),revision:dataset.revision}));await D.privateState.flush();toast('备份已生成，请确认下载完成。');});
@@ -28,9 +28,9 @@ try{
  $('undo-restore').onclick=()=>run(async()=>{if(!await ensureSaved('撤销恢复'))return;const current=await store.read();if(!await confirmBox('撤销上次恢复','回到恢复前的模板与配件工程；恢复后新增或修改的数据也会被替换。','撤销'))return;await store.recover(current.revision);await refresh();});
  $('help').onclick=()=>confirmBox('使用说明','台车模板、开挖台架、液压配件独立分类。编辑完成后点击保存修改，整批校验并保存；失败保留输入。正式数据共享，个人草稿和筛选按账号存数据库。Excel导入先预览，同名项目无法匹配时停止；未在文件中的项目保留。发货吨位是项目累计数，月份为最后发货月份，不代表当月实际发货量。备份只含本工作台正式数据与回收站，不含个人草稿。','知道了');
  window.addEventListener('private-state-updated',updateSaveStatus);
- window.addEventListener('focus',()=>{if(!busy&&!D.privateState.pending&&!window.ProgressUI?.hasDraft())run(refresh);});
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!busy&&!D.privateState.pending&&!window.ProgressUI?.hasDraft())run(refresh);});
  window.addEventListener('beforeprint',()=>ProgressUI?.preparePrint());
  window.addEventListener('beforeunload',e=>{if(D.privateState.pending||D.privateState.error||window.ProgressUI?.hasDraft()){e.preventDefault();e.returnValue='';}});
- window.dispatchEvent(new Event('workbench-ready'));updateSaveStatus();
-}catch(e){error(e);}
+ window.dispatchEvent(new Event('workbench-ready'));updateSaveStatus();document.documentElement.dataset.workbenchReady='true';
+}catch(e){error(e);document.documentElement.dataset.workbenchReady='error';}
 })();

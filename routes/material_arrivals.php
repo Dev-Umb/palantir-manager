@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\MaterialArrivalController;
+use App\Http\Controllers\ProductionWorkbenchController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'permission:material-arrivals.view'])->prefix('material-arrivals')->name('material-arrivals.')->group(function (): void {
@@ -11,3 +12,5 @@ Route::middleware(['auth', 'permission:material-arrivals.view'])->prefix('materi
     Route::put('/preferences', [MaterialArrivalController::class, 'preferences'])->name('preferences');
     Route::get('/export', [MaterialArrivalController::class, 'export'])->middleware('permission:material-arrivals.export')->name('export');
 });
+
+Route::get('/production-workbench', ProductionWorkbenchController::class)->middleware('auth')->name('production-workbench');

@@ -37,7 +37,7 @@ async function mutate(operation,fields,revision=dataset.revision){
  catch(e){if(e.status)pendingMutation=null;throw e;}
 }
 const store={
- async read(){await ready;const r=await request(boot.urls.state);dataset=r.dataset;return structuredClone(dataset);},
+ async read(initial=false){await ready;if(initial)return structuredClone(dataset);const r=await request(boot.urls.state);dataset=r.dataset;return structuredClone(dataset);},
  async export(){dataset=await request(boot.urls.export);return structuredClone(dataset);},
  saveBatch:(entries,revision)=>mutate('save',{entries},revision),
  remove:(id,version,deleted)=>mutate('delete',{id,version,deleted}),

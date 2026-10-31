@@ -50,7 +50,7 @@ async function mutate(operation, fields, expectedRevision) {
 root.MaterialDatabase={ready,privateState};
 root.createWorkbenchStore=()=>({
     ready,
-    async read(){await ready;const result=await request(boot.urls.state);dataset=result.dataset;return structuredClone(dataset);},
+    async read(initial=false){await ready;if(initial)return structuredClone(dataset);const result=await request(boot.urls.state);dataset=result.dataset;return structuredClone(dataset);},
     async export(){await ready;return request(boot.urls.export);},
     save:(record,version,revision)=>mutate('save',{record,version:version??null},revision),
     remove:(id,version,deleted,revision)=>mutate('delete',{id,version,deleted},revision),

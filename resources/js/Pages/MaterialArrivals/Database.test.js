@@ -19,6 +19,8 @@ function setup(handler) {
 }
 
 describe('original workbench database bridge', () => {
+
+ it('reuses startup data but refreshes subsequent reads',async()=>{const {store,fetch}=setup(()=>{});await store.read(true);expect(fetch).toHaveBeenCalledTimes(1);await store.read();expect(fetch).toHaveBeenCalledTimes(2);});
     it('acknowledges personal persistence only after the response and keeps failed data out of committed cache', async () => {
         let release;
         const { db } = setup(() => new Promise(resolve => { release = resolve; }));
@@ -61,6 +63,20 @@ describe('original workbench database bridge', () => {
         expect(bodies).toHaveLength(2);
         expect(bodies[0]).toEqual(bodies[1]);
         expect(bodies[0].operation).toBe('save');
+    });
+
+    it('loads Excel tools only on demand and shares each library promise', async () => {
+        const urls = [];
+        const context = createContext({ document: { createElement: () => ({}), head: { append: (script) => { urls.push(script.src); queueMicrotask(() => script.onload()); } } } });
+        context.window = context;
+        const loader = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].find((match) => match[1].includes('window.WorkbenchExcel='))[1];
+        runInContext(loader, context);
+        expect(urls).toEqual([]);
+        await Promise.all([context.WorkbenchExcel.read(), context.WorkbenchExcel.read()]);
+        expect(urls).toHaveLength(1);
+        await context.WorkbenchExcel.write();
+        expect(urls).toHaveLength(2);
+        expect(urls.every((url) => url.startsWith('/workbench-assets/'))).toBe(true);
     });
 
     it('retains original classification and weight semantics, including mixed loads and zero denominator', () => {

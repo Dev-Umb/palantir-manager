@@ -9,6 +9,8 @@ function setup(handler){
  const c=createContext({fetch,structuredClone,crypto:{randomUUID},Event:class{},TEMPLATE_BOOT:{urls:{state:'/state',mutate:'/mutate',preferences:'/preferences'}}});c.window=c;c.dispatchEvent=()=>{};runInContext(read('database-adapter.js'),c);return {c,db:c.TemplateDatabase,fetch};
 }
 describe('template accessory database integration',()=>{
+
+ it('reuses startup data but refreshes subsequent reads',async()=>{const {db,fetch}=setup(()=>{});await db.store.read(true);expect(fetch).toHaveBeenCalledTimes(1);await db.store.read();expect(fetch).toHaveBeenCalledTimes(2);});
  it('does not claim private state is committed on failed writes and retains input',async()=>{
   const {db}=setup(()=>({ok:false,status:409,json:async()=>({message:'another tab changed it'})}));await db.ready;
   await db.privateState.setItem('draft','{"project":"keep"}');
