@@ -6,7 +6,7 @@ const materialViews = [['ledger', '进场台账'], ['entry', '快捷录入'], ['
 const templateViews = [['台车模板', '台车模板'], ['开挖台架', '开挖台架'], ['液压配件', '液压配件']];
 const moduleOf = (view) => materialViews.some(([key]) => key === view) ? 'material' : 'template';
 
-export default function ProductionWorkbench({ workbenches, initialModule, panelUrl }) {
+export default function ProductionWorkbench({ workbenches, initialModule, panelUrl, workspaceUrl }) {
     const [selected, setSelected] = useState(initialModule === 'template' ? '台车模板' : 'ledger');
     const [loaded, setLoaded] = useState([initialModule]);
     const [states, setStates] = useState({});
@@ -36,6 +36,10 @@ export default function ProductionWorkbench({ workbenches, initialModule, panelU
         frames.current[active]?.contentDocument?.querySelector(selector)?.click();
         pendingSelection.current = false;
     }, [selected, active, ready]);
+
+    if (workspaceUrl) {
+        return <><Head title="生产管理工作台" /><iframe title="生产管理工作台内容" src={workspaceUrl} style={{ width: '100%', height: '100dvh', border: 0, display: 'block' }} /></>;
+    }
 
     function choose(view) {
         const module = moduleOf(view);

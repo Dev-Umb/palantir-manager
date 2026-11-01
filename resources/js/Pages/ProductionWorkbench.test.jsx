@@ -7,6 +7,11 @@ afterEach(cleanup);
 const material = { url: '/material-arrivals/workbench?embedded=1', manage: true, export: true, recover: true };
 const template = { ...material, url: '/template-accessories/workbench?embedded=1' };
 describe('unified workbench', () => {
+    it('uses the complete documented workspace for dual-domain accounts', () => {
+        render(<ProductionWorkbench workbenches={{ material, template }} initialModule="material" panelUrl="/dashboard" workspaceUrl="/production-workbench/development" />);
+        expect(screen.getByTitle('生产管理工作台内容').getAttribute('src')).toBe('/production-workbench/development');
+        expect(screen.queryByTitle('原材进场内容')).toBeNull();
+    });
     it('lazy loads the other domain and preserves both frames across navigation', () => {
         render(<ProductionWorkbench workbenches={{ material, template }} initialModule="material" panelUrl="/dashboard" />);
         const original = screen.getByTitle('原材进场内容');
