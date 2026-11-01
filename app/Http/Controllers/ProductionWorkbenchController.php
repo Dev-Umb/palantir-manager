@@ -27,6 +27,7 @@ class ProductionWorkbenchController extends Controller
             'workbenches' => $workbenches,
             'initialModule' => isset($workbenches[$request->query('module', '')]) ? $request->query('module') : array_key_first($workbenches),
             'panelUrl' => route('dashboard'),
+            'workspaceUrl' => count($workbenches) === 2 ? route('production-workbench.development', array_filter(['module' => $request->query('module')])) : null,
         ]);
     }
 }

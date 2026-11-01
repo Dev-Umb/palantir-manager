@@ -24,7 +24,7 @@ class HandleInertiaRequests extends Middleware
         $workbenchOnly = $user?->isWorkbenchTechnician() ?? false;
         if ($workbenchOnly) {
             abort_unless($request->routeIs('home', 'dashboard', 'visualization',
-                'production-workbench', 'material-arrivals.*', 'template-accessories.*', 'settings.*', 'logout', 'login', 'login.store'), 403);
+                'production-workbench', 'production-workbench.*', 'material-arrivals.*', 'template-accessories.*', 'settings.*', 'logout', 'login', 'login.store'), 403);
         }
         if ($passwordOnly) {
             abort_unless($request->routeIs('timebook.*', 'ai.index', 'ai.messages', 'ai.conversations.show',
@@ -32,7 +32,7 @@ class HandleInertiaRequests extends Middleware
                 'settings.index', 'settings.email', 'settings.password', 'logout', 'miniapp.session.*'), 403);
         }
 
-        if ($request->routeIs('material-arrivals.workbench', 'material-arrivals.state', 'material-arrivals.mutate', 'material-arrivals.preferences', 'material-arrivals.export',
+        if ($request->routeIs('production-workbench.*', 'material-arrivals.workbench', 'material-arrivals.state', 'material-arrivals.mutate', 'material-arrivals.preferences', 'material-arrivals.export',
             'template-accessories.workbench', 'template-accessories.state', 'template-accessories.mutate', 'template-accessories.preferences', 'template-accessories.export')) {
             return parent::share($request);
         }

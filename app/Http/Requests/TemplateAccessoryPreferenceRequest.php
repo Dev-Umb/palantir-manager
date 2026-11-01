@@ -12,14 +12,14 @@ class TemplateAccessoryPreferenceRequest extends FormRequest
         $user = $this->user()?->fresh();
 
         return $user?->canDo('template-accessories.view')
-            && (! in_array($this->input('key'), ['draft', 'inline'], true) || $user->canDo('template-accessories.manage'))
+            && (! in_array($this->input('key'), ['draft', 'inline', 'detail'], true) || $user->canDo('template-accessories.manage'))
             && ($this->input('key') !== 'backup' || $user->canDo('template-accessories.export'));
     }
 
     public function rules(): array
     {
         return [
-            'key' => ['required', Rule::in(['draft', 'inline', 'filters', 'backup'])],
+            'key' => ['required', Rule::in(['draft', 'inline', 'detail', 'filters', 'backup'])],
             'value' => ['nullable', 'string', 'max:524288', 'json'],
             'expected_revision' => ['required', 'integer:strict', 'min:0'],
         ];
