@@ -4,7 +4,11 @@ const boot=root.PRODUCTION_BOOT;
 let dataset,pending,initialRead=true;
 async function request(path,body){
  const response=await fetch(boot.base+'/'+path,{method:body?'POST':'GET',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':boot.csrf},body:body?JSON.stringify(body):undefined});
- const result=await response.json().catch(()=>({}));if(!response.ok)throw Error(Object.values(result.errors||{}).flat()[0]||result.message||'保存失败，请保留输入。');return result;
+ if([401,419].includes(response.status)||response.redirected)throw Error('登录状态已失效或请求被重定向，请保留当前输入，在新标签页重新登录后重试。');
+ const result=await response.json().catch(()=>null);
+ if(!response.ok)throw Error(Object.values(result?.errors||{}).flat()[0]||result?.message||'保存失败，请保留输入。');
+ if(!result||!Number.isInteger(result.revision)||!['records','imports','progressRecords','progressImports','materialDemandPlans'].every(key=>Array.isArray(result[key])))throw Error('未取得完整工程数据，已停止保存并保留输入，请稍后重试；仍失败时请重新登录。');
+ return result;
 }
 const ready=request('state').then(d=>{dataset=d;});
 const legacy=boot.legacyPreferences||{}, queues=new Map(), failures=new Map();let writes=0;
