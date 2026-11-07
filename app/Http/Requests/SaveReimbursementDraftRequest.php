@@ -34,7 +34,7 @@ class SaveReimbursementDraftRequest extends FormRequest
             'payload.items.*.evidence_source.upload_id' => ['required_with:payload.items.*.evidence_source', 'uuid'],
             'payload.items.*.evidence_source.candidate_id' => ['required_with:payload.items.*.evidence_source', 'string', 'regex:/^[0-9]{1,2}-[0-9]{1,3}$/'],
             'payload.items.*.attachments' => ['present', 'array', 'max:10'],
-            'payload.items.*.attachments.*' => ['uuid', 'distinct'],
+            'payload.items.*.attachments.*' => ['uuid'],
             'payload.cc' => ['present', 'array', 'max:50'],
             'payload.cc.*' => ['integer', 'distinct'],
             'payload.reimbursement_id' => ['nullable', 'integer'],
