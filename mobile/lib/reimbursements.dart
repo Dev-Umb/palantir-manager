@@ -515,6 +515,11 @@ class _ReimbursementDetailState extends State<ReimbursementDetail> {
                           '¥${reimbursementMoney(item['cents'])}',
                         ),
                         kv('开票日期', item['invoice_date'] ?? '未填写'),
+                        if (item['evidence_source'] != null)
+                          kv(
+                            '凭证来源',
+                            '第 ${item['evidence_source']['candidate_id'].split('-')[0]} 页 · 凭证 ${item['evidence_source']['candidate_id'].split('-')[1]}',
+                          ),
                         for (final file in maps(item['attachments']))
                           Row(
                             children: [
@@ -650,6 +655,8 @@ class _ReimbursementFormState extends State<ReimbursementForm>
   String type = reimbursementTypes.first, key = reimbursementKey(), error = '';
   bool busy = false;
   int uploading = 0;
+  bool batchEvidence = false;
+  final evidenceLocals = <Map<String, dynamic>>[];
   Future<void> invoiceReviews = Future.value();
   String draftId = reimbursementKey(), draftStatus = '';
   int draftRevision = 0;
@@ -677,6 +684,8 @@ class _ReimbursementFormState extends State<ReimbursementForm>
             'invoice_date': r['invoice_date'].text.isEmpty
                 ? null
                 : r['invoice_date'].text,
+            if (r['evidence_source'] != null)
+              'evidence_source': r['evidence_source'],
             'attachments': (r['attachments'] as List)
                 .map((a) => a['id'])
                 .toList(),
@@ -883,7 +892,15 @@ class _ReimbursementFormState extends State<ReimbursementForm>
       if (mounted) error = '$e';
     } finally {
       restoring = false;
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+        for (final file in evidenceCards()) {
+          if (file['evidence_status'] != null &&
+              file['evidence_status'] != 'reviewed') {
+            recognizeEvidence(file);
+          }
+        }
+      }
     }
   }
 
@@ -924,6 +941,8 @@ class _ReimbursementFormState extends State<ReimbursementForm>
       'amount': TextEditingController(text: item?['amount'] ?? ''),
       'invoice_date': TextEditingController(text: item?['invoice_date'] ?? ''),
       'attachments': [...maps(item?['attachments'])],
+      if (item?['evidence_source'] != null)
+        'evidence_source': item!['evidence_source'],
       'failed': <UploadFile>[],
     });
     for (final field in ['description', 'amount', 'invoice_date']) {
@@ -946,6 +965,391 @@ class _ReimbursementFormState extends State<ReimbursementForm>
     }
     super.dispose();
   }
+
+  List<Map<String, dynamic>> evidenceCards() {
+    final seen = <String>{};
+    return rows
+        .expand((r) => (r['attachments'] as List).cast<Map<String, dynamic>>())
+        .where((f) => seen.add(f['id'] as String))
+        .toList();
+  }
+
+  Future<void> uploadEvidence() async {
+    if (busy || pending != null || uploading > 0 || batchEvidence) return;
+    try {
+      final files = await selectUploads();
+      if (!mounted || widget.api.user?['id'] != account || files.isEmpty) {
+        return;
+      }
+      if (rows.length + files.length > 51) throw ApiFailure('每单最多 50 项费用');
+      final bytes = evidenceCards().fold<int>(
+        0,
+        (n, f) => n + (f['size'] as int? ?? 0),
+      );
+      if (bytes + files.fold<int>(0, (n, f) => n + f.bytes.length) >
+          200 * 1024 * 1024) {
+        throw ApiFailure('附件累计不能超过 200 MB');
+      }
+      setState(() {
+        batchEvidence = true;
+        evidenceLocals.addAll(files.map((f) => {'file': f}));
+      });
+      for (final file in files) {
+        if (!mounted || widget.api.user?['id'] != account) break;
+        var row = rows
+            .where(
+              (r) =>
+                  r['attachments'].isEmpty &&
+                  r['failed'].isEmpty &&
+                  r['amount'].text.isEmpty &&
+                  r['description'].text.isEmpty,
+            )
+            .firstOrNull;
+        if (row == null) {
+          setState(() => add());
+          row = rows.last;
+        }
+        await upload(row, file);
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    } finally {
+      if (mounted) setState(() => batchEvidence = false);
+    }
+  }
+
+  Future<void> recognizeEvidence(
+    Map<String, dynamic> file, {
+    bool retry = false,
+  }) async {
+    if (file['evidencePolling'] == true) return;
+    file['evidencePolling'] = true;
+    bool active() =>
+        mounted &&
+        widget.api.user?['id'] == account &&
+        pending == null &&
+        rows.any((r) => r['attachments'].contains(file));
+    try {
+      var state = await widget.api.send(
+        '/reimbursements/uploads/${file['id']}/evidence',
+        {'retry': retry},
+      );
+      var polls = 0;
+      while (active() && ['queued', 'processing'].contains(state['status'])) {
+        if (++polls > 500) throw ApiFailure('识别仍在处理中，请稍后重试查询');
+        setState(() {
+          file['evidence_status'] = state['status'];
+          file['evidence_result'] = state['result'];
+        });
+        await Future<void>.delayed(const Duration(seconds: 3));
+        if (!active()) return;
+        state = await widget.api.get(
+          '/reimbursements/uploads/${file['id']}/evidence',
+        );
+      }
+      if (!active()) return;
+      setState(() {
+        file['evidence_status'] = state['status'];
+        file['evidence_result'] = state['result'];
+        file.remove('recognitionError');
+        if (state['status'] == 'reviewed') return;
+        if (rows.any(
+          (r) =>
+              r['attachments'].contains(file) &&
+              r['evidence_source'] == null &&
+              (r['amount'].text.isNotEmpty || r['description'].text.isNotEmpty),
+        )) {
+          file['recognitionError'] = '此附件已有手工费用，请核对识别结果后手工补录';
+          return;
+        }
+        for (final candidate in maps(mapOf(state['result'])['items'])) {
+          if (candidate['amount'] == null ||
+              rows.any(
+                (r) =>
+                    r['evidence_source']?['upload_id'] == file['id'] &&
+                    r['evidence_source']?['candidate_id'] == candidate['id'],
+              )) {
+            continue;
+          }
+          if (candidate['number'] != null &&
+              rows.any(
+                (r) => r['description'].text.contains(candidate['number']),
+              )) {
+            file['recognitionError'] = '疑似重复凭证，请手工核对';
+            continue;
+          }
+          var row = rows
+              .where(
+                (r) =>
+                    r['attachments'].contains(file) &&
+                    r['amount'].text.isEmpty &&
+                    r['description'].text.isEmpty &&
+                    r['evidence_source'] == null,
+              )
+              .firstOrNull;
+          if (row == null) {
+            if (rows.length >= 50) {
+              file['recognitionError'] = '超过 50 项，剩余凭证请拆单';
+              break;
+            }
+            add();
+            row = rows.last;
+            row['attachments'].add(file);
+          }
+          row['amount'].text = candidate['amount'];
+          row['invoice_date'].text = candidate['invoice_date'] ?? '';
+          row['description'].text =
+              '${candidate['description']}\n来源：${file['name']}，第 ${candidate['page']} 页 ${candidate['region'] ?? ''}'
+                  .characters
+                  .take(500)
+                  .toString();
+          row['evidence_source'] = {
+            'upload_id': file['id'],
+            'candidate_id': candidate['id'],
+          };
+        }
+      });
+    } catch (e) {
+      if (active()) {
+        setState(() {
+          file['evidence_status'] = 'failed';
+          file['recognitionError'] = '$e';
+        });
+      }
+    } finally {
+      file['evidencePolling'] = false;
+    }
+  }
+
+  Future<void> associateEvidence(Map<String, dynamic> file) async {
+    if (busy || pending != null) return;
+    final targets = rows
+        .where(
+          (r) =>
+              r['attachments'].length < 10 &&
+              !(r['attachments'] as List).any((a) => a['id'] == file['id']) &&
+              r['amount'].text.isNotEmpty &&
+              r['description'].text.isNotEmpty,
+        )
+        .toList();
+    if (targets.isEmpty) {
+      setState(() => error = '请先填写另一项费用，再关联此补充凭证');
+      return;
+    }
+    final target = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (c) => SimpleDialog(
+        title: const Text('选择已有费用'),
+        children: targets
+            .map(
+              (r) => SimpleDialogOption(
+                onPressed: () => Navigator.pop(c, r),
+                child: Text('${r['description'].text} ¥${r['amount'].text}'),
+              ),
+            )
+            .toList(),
+      ),
+    );
+    if (target == null || !mounted) return;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('关联为补充凭证'),
+        content: const Text('附件将移到所选费用，由此附件自动生成的费用项将移除，手工填写项保留。请确认不是不同支出。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('确认'),
+          ),
+        ],
+      ),
+    );
+    if (yes != true || !mounted || widget.api.user?['id'] != account) return;
+    try {
+      await widget.api.send(
+        '/reimbursements/uploads/${file['id']}/evidence/review',
+        {},
+      );
+      if (!mounted ||
+          widget.api.user?['id'] != account ||
+          !rows.contains(target)) {
+        return;
+      }
+      setState(() {
+        final removed = rows
+            .where(
+              (r) =>
+                  r['evidence_source']?['upload_id'] == file['id'] &&
+                  r['attachments'].length == 1,
+            )
+            .toList();
+        rows.removeWhere(removed.contains);
+        for (final r in rows) {
+          r['attachments'].removeWhere((a) => a['id'] == file['id']);
+          if (r['evidence_source']?['upload_id'] == file['id']) {
+            r.remove('evidence_source');
+          }
+        }
+        file['evidence_status'] = 'reviewed';
+        file.remove('recognitionError');
+        target['attachments'].add(file);
+        for (final r in removed) {
+          for (final field in ['description', 'amount', 'invoice_date']) {
+            r[field].dispose();
+          }
+        }
+      });
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
+  Future<void> reviewEvidence(Map<String, dynamic> file) async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('手工核对完成'),
+        content: const Text('确认所有费用均已补录，或此附件仅补充现有费用？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('确认'),
+          ),
+        ],
+      ),
+    );
+    if (yes != true || !mounted || widget.api.user?['id'] != account) return;
+    try {
+      await widget.api.send(
+        '/reimbursements/uploads/${file['id']}/evidence/review',
+        {},
+      );
+      if (mounted && widget.api.user?['id'] == account) {
+        setState(() {
+          file['evidence_status'] = 'reviewed';
+          file.remove('recognitionError');
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    }
+  }
+
+  Widget evidencePanel() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '附件',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          TextButton.icon(
+            onPressed: busy || restoring || uploading > 0 || batchEvidence
+                ? null
+                : uploadEvidence,
+            icon: const Icon(Icons.add),
+            label: const Text('批量添加 PDF / 图片'),
+          ),
+          for (final local in evidenceLocals.where(
+            (f) =>
+                f['id'] == null &&
+                (batchEvidence ||
+                    rows.any((r) => r['failed'].contains(f['file']))),
+          ))
+            ListTile(
+              title: Text((local['file'] as UploadFile).name),
+              subtitle: Text(
+                rows.any((r) => r['failed'].contains(local['file']))
+                    ? '上传失败 · 请在费用项重试或移除'
+                    : '等待上传 · 点击预览',
+              ),
+              trailing: rows.any((r) => r['failed'].contains(local['file']))
+                  ? const Icon(Icons.circle, size: 10, color: Colors.red)
+                  : null,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AttachmentPage(
+                    api: widget.api,
+                    path: '',
+                    name: (local['file'] as UploadFile).name,
+                    localBytes: (local['file'] as UploadFile).bytes,
+                  ),
+                ),
+              ),
+            ),
+          for (final file in evidenceCards())
+            Column(
+              children: [
+                ListTile(
+                  title: Text(file['name'] ?? '附件'),
+                  subtitle: Text(
+                    '${{'queued': '等待识别', 'processing': '识别中', 'completed': '已识别', 'attention': '待核对', 'failed': '识别失败', 'reviewed': '已手工核对'}[file['evidence_status']] ?? '已上传'} · 点击预览',
+                  ),
+                  trailing:
+                      [
+                            'attention',
+                            'failed',
+                          ].contains(file['evidence_status']) ||
+                          file['recognitionError'] != null
+                      ? const Icon(Icons.circle, size: 10, color: Colors.red)
+                      : null,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AttachmentPage(
+                        api: widget.api,
+                        path: '/reimbursements/uploads/${file['id']}/preview',
+                        name: file['name'],
+                      ),
+                    ),
+                  ),
+                ),
+                if (file['evidence_status'] != 'reviewed' &&
+                    (file['recognitionError'] != null ||
+                        [
+                          'attention',
+                          'failed',
+                        ].contains(file['evidence_status']))) ...[
+                  Text(
+                    file['recognitionError'] ??
+                        maps(mapOf(file['evidence_result'])['issues'])
+                            .map((i) => '第 ${i['page']} 页：${i['message']}')
+                            .join('；'),
+                  ),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => recognizeEvidence(file, retry: true),
+                        child: const Text('重试'),
+                      ),
+                      TextButton(
+                        onPressed: () => associateEvidence(file),
+                        child: const Text('关联已有费用'),
+                      ),
+                      TextButton(
+                        onPressed: () => reviewEvidence(file),
+                        child: const Text('已手工核对'),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+        ],
+      ),
+    ),
+  );
 
   Future<void> recognizeInvoice(
     Map<String, dynamic> row,
@@ -1137,6 +1541,7 @@ class _ReimbursementFormState extends State<ReimbursementForm>
         if (attachment['recognitionError'] != null)
           Text(attachment['recognitionError']),
         if (attachment['mime'] == 'application/pdf' &&
+            attachment['evidence_status'] == null &&
             attachment['recognizing'] != true)
           TextButton(
             onPressed: busy || pending != null
@@ -1187,7 +1592,9 @@ class _ReimbursementFormState extends State<ReimbursementForm>
         error = '';
       });
       try {
-        if (draftRevision > 0 || file.name.toLowerCase().endsWith('.pdf')) {
+        if (draftRevision > 0 ||
+            batchEvidence ||
+            file.name.toLowerCase().endsWith('.pdf')) {
           uploadContexts.putIfAbsent(
             file,
             () => jsonEncode({
@@ -1220,7 +1627,14 @@ class _ReimbursementFormState extends State<ReimbursementForm>
             row['attachments'].add(result['file']);
             row['failed'].remove(file);
           });
-          if (result['file']['mime'] == 'application/pdf') {
+          if (batchEvidence ||
+              evidenceLocals.any((f) => identical(f['file'], file))) {
+            final local = evidenceLocals
+                .where((f) => identical(f['file'], file))
+                .firstOrNull;
+            if (local != null) local['id'] = result['file']['id'];
+            recognizeEvidence(result['file']);
+          } else if (result['file']['mime'] == 'application/pdf') {
             recognizeInvoice(row, result['file']);
           }
         }
@@ -1242,6 +1656,20 @@ class _ReimbursementFormState extends State<ReimbursementForm>
   }
 
   Future<void> submit() async {
+    if (batchEvidence ||
+        evidenceCards().any(
+          (f) =>
+              [
+                'queued',
+                'processing',
+                'attention',
+                'failed',
+              ].contains(f['evidence_status']) ||
+              (f['evidence_status'] != null && f['recognitionError'] != null),
+        )) {
+      setState(() => error = '请等待识别完成并处理红点附件');
+      return;
+    }
     if (widget.api.user?['id'] != account ||
         draftLoadFailed ||
         restoring ||
@@ -1278,6 +1706,8 @@ class _ReimbursementFormState extends State<ReimbursementForm>
                 'invoice_date': r['invoice_date'].text.isEmpty
                     ? null
                     : r['invoice_date'].text,
+                if (r['evidence_source'] != null)
+                  'evidence_source': r['evidence_source'],
                 'attachments': (r['attachments'] as List)
                     .map((a) => a['id'])
                     .toList(),
@@ -1432,6 +1862,7 @@ class _ReimbursementFormState extends State<ReimbursementForm>
                     ],
                   ),
                 ),
+                evidencePanel(),
                 for (final (i, r) in rows.indexed)
                   Card(
                     key: ValueKey(r['key']),
@@ -1534,9 +1965,13 @@ class _ReimbursementFormState extends State<ReimbursementForm>
                                 onPressed:
                                     busy || pending != null || uploading > 0
                                     ? null
-                                    : () => setState(
-                                        () => r['attachments'].remove(a),
-                                      ),
+                                    : () => setState(() {
+                                        r['attachments'].remove(a);
+                                        if (r['evidence_source']?['upload_id'] ==
+                                            a['id']) {
+                                          r.remove('evidence_source');
+                                        }
+                                      }),
                                 icon: const Icon(Icons.close),
                               ),
                             ),

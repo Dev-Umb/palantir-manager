@@ -15,6 +15,17 @@ Future<UploadFile?> selectUpload() async {
   }
 }
 
+Future<List<UploadFile>> selectUploads() async {
+  try {
+    final result = await android.invokeListMethod<dynamic>('pickFiles');
+    return (result ?? [])
+        .map((f) => UploadFile(f['name'] as String, f['bytes'] as Uint8List))
+        .toList();
+  } on PlatformException catch (e) {
+    throw ApiFailure(e.message ?? '文件选择失败');
+  }
+}
+
 Future<void> openExternal(BuildContext context, Uri uri) async {
   if (!['https', 'http', 'tel'].contains(uri.scheme)) {
     toast(context, '不支持此链接');
@@ -30,11 +41,13 @@ Future<void> openExternal(BuildContext context, Uri uri) async {
 class AttachmentPage extends StatefulWidget {
   final PalantirApi api;
   final String path, name;
+  final Uint8List? localBytes;
   const AttachmentPage({
     super.key,
     required this.api,
     required this.path,
     required this.name,
+    this.localBytes,
   });
   @override
   State<AttachmentPage> createState() => _AttachmentPageState();
@@ -63,7 +76,7 @@ class _AttachmentPageState extends State<AttachmentPage> {
       error = null;
     });
     try {
-      final bytes = await widget.api.download(widget.path);
+      final bytes = widget.localBytes ?? await widget.api.download(widget.path);
       if (!mounted) return;
       if (bytes.length >= 4 && String.fromCharCodes(bytes.take(4)) == '%PDF') {
         final result = await android.invokeMapMethod<String, dynamic>(

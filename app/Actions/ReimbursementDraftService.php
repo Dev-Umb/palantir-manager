@@ -9,6 +9,7 @@ use App\Models\ReimbursementUpload;
 use App\Models\ReimbursementVersion;
 use App\Models\StoredAttachment;
 use App\Models\User;
+use App\Support\ReimbursementEvidenceSources;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -54,7 +55,7 @@ class ReimbursementDraftService
                     throw ValidationException::withMessages(['payload.items' => '附件不属于此草稿或已用于其他申请。']);
                 }
             }
-            abort_unless(count($ids) === count(array_unique($ids)), 422, '附件不能重复使用。');
+            app(ReimbursementEvidenceSources::class)->validate($data['payload']['items']);
             $draft ??= new ReimbursementDraft(['id' => $id, 'user_id' => $actor->id]);
             $draft->fill(['payload' => $data['payload'], 'revision' => $draft->revision + 1])->save();
             ReimbursementUpload::whereIn('id', $ids)->whereNull('draft_id')->update(['draft_id' => $id]);
@@ -86,7 +87,7 @@ class ReimbursementDraftService
                 $upload = $uploads->get($id);
                 $file = $stored->get($upload?->stored_attachment_id);
 
-                return ['id' => $id, 'name' => $file?->original_name ?? '附件不可用', 'mime' => $file?->mime_type, 'size' => $file?->size, 'url' => route('reimbursements.drafts.file', [$draft->id, $id], false)];
+                return ['evidence_status' => $upload?->evidence_status, 'evidence_result' => $upload?->evidence_result, 'id' => $id, 'name' => $file?->original_name ?? '附件不可用', 'mime' => $file?->mime_type, 'size' => $file?->size, 'url' => route('reimbursements.drafts.file', [$draft->id, $id], false)];
             }, $item['attachments']);
         }
 

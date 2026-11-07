@@ -128,14 +128,16 @@ class MainActivity : FlutterActivity() {
                         }
                     } catch (_: Exception) { runOnUiThread { result.error("share", "报价文件无法分享，请重试", null) } }
                 }
-                "pickFile" -> {
+                "pickFile", "pickFiles" -> {
                     if (picker != null) { result.error("busy", "文件选择器已打开", null) }
                     else {
                         picker = result
+                        pickerMultiple = call.method == "pickFiles"
                         try {
                             val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                                 addCategory(Intent.CATEGORY_OPENABLE)
                                 type = "*/*"
+                                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, pickerMultiple)
                                 putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "image/jpeg", "image/png"))
                             }
                             startActivityForResult(intent, 71)
@@ -186,6 +188,8 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private var pickerMultiple = false
+
     @Deprecated("Used for the Flutter host activity's system document picker")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -207,10 +211,13 @@ class MainActivity : FlutterActivity() {
         if (requestCode != 71) return
         val result = picker ?: return
         picker = null
-        val uri = data?.data
-        if (resultCode != Activity.RESULT_OK || uri == null) { result.success(null); return }
+        val multiple = pickerMultiple
+        val uris = data?.clipData?.let { clip -> (0 until clip.itemCount).map { clip.getItemAt(it).uri } } ?: listOfNotNull(data?.data)
+        if (resultCode != Activity.RESULT_OK || uris.isEmpty()) { result.success(null); return }
+        if (uris.size > 9) { result.error("file", "每次最多选择 9 个文件", null); return }
         worker.execute {
             try {
+                val selected = uris.map { uri ->
                 var name = "附件"
                 contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                     if (cursor.moveToFirst()) name = cursor.getString(0)
@@ -226,7 +233,9 @@ class MainActivity : FlutterActivity() {
                     }
                     stream.toByteArray()
                 }
-                runOnUiThread { result.success(mapOf("name" to name, "bytes" to bytes)) }
+                mapOf("name" to name, "bytes" to bytes)
+                }
+                runOnUiThread { result.success(if (multiple) selected else selected.first()) }
             } catch (_: Exception) { runOnUiThread { result.error("file", "无法读取文件，请检查格式及大小（最大 20 MB）", null) } }
         }
     }

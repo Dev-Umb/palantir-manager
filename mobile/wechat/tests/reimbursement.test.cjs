@@ -102,3 +102,39 @@ test('expense red trash keeps removal, upload protection and remaining expense a
  const p=load('form',{onClear(){}});p.data.items=[{amount:'113.00',attachments:[{id:'first'}]},{amount:'20.50',attachments:[{id:'second'}]}];const e={currentTarget:{dataset:{i:0}}};p.data.uploading=true;p.remove(e);assert.equal(p.data.items.length,2);p.data.uploading=false;p.remove(e);assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].attachments[0].id,'second');assert.equal(p.data.total,'20.50');
  const w=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/form.wxml'),'utf8');assert.match(w,/class="delete-icon-button" aria-label="删除费用/);assert.match(w,/wx:if="{{items.length>1}}"/);assert.match(w,/bindtap="removeFile">移除/);const css=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/common.wxss'),'utf8');assert.match(css,/color:#d93025/);
 });
+
+test('multi-ticket evidence creates editable expenses once and preserves manual edits on retry',async()=>{
+ const file={id:'pdf',name:'多票.pdf'},candidates=[{id:'1-1',page:1,amount:'10.00',description:'发票 A',number:'A12345678'},{id:'2-1',page:2,amount:'20.00',description:'发票 B',number:'B12345678'}];
+ const p=load('form',{onClear(){},epoch:()=>1,request:async()=>({status:'completed',result:{items:candidates}})});
+ p.data.items=[{key:'row',description:'',amount:'',invoice_date:'',attachments:[file],failed:[]}];
+ await p.recognizeEvidence(file);assert.equal(p.data.items.length,2);assert.equal(p.data.total,'30.00');
+ p.data.items[0].amount='12.00';p.data.items[0].description='手工确认';await p.recognizeEvidence(file,true);
+ assert.equal(p.data.items.length,2);assert.equal(p.data.items[0].amount,'12.00');assert.equal(p.data.items[0].description,'手工确认');assert.equal(p.draftPayload().items[1].evidence_source.candidate_id,'2-1');
+});
+test('evidence does not repartition a manually filled expense and ignores late account responses',async()=>{
+ const file={id:'pdf',name:'票.pdf'};let epoch=1,finish;const p=load('form',{onClear(){},epoch:()=>epoch,request:()=>new Promise(r=>finish=r)});
+ p.data.items=[{key:'r',description:'手填',amount:'9.00',attachments:[file],failed:[]}];
+ let call=p.recognizeEvidence(file);finish({status:'completed',result:{items:[{id:'1-1',amount:'10.00'}]}});await call;
+ assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].amount,'9.00');assert.match(file.recognitionError,/手工/);
+ call=p.recognizeEvidence(file);epoch=2;finish({status:'completed',result:{items:[{id:'2-1',amount:'99.00'}]}});await call;assert.equal(p.data.items.length,1);
+});
+test('batch upload retries failed file in its original expense and leaves successful files intact',async()=>{
+ let fail=true,n=0;const p=load('form',{onClear(){},epoch:()=>1,upload:async()=>{if(fail)throw Error('断网');return {file:{id:String(++n),name:'a.png',mime:'image/png'}};}});
+ p.recognizeEvidence=async()=>{};
+ const file={path:'/a.png',name:'a.png',size:2};await p.uploadAttachments([file]);assert.equal(p.data.items.length,1);assert.equal(p.data.attachmentCards[0].red,true);
+ const retry=p.localFiles[0];p.localFiles=[];fail=false;await p.uploadAttachments([retry]);assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].failed.length,0);assert.equal(p.data.items[0].attachments.length,1);
+});
+test('local preview works before upload and does not clear failure status',async()=>{
+ let path;const p=load('form',{onClear(){},epoch:()=>1},{openDocument:o=>{path=o.filePath;o.success();}});
+ p.data.attachmentCards=[{name:'a.pdf',path:'/queued.pdf',red:true}];await p.previewAttachment({currentTarget:{dataset:{index:0}}});assert.equal(path,'/queued.pdf');assert.equal(p.data.attachmentCards[0].red,true);
+});
+test('explicitly associating payment evidence removes generated duplicate expense but preserves target amount',async()=>{
+ const invoice={id:'invoice',name:'发票.pdf'},payment={id:'payment',name:'付款.png',evidence_status:'attention'};
+ const p=load('form',{onClear(){},epoch:()=>1,request:async()=>({status:'reviewed'})},{showActionSheet:o=>o.success({tapIndex:0}),showModal:o=>o.success({confirm:true})});
+ p.data.items=[{key:'a',description:'原始发票',amount:'60.00',attachments:[invoice],failed:[]},{key:'b',description:'付款凭证',amount:'60.00',attachments:[payment],failed:[],evidence_source:{upload_id:'payment',candidate_id:'1-1'}}];
+ p.refreshAttachments();p.associateEvidence({currentTarget:{dataset:{index:1}}});await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].amount,'60.00');assert.equal(p.data.items[0].attachments.length,2);assert.equal(payment.evidence_status,'reviewed');assert.equal(p.data.total,'60.00');
+});
+test('removing attachment while recognition is in flight prevents late expense insertion',async()=>{
+ let finish;const p=load('form',{onClear(){},epoch:()=>1,request:()=>new Promise(r=>finish=r)});const file={id:'a'};p.data.items[0].attachments=[file];const call=p.recognizeEvidence(file);p.removeFile({currentTarget:{dataset:{i:0,j:0}}});finish({status:'completed',result:{items:[{id:'1-1',amount:'90.00'}]}});await call;assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].amount,'');assert.equal(p.data.items[0].attachments.length,0);
+});
