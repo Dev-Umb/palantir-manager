@@ -121,12 +121,12 @@ describe('Layout workflow task navigation', () => {
 
 });
 
-it('compacts the finance reminder while preserving the password entry and default notice elsewhere', () => {
+it('hides the finance reminder while preserving the default notice elsewhere', () => {
     layoutUser.is_password_changed = false;
     try {
-        const {rerender}=render(<Layout hideHeader compactNotice title="财务工作台"><div>明细</div></Layout>);
+        const {rerender}=render(<Layout hideHeader hidePasswordReminder title="财务工作台"><div>明细</div></Layout>);
         expect(screen.queryByText('为保障账号安全，请修改密码。修改完成前将持续提醒。')).toBeNull();
-        expect(screen.getByRole('link',{name:'修改密码'})).toBeTruthy();
+        expect(screen.queryByRole('link',{name:'修改密码'})).toBeNull();
         expect(screen.queryByRole('heading',{name:'财务工作台'})).toBeNull();
         rerender(<Layout title="其他页面"><div>内容</div></Layout>);
         expect(screen.getByText('为保障账号安全，请修改密码。修改完成前将持续提醒。')).toBeTruthy();
