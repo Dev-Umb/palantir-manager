@@ -14,7 +14,7 @@ use App\Models\ReimbursementWorkflow;
 use App\Models\Role;
 use App\Models\StoredAttachment;
 use App\Models\User;
-use App\Support\BatchInvoiceRecognition;
+use App\Support\ReimbursementEvidenceRecognition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -241,13 +241,65 @@ class ReimbursementBatchTest extends TestCase
         $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
         $upload = ReimbursementUpload::factory()->create(['user_id' => $this->owner->id]);
         $f = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'upload_id' => $upload->id, 'status' => 'queued']);
-        $recognizer = \Mockery::mock(BatchInvoiceRecognition::class);
-        $recognizer->shouldReceive('recognize')->once()->andReturn(['type' => '话费', 'amount' => '50.00', 'invoice_date' => '2026-10-29', 'description' => '话费', 'warnings' => [], 'uncertain' => false, 'invoice_number' => '12345678', 'invoice_code' => null]);
+        $recognizer = \Mockery::mock(ReimbursementEvidenceRecognition::class);
+        $recognizer->shouldReceive('recognize')->once()->andReturn(['status' => 'completed', 'items' => [['id' => '1-1', 'page' => 1, 'type' => '话费', 'amount' => '50.00', 'invoice_date' => '2026-10-29', 'description' => '话费', 'number' => '12345678']], 'issues' => [], 'pages' => 1, 'done_pages' => [1]]);
         $job = new ProcessReimbursementInvoice($f->id);
         $job->handle($recognizer, app(ReimbursementBatchService::class));
         $job->handle($recognizer, app(ReimbursementBatchService::class));
         $this->assertDatabaseCount('reimbursement_drafts', 1);
         $this->assertSame('recognized', $f->fresh()->status);
+    }
+
+    public function test_actual_batch_job_continues_long_pdf_and_generates_each_expense_once(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        $upload = ReimbursementUpload::factory()->create(['user_id' => $this->owner->id]);
+        $file = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'upload_id' => $upload->id, 'status' => 'queued']);
+        $items = array_map(fn ($page) => ['id' => $page.'-1', 'page' => $page, 'type' => '住宿费', 'amount' => '10.00', 'description' => '住宿费', 'invoice_date' => '2026-11-08', 'number' => 'INV'.$page], range(1, 10));
+        $progress = ['status' => 'processing', 'items' => array_slice($items, 0, 5), 'issues' => [], 'pages' => 10, 'done_pages' => range(1, 5)];
+        $complete = ['status' => 'completed', 'items' => $items, 'issues' => [], 'pages' => 10, 'done_pages' => range(1, 10)];
+        $recognizer = \Mockery::mock(ReimbursementEvidenceRecognition::class);
+        $recognizer->shouldReceive('recognize')->with(\Mockery::type(StoredAttachment::class), [])->once()->andReturn($progress);
+        $recognizer->shouldReceive('recognize')->with(\Mockery::type(StoredAttachment::class), $progress)->once()->andReturn($complete);
+        $job = new ProcessReimbursementInvoice($file->id);
+        $job->handle($recognizer, app(ReimbursementBatchService::class));
+        $this->assertDatabaseCount('reimbursement_drafts', 0);
+        Queue::assertPushed(ProcessReimbursementInvoice::class, 1);
+        $job->handle($recognizer, app(ReimbursementBatchService::class));
+        $job->handle($recognizer, app(ReimbursementBatchService::class));
+        $draft = ReimbursementDraft::where('batch_id', $batch->id)->sole();
+        $this->assertCount(10, $draft->payload['items']);
+        $this->assertSame('10-1', $draft->payload['items'][9]['evidence_source']['candidate_id']);
+        $this->assertSame('completed', $upload->fresh()->evidence_status);
+        $this->actingAs($this->owner)->getJson('/reimbursements/drafts/'.$draft->id)->assertOk()->assertJsonCount(10, 'draft.payload.items');
+        $this->assertDatabaseCount('reimbursements', 0);
+    }
+
+    public function test_new_multifile_batch_combines_mixed_expenses_in_one_draft(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        foreach (['住宿费', '加油费'] as $type) {
+            $file = $this->recognized($batch, $type);
+            $file->update(['result' => ['type' => $type, 'sources' => [['id' => '1-1', 'page' => 1, 'description' => $type, 'amount' => '100.00', 'invoice_date' => null]]]]);
+        }
+        app(ReimbursementBatchService::class)->finish($batch);
+        $draft = ReimbursementDraft::where('batch_id', $batch->id)->sole();
+        $this->assertSame('其他', $draft->payload['type']);
+        $this->assertCount(2, $draft->payload['items']);
+    }
+
+    public function test_batch_bounds_count_expenses_not_pdf_files_and_keep_original_in_one_draft(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        foreach ([30, 25] as $count) {
+            $file = $this->recognized($batch);
+            $file->update(['result' => ['type' => '住宿费', 'sources' => array_map(fn ($page) => ['id' => $page.'-1', 'page' => $page, 'description' => '住宿', 'amount' => '1.00', 'invoice_date' => null], range(1, $count))]]);
+        }
+        app(ReimbursementBatchService::class)->finish($batch);
+        $drafts = ReimbursementDraft::where('batch_id', $batch->id)->get();
+        $this->assertCount(2, $drafts);
+        $this->assertEqualsCanonicalizing([25, 30], $drafts->map(fn ($d) => count($d->payload['items']))->all());
+        $this->assertCount(1, array_unique(array_column($drafts[0]->payload['items'], 'attachments'), SORT_REGULAR));
     }
 
     public function test_old_app_receives_safe_edit_notice_and_manual_types_remain_editable(): void
