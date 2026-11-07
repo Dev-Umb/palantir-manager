@@ -196,4 +196,31 @@ class FinanceShipmentTest extends TestCase
         $this->assertSame(1, $writer->documentCount([$first, $second]));
         $this->assertSame($before, $this->project->fresh()->getRawOriginal());
     }
+
+    public function test_legacy_headers_preserve_shipped_quantity_and_do_not_infer_arrival_dates(): void
+    {
+        $result = app(FinanceShipmentImport::class)->classify([
+            ['name' => '原发与回单', 'rows' => [
+                ['发货时间', '车号', '名称', '原发数量', '回单数量', '单价'],
+                ['2026.11.01', '晋A', '模板', 18.96, 18.56, 6550],
+            ]],
+            ['name' => '到货', 'rows' => [
+                ['到货日期', '材料名称', '数量(吨)', '单位'],
+                ['2026.11.01', '模板', 10, '吨'],
+            ]],
+            ['name' => '件和吨数', 'rows' => [
+                ['到货日期', '物资名称', '单位', '数量', '吨数'],
+                ['2026.11.01', '构件', '件', 2, 18.68],
+            ]],
+            ['name' => '无表头', 'rows' => [['2026.11.01', '晋B', '模板', 5]]],
+        ], 'legacy.xls');
+        $this->assertSame(18.96, $result['records'][0]['quantity']);
+        $this->assertSame('', $result['records'][0]['unit']);
+        $this->assertNull($result['records'][1]['date']);
+        $this->assertSame('吨', $result['records'][1]['unit']);
+        $this->assertEquals(2, $result['records'][2]['quantity']);
+        $this->assertSame('件', $result['records'][2]['unit']);
+        $this->assertSame('pending', $result['records'][3]['status']);
+        $this->assertSame(['2026.11.01', '晋B', '模板', '5'], $result['records'][3]['raw']);
+    }
 }

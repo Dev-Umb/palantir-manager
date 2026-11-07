@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Actions\SaveFinanceShipments;
+use App\Models\FinanceShipmentLedger;
 use App\Models\ObjectRecord;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -15,40 +16,43 @@ class FinanceShipmentImport
 {
     public function __construct(private SaveFinanceShipments $writer, private FinanceShipmentAccess $access) {}
 
-    public function preview(ObjectRecord $project, string $path, string $name, User $user): array
+    public function preview(ObjectRecord|FinanceShipmentLedger $project, string $path, string $name, User $user): array
     {
-        $this->access->authorize($user, $project);
-        $hash = hash_file('sha256', $path);
-        $existing = DB::table('finance_shipment_imports')->where('project_id', $project->id)->where('hash', $hash)->first();
-        if ($existing) {
-            return $this->present($existing);
-        }
-        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-        if (! in_array($extension, ['xls', 'xlsx', 'csv'], true) || filesize($path) > 20 * 1024 * 1024) {
-            throw ValidationException::withMessages(['file' => '请选择不超过20MiB的xls、xlsx或UTF-8 CSV。']);
-        }
-        $process = new Process([config('finance_shipments.python'), base_path('scripts/read-shipment-workbook.py'), $path, $extension]);
-        $process->setTimeout(30);
-        $process->run();
-        if (! $process->isSuccessful()) {
-            throw ValidationException::withMessages(['file' => '无法读取表格，请检查文件格式；服务器需要已安装的 Python xlrd/openpyxl 读取器。']);
-        }
-        $sheets = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
-        $preview = $this->deduplicate($this->classify($sheets, $name), $this->writer->current($project)['orders']);
-        $id = (string) Str::uuid();
-        $stored = 'finance-shipments/'.$project->id.'/'.$hash.'.'.$extension;
-        $stream = fopen($path, 'rb');
-        try {
-            if (! Storage::disk('local')->put($stored, $stream)) {
-                throw ValidationException::withMessages(['file' => '原文件保存失败，尚未导入任何数据。']);
+        return DB::transaction(function () use ($project, $path, $name, $user): array {
+            $this->access->authorize($user, $project);
+            $project = $this->writer->resolve($project, $user);
+            $hash = hash_file('sha256', $path);
+            $existing = DB::table('finance_shipment_imports')->where('ledger_id', $project->id)->where('hash', $hash)->first();
+            if ($existing) {
+                return $this->present($existing);
             }
-        } finally {
-            fclose($stream);
-        }
-        DB::table('finance_shipment_imports')->insertOrIgnore(['id' => $id, 'project_id' => $project->id, 'user_id' => $user->id,
-            'hash' => $hash, 'name' => mb_substr($name, 0, 255), 'path' => $stored, 'preview' => json_encode($preview, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'created_at' => now(), 'updated_at' => now()]);
+            $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            if (! in_array($extension, ['xls', 'xlsx', 'csv'], true) || filesize($path) > 20 * 1024 * 1024) {
+                throw ValidationException::withMessages(['file' => '请选择不超过20MiB的xls、xlsx或UTF-8 CSV。']);
+            }
+            $process = new Process([config('finance_shipments.python'), base_path('scripts/read-shipment-workbook.py'), $path, $extension]);
+            $process->setTimeout(30);
+            $process->run();
+            if (! $process->isSuccessful()) {
+                throw ValidationException::withMessages(['file' => '无法读取表格，请检查文件格式；服务器需要已安装的 Python xlrd/openpyxl 读取器。']);
+            }
+            $sheets = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+            $preview = $this->deduplicate($this->classify($sheets, $name), $this->writer->current($project)['orders']);
+            $id = (string) Str::uuid();
+            $stored = 'finance-shipments/ledger-'.$project->id.'/'.$hash.'.'.$extension;
+            $stream = fopen($path, 'rb');
+            try {
+                if (! Storage::disk('local')->put($stored, $stream)) {
+                    throw ValidationException::withMessages(['file' => '原文件保存失败，尚未导入任何数据。']);
+                }
+            } finally {
+                fclose($stream);
+            }
+            DB::table('finance_shipment_imports')->insertOrIgnore(['id' => $id, 'project_id' => $project->project_id, 'ledger_id' => $project->id, 'user_id' => $user->id,
+                'hash' => $hash, 'name' => mb_substr($name, 0, 255), 'path' => $stored, 'preview' => json_encode($preview, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'created_at' => now(), 'updated_at' => now()]);
 
-        return $this->present(DB::table('finance_shipment_imports')->where('project_id', $project->id)->where('hash', $hash)->sole());
+            return $this->present(DB::table('finance_shipment_imports')->where('ledger_id', $project->id)->where('hash', $hash)->sole());
+        });
     }
 
     public function present(object $import): array
@@ -62,13 +66,13 @@ class FinanceShipmentImport
             'draft_count' => count(array_filter($importable, fn (array $r): bool => $r['status'] === 'pending'))];
     }
 
-    public function commit(ObjectRecord $project, string $id, User $user, bool $supplementPending = false): array
+    public function commit(ObjectRecord|FinanceShipmentLedger $project, string $id, User $user, bool $supplementPending = false): array
     {
         $this->access->authorize($user, $project);
 
         return DB::transaction(function () use ($project, $id, $user, $supplementPending): array {
-            $project = ObjectRecord::query()->lockForUpdate()->findOrFail($project->id);
-            $import = DB::table('finance_shipment_imports')->where('project_id', $project->id)->where('id', $id)->lockForUpdate()->first();
+            $project = $this->writer->resolve($project, $user);
+            $import = DB::table('finance_shipment_imports')->where('ledger_id', $project->id)->where('id', $id)->lockForUpdate()->first();
             abort_unless($import, 404);
             if ($import->imported_at && ! $supplementPending) {
                 return [...$this->writer->current($project), 'import' => $this->present($import)];
@@ -104,26 +108,33 @@ class FinanceShipmentImport
     public function classify(array $sheets, string $file): array
     {
         $records = [];
-        $aliases = ['date' => ['发货时间', '发货日期'], 'vehicle' => ['车号', '车牌号'], 'name' => ['货物名称', '发货名称', '物资名称', '产品名称'], 'quantity' => ['数量', '吨数', '实收数量', '重量', '重量（吨）', '数量（吨）'], 'unit' => ['单位', '计量单位'], 'price' => ['单价', '结算单价'], 'amount' => ['金额', '结算金额'], 'note' => ['备注']];
+        $aliases = ['date' => ['发货时间', '发货日期'], 'arrival_date' => ['到货日期'], 'vehicle' => ['车号', '车牌号'], 'name' => ['货物名称', '发货名称', '物资名称', '产品名称', '材料名称', '名称'], 'quantity' => ['原发数量', '数量', '吨数', '实收数量', '重量', '重量（吨）', '数量（吨）', '数量(吨)', '回单数量'], 'unit' => ['单位', '计量单位'], 'price' => ['单价', '结算单价'], 'amount' => ['金额', '结算金额'], 'note' => ['备注']];
         foreach ($sheets as $sheet) {
             $map = [];
             $tonnes = false;
+            $receiptOnly = false;
+            $recognized = false;
             foreach ($sheet['rows'] as $index => $cells) {
                 $cells = array_map(fn ($v): string => trim((string) ($v ?? '')), $cells);
                 if (! array_filter($cells, fn (string $v): bool => $v !== '')) {
                     continue;
                 }
                 $candidate = [];
+                $labels = array_map(fn (string $label): string => preg_replace('/\s+/u', '', $label), $cells);
                 foreach ($aliases as $key => $names) {
-                    foreach ($cells as $column => $label) {
-                        if (in_array(preg_replace('/\s+/u', '', $label), $names, true)) {
+                    foreach ($names as $name) {
+                        $column = array_search($name, $labels, true);
+                        if ($column !== false) {
                             $candidate[$key] = $column;
+                            break;
                         }
                     }
                 }
-                if (isset($candidate['date'], $candidate['name'], $candidate['quantity'])) {
+                if (isset($candidate['name'], $candidate['quantity']) && (isset($candidate['date']) || isset($candidate['arrival_date']))) {
+                    $recognized = true;
                     $map = $candidate;
-                    $tonnes = in_array($cells[$map['quantity']], ['吨数', '重量（吨）', '数量（吨）'], true);
+                    $tonnes = in_array($cells[$map['quantity']], ['吨数', '重量（吨）', '数量（吨）', '数量(吨)'], true);
+                    $receiptOnly = $labels[$map['quantity']] === '回单数量';
 
                     continue;
                 }
@@ -132,7 +143,7 @@ class FinanceShipmentImport
                 }
                 $get = fn (string $key): string => isset($map[$key]) ? ($cells[$map[$key]] ?? '') : '';
                 $source = mb_substr($file.' / '.$sheet['name'].' / 第'.($index + 1).'行', 0, 500);
-                $businessText = implode(' ', array_slice($cells, 0, max($map['name'], $map['quantity'], $map['date'], $map['vehicle'] ?? 0) + 1));
+                $businessText = implode(' ', array_slice($cells, 0, max($map['name'], $map['quantity'], $map['date'] ?? $map['arrival_date'] ?? 0, $map['vehicle'] ?? 0) + 1));
                 $status = 'ready';
                 $reason = '';
                 if (preg_match('/开票|发票|收款|回款|付款|小计|合计|总计|累计|结算|扣运费|欠款|运费/', $businessText)) {
@@ -144,6 +155,12 @@ class FinanceShipmentImport
                 $quantity = is_numeric($get('quantity')) ? round((float) $get('quantity'), 3) : null;
                 $price = is_numeric($get('price')) ? round((float) $get('price'), 2) : null;
                 $problems = [];
+                if ($receiptOnly) {
+                    $problems[] = '仅有回单数量，实际发货数量待确认';
+                }
+                if (isset($map['arrival_date']) && ! isset($map['date'])) {
+                    $problems[] = '到货日期不作为发货日期';
+                }
                 if (! $date) {
                     $problems[] = '发货日期缺失或无法识别';
                 }
@@ -169,6 +186,18 @@ class FinanceShipmentImport
                 $records[] = ['status' => $status, 'reason' => $reason, 'source' => $source, 'date' => $date, 'vehicle' => mb_substr($get('vehicle'), 0, 200),
                     'name' => mb_substr($get('name'), 0, 300), 'unit' => $unit, 'quantity' => $quantity, 'price' => $price,
                     'note' => mb_substr($get('note'), 0, 1000), 'original_amount' => $get('amount'), 'raw' => $cells];
+            }
+            if (! $recognized) {
+                foreach ($sheet['rows'] as $index => $cells) {
+                    $cells = array_map(fn ($value): string => trim((string) ($value ?? '')), $cells);
+                    if (count(array_filter($cells, fn (string $value): bool => $value !== '')) < 2) {
+                        continue;
+                    }
+                    $records[] = ['status' => 'pending', 'reason' => '未识别发货表头，保留原始内容待订正',
+                        'source' => mb_substr($file.' / '.$sheet['name'].' / 第'.($index + 1).'行', 0, 500),
+                        'date' => null, 'vehicle' => '', 'name' => '', 'unit' => '', 'quantity' => null, 'price' => null,
+                        'note' => '未识别表头', 'original_amount' => '', 'raw' => $cells];
+                }
             }
         }
         $counts = ['ready' => 0, 'pending' => 0, 'excluded' => 0];
@@ -210,7 +239,7 @@ class FinanceShipmentImport
         return in_array($record['status'], ['ready', 'pending'], true)
             && trim($record['name']) !== '' && $record['quantity'] > 0 && $record['quantity'] <= 99999.999
             && in_array($record['unit'], ['', '吨', '件', '台', '米'], true)
-            && ! preg_match('/疑似重复|退货|冲减|无效|单价需|货物名称缺失/u', $record['reason']);
+            && ! preg_match('/疑似重复|退货|冲减|无效|单价需|货物名称缺失|仅有回单/u', $record['reason']);
     }
 
     private function normalizePreview(array $preview): array
