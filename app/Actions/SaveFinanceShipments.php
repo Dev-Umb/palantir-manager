@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\FinanceShipmentAccess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class SaveFinanceShipments
 {
@@ -92,6 +93,24 @@ class SaveFinanceShipments
                 $order['source'] = $oldSources->has($order['id']) ? $oldSources[$order['id']] : ($trustedImport ? ($order['source'] ?? null) : null);
             }
             unset($order);
+            $groups = collect($input['orders'])->groupBy(fn (array $order): string => ! empty($order['source']) ? preg_replace('/ \/ 第\d+行$/u', '', $order['source']) : '手工录入');
+            foreach ($groups as $group) {
+                $seen = [];
+                foreach ($group->sortBy(function (array $order): int {
+                    preg_match('/第(\d+)行$/u', $order['source'] ?? '', $match);
+
+                    return (int) ($match[1] ?? 0);
+                }) as $order) {
+                    foreach ($order['rows'] as $row) {
+                        $seen[$row['id']] = true;
+                        foreach ($row['subtotal_starts'] ?? [] as $start) {
+                            if (! isset($seen[$start])) {
+                                throw ValidationException::withMessages(['orders' => '小计范围必须引用同一工作表中当前行或前面的明细。']);
+                            }
+                        }
+                    }
+                }
+            }
             if ($before === $input['orders']) {
                 return $this->current($project);
             }

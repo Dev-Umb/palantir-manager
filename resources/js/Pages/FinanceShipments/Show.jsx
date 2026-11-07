@@ -1,11 +1,13 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import Layout from '../../Components/Layout';
 import { blankRow, blankOrder, sheetGroups, totals, number, request } from './ledger';
 import './finance.css';
 export default function Show({ project, ledger, imports: initialImports, urls }) {
     const [orders, setOrders] = useState(ledger.orders), [status, setStatus] = useState('已加载'), [error, setError] = useState(null), [menu, setMenu] = useState(null), [imports, setImports] = useState(initialImports), [preview, setPreview] = useState(null), [busy, setBusy] = useState(false);
     const current = useRef(orders), saved = useRef(JSON.stringify(orders)), revision = useRef(ledger.revision), inflight = useRef(false), timer = useRef(), stopped = useRef(false), alive = useRef(true), wrap = useRef(), uploadInput = useRef();
+    const [selection, setSelection] = useState(null), [unitPicker, setUnitPicker] = useState(null);
+    const drag = useRef(null), suppressClick = useRef(false);
     const summary = totals(orders);
     const groups = sheetGroups(orders);
     const flatRows = groups.flatMap(group => group.rows);
@@ -37,6 +39,25 @@ export default function Show({ project, ledger, imports: initialImports, urls })
     }, []);
     useEffect(() => { if (preview) wrap.current?.querySelector('.finance-preview')?.scrollIntoView?.({ block: 'start' }); }, [preview]);
     useEffect(() => { const close = e => { if (e.key === 'Escape' || (e.type === 'pointerdown' && !e.target.closest('.finance-context'))) setMenu(null); }; document.addEventListener('pointerdown', close); document.addEventListener('keydown', close); return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', close); }; }, []);
+    useEffect(() => {
+        const end = () => { drag.current = null; };
+        document.addEventListener('mouseup', end);
+        return () => document.removeEventListener('mouseup', end);
+    }, []);
+    function selectTo(id, anchor = selection?.start) {
+        const group = groups.find(group => group.rows.some(item => item.row.id === anchor));
+        if (!group?.rows.some(item => item.row.id === id)) return;
+        setSelection({ start: anchor, end: id });
+    }
+    const selectedGroup = groups.find(group => group.rows.some(item => item.row.id === selection?.start));
+    const selectedIndices = selectedGroup && [selection.start, selection.end].map(id => selectedGroup.rows.findIndex(item => item.row.id === id)).sort((a,b) => a-b);
+    const selectedRows = selectedIndices ? selectedGroup.rows.slice(selectedIndices[0], selectedIndices[1] + 1) : [];
+    function subtotal(removeStart = null, target = selectedRows.at(-1)) {
+        if (!target) return;
+        const next = structuredClone(current.current), row = next[target.oi].rows[target.ri];
+        row.subtotal_starts = removeStart ? (row.subtotal_starts || []).filter(id => id !== removeStart) : [...new Set([...(row.subtotal_starts || []), selectedRows[0].row.id])];
+        change(next); setMenu(null);
+    }
     function edit(orderIndex, rowIndex, key, value) {
         const next = structuredClone(current.current);
         if (!next[orderIndex]) next.push({ ...blankOrder(), date: null });
@@ -51,7 +72,7 @@ export default function Show({ project, ledger, imports: initialImports, urls })
         next[orderIndex].rows.splice(rowIndex + 1, 0, blankRow()); change(next); setMenu(null);
         setTimeout(() => wrap.current?.querySelector(`[data-cell="${orderIndex}-${rowIndex + 1}-name"]`)?.focus(), 0);
     }
-    function context(e, oi, ri) { e.preventDefault(); const rect = wrap.current.getBoundingClientRect(); setMenu({ oi, ri, x: Math.max(0, Math.min((e.clientX || e.currentTarget.getBoundingClientRect().left) - rect.left, rect.width - 210)), y: (e.clientY || e.currentTarget.getBoundingClientRect().bottom) - rect.top }); }
+    function context(e, oi, ri) { e.preventDefault(); const id = current.current[oi]?.rows[ri]?.id; if (!selectedRows.some(item => item.row.id === id)) setSelection(id ? {start:id,end:id} : null); const rect = wrap.current.getBoundingClientRect(); setMenu({ oi, ri, x: Math.max(0, Math.min((e.clientX || e.currentTarget.getBoundingClientRect().left) - rect.left, rect.width - 210)), y: (e.clientY || e.currentTarget.getBoundingClientRect().bottom) - rect.top }); }
     function keyboard(e, oi, ri, key) {
         if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
             e.preventDefault();
@@ -66,10 +87,17 @@ export default function Show({ project, ledger, imports: initialImports, urls })
     function renderRow({oi, ri, row, source}, index, blank = false) {
         const labels = {date:'发货日期',vehicle:'车牌号',name:'货物名称',unit:'单位',quantity:'数量',price:'单价',note:'备注'};
         const cell = key => <td key={key}>{key === 'unit'
-            ? <select aria-label={`第${index + 1}行单位`} data-cell={`${oi}-${ri}-${key}`} value={row.unit || '吨'} onChange={e => edit(oi, ri, key, e.target.value)} onBlur={flush} onKeyDown={e => keyboard(e, oi, ri, key)}>{['吨','件','台','米'].map(unit => <option key={unit}>{unit}</option>)}</select>
+            ? <select size={unitPicker === row.id ? 4 : undefined} aria-label={`第${index + 1}行单位`} data-cell={`${oi}-${ri}-${key}`} value={row.unit || '吨'} onChange={e => { edit(oi, ri, key, e.target.value); setUnitPicker(null); }} onBlur={() => { setUnitPicker(null); flush(); }} onKeyDown={e => { if (e.key === 'Escape') setUnitPicker(null); keyboard(e, oi, ri, key); }}>{['吨','件','台','米'].map(unit => <option key={unit}>{unit}</option>)}</select>
             : <input aria-label={`第${index + 1}行${labels[key]}`} data-cell={`${oi}-${ri}-${key}`} type={key === 'date' ? 'date' : ['quantity','price'].includes(key) ? 'number' : 'text'} min={['quantity','price'].includes(key) ? '0' : undefined} max={key === 'price' ? '99999.99' : key === 'quantity' ? '99999.999' : undefined} step={key === 'price' ? '0.01' : '0.001'} value={row[key] ?? ''} placeholder={blank && key === 'name' ? '直接输入新明细' : ''} onChange={e => edit(oi, ri, key, e.target.value)} onBlur={flush} onKeyDown={e => keyboard(e, oi, ri, key)} />}</td>;
-        return <tr key={row.id} title={source || undefined} onContextMenu={e => context(e, oi, ri)}>
-            <th scope="row">{index + 1}</th>{['date','vehicle','name','unit','quantity','price'].map(cell)}
+        return <tr key={row.id} title={source || undefined} aria-selected={!blank && selectedRows.some(item => item.row.id === row.id)} className={!blank && selectedRows.some(item => item.row.id === row.id) ? 'finance-selected-row' : undefined}
+            onMouseDownCapture={e => { if (e.button !== 0 || blank || e.target.closest('button')) return; if (e.shiftKey && selection) { e.preventDefault(); selectTo(row.id); } else { drag.current = { id: row.id }; suppressClick.current = false; if (e.target.tagName === 'SELECT' && unitPicker !== row.id) e.preventDefault(); setSelection(null); } }}
+            onMouseEnter={e => { if (!blank && drag.current && e.buttons === 1 && (drag.current.id !== row.id || drag.current.moved)) { e.preventDefault(); drag.current.moved = true; suppressClick.current = true; selectTo(row.id, drag.current.id); window.getSelection()?.removeAllRanges(); } }}
+            onMouseUpCapture={e => { if (!suppressClick.current && e.target.tagName === 'SELECT' && unitPicker !== row.id) { e.target.focus(); setUnitPicker(row.id); } }}
+            onClickCapture={e => { if (suppressClick.current) { e.preventDefault(); e.stopPropagation(); suppressClick.current = false; } }}
+            onDragStart={e => e.preventDefault()}
+            onContextMenu={e => { if (!selectedRows.some(item => item.row.id === row.id)) setSelection(blank ? null : {start:row.id,end:row.id}); context(e, oi, ri); }}>
+
+            <th scope="row" tabIndex={blank ? undefined : 0} aria-label={`选择第${index + 1}行`} onKeyDown={e => { if (e.key === ' ') { e.preventDefault(); setSelection({start:row.id,end:row.id}); } if (e.shiftKey && ['ArrowUp','ArrowDown'].includes(e.key)) { e.preventDefault(); const next = flatRows[index + (e.key === 'ArrowDown' ? 1 : -1)]; if (next) selectTo(next.row.id, selection?.start || row.id); } if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) context(e,oi,ri); }}>{index + 1}</th>{['date','vehicle','name','unit','quantity','price'].map(cell)}
             <td className="finance-calculated">{row.quantity != null && row.price != null ? number(Math.round(Math.round(Number(row.quantity) * 1000) * Math.round(Number(row.price) * 100) / 1000) / 100) : '—'}</td>{cell('note')}
             <td><button className="ghost-button" aria-label={`第${index + 1}行操作`} onClick={e => context(e, oi, ri)}>⋯</button></td>
         </tr>;
@@ -81,13 +109,21 @@ export default function Show({ project, ledger, imports: initialImports, urls })
         <div className="finance-scroll"><table className="finance-grid finance-sheet-grid"><thead><tr>{['序号','发货日期','车牌号','货物名称','单位','数量','单价（元）','金额（元）','备注',''].map((label,i)=><th key={i}>{label}</th>)}</tr></thead>
             {groups.map(group => { const sum=totals(group.orders); return <tbody key={group.key}>
                 <tr className="finance-sheet-source"><th colSpan="10">{group.key}</th></tr>
-                {group.rows.map(row => renderRow(row,rowNumber++))}
+                {group.rows.map((row, position) => {
+                    const index = rowNumber++;
+                    return <Fragment key={row.row.id}>{renderRow(row,index)}{(row.row.subtotal_starts || []).map(start => {
+                        const first = group.rows.findIndex(item => item.row.id === start);
+                        if (first < 0 || first > position) return null;
+                        const sum = totals([{rows:group.rows.slice(first,position+1).map(item => item.row)}]);
+                        return <tr key={start} className="finance-sheet-subtotal"><th colSpan="5">第 {index - position + first + 1}–{index + 1} 行小计</th><td>{number(sum.tonnes)} 吨</td><td></td><td>{number(sum.amount)}</td><td colSpan="2"><button className="ghost-button" onClick={() => subtotal(start,row)}>删除小计</button></td></tr>;
+                    })}</Fragment>;
+                })}
                 <tr className="finance-sheet-subtotal"><th colSpan="5">小计</th><td>{number(sum.tonnes)} 吨</td><td></td><td>{number(sum.amount)}</td><td colSpan="2">{sum.pending > 0 ? `${sum.pending} 行待定` : ''}</td></tr>
             </tbody>; })}
             <tbody>{renderRow({oi:orders.length,ri:0,row:{id:'trailing',date:null,vehicle:'',name:'',unit:'吨',quantity:null,price:null,note:''}},rowNumber,true)}</tbody>
             <tfoot><tr><th colSpan="5">合计</th><td>{number(summary.tonnes)} 吨</td><td></td><td>{number(summary.amount)}</td><td colSpan="2">{summary.pending > 0 ? `${summary.pending} 行待定` : ''}</td></tr></tfoot>
         </table></div>
-        {menu && <div className="finance-context" role="group" aria-label="明细行操作" style={{ left: menu.x, top: menu.y }}><span>第 {menu.ri + 1} 行</span><button autoFocus onClick={() => insert(menu.oi, menu.ri)}>在下方插入明细</button><button className="ghost-button" onClick={() => setMenu(null)}>取消</button></div>}
+        {menu && <div className="finance-context" role="group" aria-label="明细行操作" style={{ left: menu.x, top: menu.y }}><span>第 {menu.ri + 1} 行</span><button autoFocus onClick={() => insert(menu.oi, menu.ri)}>在下方插入明细</button><button disabled={!selectedRows.length} onClick={() => subtotal()}>在选区下方插入小计</button><button className="ghost-button" onClick={() => setMenu(null)}>取消</button></div>}
         {preview && <section className="surface finance-preview"><div className="section-head"><h3>导入预检 · {preview.name}</h3><button className="ghost-button" onClick={() => setPreview(null)}>关闭</button></div><p>可进入明细 {preview.importable_count ?? preview.counts.ready} 行（含待确认 {preview.draft_count ?? 0} 行） · 待订正 {preview.counts.pending} 行 · 排除 {preview.counts.excluded} 行</p><p className="muted">未标单位按吨统计；件、台、米不计吨数。原文件和排除记录保留。</p><button disabled={busy || dirty() || !!preview.imported_at || !(preview.importable_count ?? preview.counts.ready)} onClick={commit}>{preview.imported_at ? '已导入，不会重复添加' : '确认导入发货明细'}</button><ImportRows records={preview.records} /></section>}
         <details className="finance-import-history"><summary>导入记录{importPending > 0 ? ` · ${importPending} 行待处理` : ''}</summary>{imports.length ? imports.map(item => <details key={item.id}><summary>{item.name} · {item.imported_at ? '已处理' : '待确认'} · 可导入 {item.counts.ready} / 待订正 {item.counts.pending} / 排除 {item.counts.excluded}</summary>{!item.imported_at && <button onClick={() => setPreview(item)}>查看预检</button>}<ImportRows records={item.records} /></details>) : <p className="muted">尚无导入记录</p>}</details>
     </div></Layout>;
