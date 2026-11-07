@@ -1,4 +1,4 @@
-export const blankRow = () => ({ id: crypto.randomUUID(), date: null, vehicle: '', name: '', unit: '吨', quantity: null, price: null, note: '' });
+export const blankRow = () => ({ id: crypto.randomUUID(), date: null, vehicle: '', name: '', unit: '吨', quantity: null, price: null, net_price: null, processing_fee: null, note: '' });
 export const blankOrder = () => ({ id: crypto.randomUUID(), date: new Date().toLocaleDateString('sv-SE'), vehicle: '', source: '', rows: [] });
 export function totals(orders) {
     let milli = 0, cents = 0, pending = 0; const dates = [];

@@ -94,7 +94,7 @@ class FinanceShipmentImport
                 }
                 $record['ledger_order_id'] = (string) Str::uuid();
                 $orders[] = ['id' => $record['ledger_order_id'], 'date' => $record['date'], 'vehicle' => $record['vehicle'], 'source' => $record['source'], 'rows' => [[
-                    'id' => (string) Str::uuid(), 'name' => $record['name'], 'unit' => $record['unit'] ?: null, 'quantity' => $record['quantity'], 'price' => $record['price'], 'note' => $record['note'],
+                    'id' => (string) Str::uuid(), 'name' => $record['name'], 'unit' => $record['unit'] ?: null, 'quantity' => $record['quantity'], 'price' => $record['price'], 'net_price' => $record['net_price'] ?? null, 'processing_fee' => $record['processing_fee'] ?? null, 'note' => $record['note'],
                 ]]];
             }
             unset($record);
@@ -108,7 +108,7 @@ class FinanceShipmentImport
     public function classify(array $sheets, string $file): array
     {
         $records = [];
-        $aliases = ['date' => ['发货时间', '发货日期'], 'arrival_date' => ['到货日期'], 'vehicle' => ['车号', '车牌号'], 'name' => ['货物名称', '发货名称', '物资名称', '产品名称', '材料名称', '名称'], 'quantity' => ['原发数量', '数量', '吨数', '实收数量', '重量', '重量（吨）', '数量（吨）', '数量(吨)', '回单数量'], 'unit' => ['单位', '计量单位'], 'price' => ['单价', '结算单价'], 'amount' => ['金额', '结算金额'], 'note' => ['备注']];
+        $aliases = ['date' => ['发货时间', '发货日期'], 'arrival_date' => ['到货日期'], 'vehicle' => ['车号', '车牌号'], 'name' => ['货物名称', '发货名称', '物资名称', '产品名称', '材料名称', '名称'], 'quantity' => ['原发数量', '数量', '吨数', '实收数量', '重量', '重量（吨）', '数量（吨）', '数量(吨)', '回单数量'], 'unit' => ['单位', '计量单位'], 'price' => ['单价', '结算单价'], 'net_price' => ['网价', '网价（元）', '网价(元)'], 'processing_fee' => ['加工费', '加工费（元）', '加工费(元)'], 'amount' => ['金额', '结算金额'], 'note' => ['备注']];
         foreach ($sheets as $sheet) {
             $map = [];
             $receiptOnly = false;
@@ -153,6 +153,14 @@ class FinanceShipmentImport
                 $quantity = is_numeric($get('quantity')) ? round((float) $get('quantity'), 3) : null;
                 $price = is_numeric($get('price')) ? round((float) $get('price'), 2) : null;
                 $problems = [];
+                $referencePrices = [];
+                foreach (['net_price' => '网价', 'processing_fee' => '加工费'] as $key => $label) {
+                    $value = $get($key);
+                    $referencePrices[$key] = is_numeric($value) ? round((float) $value, 2) : null;
+                    if ($value !== '' && ($referencePrices[$key] === null || $referencePrices[$key] < 0 || $referencePrices[$key] > 99999.99)) {
+                        $problems[] = $label.'需核对';
+                    }
+                }
                 if ($receiptOnly) {
                     $problems[] = '仅有回单数量，实际发货数量待确认';
                 }
@@ -176,7 +184,7 @@ class FinanceShipmentImport
                     $reason = implode('；', $problems);
                 }
                 $records[] = ['status' => $status, 'reason' => $reason, 'source' => $source, 'date' => $date, 'vehicle' => mb_substr($get('vehicle'), 0, 200),
-                    'name' => mb_substr($get('name'), 0, 300), 'unit' => $unit, 'quantity' => $quantity, 'price' => $price,
+                    'name' => mb_substr($get('name'), 0, 300), 'unit' => $unit, 'quantity' => $quantity, 'price' => $price, ...$referencePrices,
                     'note' => mb_substr($get('note'), 0, 1000), 'original_amount' => $get('amount'), 'raw' => $cells];
             }
             if (! $recognized) {
@@ -231,7 +239,7 @@ class FinanceShipmentImport
         return in_array($record['status'], ['ready', 'pending'], true)
             && trim($record['name']) !== '' && $record['quantity'] > 0 && $record['quantity'] <= 99999.999
             && in_array($record['unit'], ['', '吨', '件', '台', '米'], true)
-            && ! preg_match('/疑似重复|退货|冲减|无效|单价需|货物名称缺失|仅有回单/u', $record['reason']);
+            && ! preg_match('/疑似重复|退货|冲减|无效|单价需|网价需|加工费需|货物名称缺失|仅有回单/u', $record['reason']);
     }
 
     private function normalizePreview(array $preview): array
