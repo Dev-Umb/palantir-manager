@@ -83,6 +83,14 @@ class ReimbursementEvidenceTest extends TestCase
         $draft = app(ReimbursementDraftService::class)->save($user, (string) Str::uuid(), ['revision' => 0, 'payload' => ['title' => '测试', 'type' => '其他', 'note' => '', 'cc' => [], 'items' => $items]], true);
         $this->assertCount(2, $draft->payload['items']);
         $this->assertDatabaseCount('reimbursement_uploads', 1);
+        $url = '/reimbursements/drafts/'.$draft->id;
+        $this->actingAs($user)->putJson($url, ['revision' => $draft->revision, 'payload' => $draft->payload])->assertOk();
+        $this->getJson($url)->assertOk()->assertJsonCount(2, 'draft.payload.items');
+        foreach ([[$items[0], $items[0]], [['attachments' => [$upload->id, $upload->id]]], [['attachments' => [$upload->id]], ['attachments' => [$upload->id]]], [[...$items[0], 'evidence_source' => ['upload_id' => $upload->id, 'candidate_id' => '9-9']]]] as $invalidItems) {
+            $this->putJson($url, ['revision' => $draft->fresh()->revision, 'payload' => [...$draft->payload, 'items' => $invalidItems]])->assertUnprocessable();
+        }
+        $this->actingAs($this->owner())->putJson($url, ['revision' => $draft->fresh()->revision, 'payload' => $draft->payload])->assertForbidden();
+
         $this->expectException(ValidationException::class);
         app(ReimbursementEvidenceSources::class)->validate([$items[0], $items[0]]);
     }
