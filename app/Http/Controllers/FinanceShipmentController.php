@@ -40,23 +40,26 @@ class FinanceShipmentController extends Controller
             $project = $projects->get($ledger->project_id);
             $owner = $project?->payload['business_owner_user_id'] ?? null;
             $summary = $this->writer->summary($ledger->orders);
+            $canEdit = ! $project || $this->visibility->allowsRecordWrite($request->user(), $project);
 
             return ['id' => 'ledger-'.$ledger->id, 'ledger_id' => $ledger->id, 'revision' => $ledger->revision,
-                'project_id' => $ledger->project_id, 'title' => $project?->title ?: $ledger->title ?: '未命名台账',
-                'source_title' => $ledger->title, 'code' => $project?->code,
+                'project_id' => $ledger->project_id, 'title' => $ledger->display_title ?: $project?->title ?: $ledger->title ?: '未命名台账',
+                'source_title' => $ledger->title, 'project_title' => $project?->title, 'code' => $project?->code,
                 'owner_id' => $project ? ($owner ?: 'unassigned') : 'unlinked',
                 'owner' => $project ? ($owners->get($owner)?->name ?? '未分配业务员') : '待关联资料',
                 'tonnes' => $summary['tonnes'], 'last_date' => $summary['last_date'],
                 'pending' => $summary['pending'] + ($pendingImports->get($ledger->id) ?? 0),
                 'order_count' => $this->writer->documentCount($ledger->orders),
                 'url' => route('finance-shipments.ledgers.show', $ledger),
-                'association_url' => ! $project || $this->visibility->allowsRecordWrite($request->user(), $project) ? route('finance-shipments.ledgers.associate', $ledger) : null];
+                'rename_url' => $canEdit ? route('finance-shipments.ledgers.rename', $ledger) : null,
+                'association_url' => $canEdit ? route('finance-shipments.ledgers.associate', $ledger) : null];
         });
         foreach ($projects->except($ledgers->pluck('project_id')->filter()->all()) as $project) {
             $owner = $project->payload['business_owner_user_id'] ?? null;
             $rows->push(['id' => $project->id, 'title' => $project->title, 'code' => $project->code,
                 'owner_id' => $owner ?: 'unassigned', 'owner' => $owners->get($owner)?->name ?? '未分配业务员',
                 'tonnes' => null, 'last_date' => null, 'pending' => 0, 'order_count' => 0,
+                'revision' => 0, 'rename_url' => $this->visibility->allowsRecordWrite($request->user(), $project) ? route('finance-shipments.rename', $project) : null,
                 'url' => route('finance-shipments.show', $project)]);
         }
 
@@ -94,7 +97,7 @@ class FinanceShipmentController extends Controller
         $owner = $project ? User::find($project->payload['business_owner_user_id'] ?? null) : null;
 
         return Inertia::render('FinanceShipments/Show', [
-            'project' => ['id' => $project?->id, 'title' => $project?->title ?: $ledger->title ?: '未关联台账',
+            'project' => ['id' => $project?->id, 'title' => $ledger->display_title ?: $project?->title ?: $ledger->title ?: '未关联台账',
                 'code' => $project?->code, 'owner_id' => $project ? ($owner?->id ?? 'unassigned') : 'unlinked',
                 'owner' => $owner?->name ?? '待关联资料'],
             'ledger' => $this->writer->current($ledger),
@@ -102,6 +105,38 @@ class FinanceShipmentController extends Controller
             'urls' => ['index' => route('finance-shipments.index'), 'save' => route('finance-shipments.ledgers.save', $ledger),
                 'preview' => route('finance-shipments.ledgers.preview', $ledger), 'commit' => route('finance-shipments.ledgers.commit', $ledger)],
         ]);
+    }
+
+    public function renameLedger(Request $request, FinanceShipmentLedger $ledger): JsonResponse
+    {
+        return $this->rename($request, $ledger);
+    }
+
+    public function renameProject(Request $request, ObjectRecord $project): JsonResponse
+    {
+        return $this->rename($request, $project);
+    }
+
+    private function rename(Request $request, ObjectRecord|FinanceShipmentLedger $target): JsonResponse
+    {
+        $this->access->authorize($request->user(), $target);
+        $input = $request->validate(['display_title' => ['required', 'string', 'max:255'], 'revision' => ['required', 'integer', 'min:0']]);
+
+        return DB::transaction(function () use ($request, $target, $input): JsonResponse {
+            $ledger = $this->writer->resolve($target, $request->user());
+            $ledger = FinanceShipmentLedger::lockForUpdate()->findOrFail($ledger->id);
+            $this->access->authorize($request->user(), $ledger);
+            abort_unless($ledger->revision === (int) $input['revision'], 409, '台账已更新，名称未覆盖，请刷新后重试。');
+            if ($ledger->display_title !== $input['display_title']) {
+                $before = $ledger->display_title;
+                $ledger->update(['display_title' => $input['display_title'], 'revision' => $ledger->revision + 1]);
+                AuditLog::create(['user_id' => $request->user()->id, 'action' => 'finance.shipments.rename',
+                    'subject_type' => 'finance_shipment_ledger', 'subject_id' => $ledger->id,
+                    'payload' => ['before' => $before, 'after' => $ledger->display_title, 'revision' => $ledger->revision]]);
+            }
+
+            return response()->json(['display_title' => $ledger->display_title, 'revision' => $ledger->revision]);
+        });
     }
 
     public function saveLedger(SaveFinanceShipmentRequest $request, FinanceShipmentLedger $ledger): JsonResponse
