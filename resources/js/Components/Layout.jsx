@@ -16,7 +16,7 @@ const iconFor = {
     timebook: ClipboardCheck,
 };
 
-export default function Layout({ title, eyebrow, children, aside, immersive = false, hideHeader = false, compactNotice = false, cockpit = false, presentation = false }) {
+export default function Layout({ title, eyebrow, children, aside, immersive = false, hideHeader = false, hidePasswordReminder = false, cockpit = false, presentation = false }) {
     const page = usePage();
     const { auth, nav, flash, notificationUnreadCount = 0 } = page.props;
     const passwordChangeRequired = auth.user?.is_password_changed === false || auth.password_only;
@@ -162,10 +162,10 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                 onLogout={logout}
                 onDesktop={forcedMobile ? () => { setForcedMobile(false); setMobileMenuOpen(false); } : null}
             />
-            <main className={`workspace ${immersive ? 'workspace-immersive' : ''}`} style={immersive && passwordChangeRequired ? { gridTemplateRows: `${!hideHeader ? 'auto ' : ''}auto minmax(0, 1fr)` } : undefined}>
-                {passwordChangeRequired && (
-                    <div className={compactNotice ? "password-reminder-compact" : "password-reminder"} role="status">
-                        {!compactNotice && <span>{auth.user?.is_password_changed === false ? '为保障账号安全，请修改密码。修改完成前将持续提醒。' : '工日簿专用账号'}</span>}
+            <main className={`workspace ${immersive ? 'workspace-immersive' : ''}`} style={immersive && passwordChangeRequired && !hidePasswordReminder ? { gridTemplateRows: `${!hideHeader ? 'auto ' : ''}auto minmax(0, 1fr)` } : undefined}>
+                {passwordChangeRequired && !hidePasswordReminder && (
+                    <div className="password-reminder" role="status">
+                        <span>{auth.user?.is_password_changed === false ? '为保障账号安全，请修改密码。修改完成前将持续提醒。' : '工日簿专用账号'}</span>
                         <Link href={`${auth.settings_url}#password`}>修改密码</Link>
                     </div>
                 )}

@@ -5,7 +5,7 @@ import { blankRow, blankOrder, sheetGroups, totals, number, request } from './le
 import './finance.css';
 export default function Show({ project, ledger, imports: initialImports, urls }) {
     const [orders, setOrders] = useState(ledger.orders), [status, setStatus] = useState('已加载'), [error, setError] = useState(null), [menu, setMenu] = useState(null), [imports, setImports] = useState(initialImports), [preview, setPreview] = useState(null), [busy, setBusy] = useState(false);
-    const current = useRef(orders), saved = useRef(JSON.stringify(orders)), revision = useRef(ledger.revision), inflight = useRef(false), timer = useRef(), stopped = useRef(false), alive = useRef(true), wrap = useRef();
+    const current = useRef(orders), saved = useRef(JSON.stringify(orders)), revision = useRef(ledger.revision), inflight = useRef(false), timer = useRef(), stopped = useRef(false), alive = useRef(true), wrap = useRef(), uploadInput = useRef();
     const summary = totals(orders);
     const groups = sheetGroups(orders);
     const flatRows = groups.flatMap(group => group.rows);
@@ -75,8 +75,8 @@ export default function Show({ project, ledger, imports: initialImports, urls })
         </tr>;
     }
     let rowNumber = 0;
-    return <Layout hideHeader compactNotice><Head title={`${project.title || project.code} · 发货明细`} /><div className="finance-workbench finance-sheet" ref={wrap}>
-        <div className="finance-sheet-toolbar"><div className="finance-actions"><Link href={`${urls.index}?owner=${project.owner_id}`}>← 返回项目</Link><h2>{project.title || project.code}</h2></div><div className="finance-actions"><span role="status" className="finance-status">{status}</span><label className="finance-upload">{busy ? '处理中…' : '导入 Excel / CSV'}<input aria-label="导入发货数据" type="file" accept=".xls,.xlsx,.csv" disabled={busy || dirty() || inflight.current} onChange={e => { upload(e.target.files?.[0]); e.target.value = ''; }} /></label></div></div>
+    return <Layout hideHeader hidePasswordReminder><Head title={`${project.title || project.code} · 发货明细`} /><div className="finance-workbench finance-sheet" ref={wrap}>
+        <div className="finance-sheet-toolbar"><div className="finance-actions"><Link href={`${urls.index}?owner=${project.owner_id}`}>← 返回项目</Link><h2>{project.title || project.code}</h2></div><div className="finance-actions"><span role="status" className="finance-status">{status}</span><button type="button" disabled={busy || dirty() || inflight.current} onClick={() => uploadInput.current?.click()}>{busy ? '处理中…' : '导入Excel/CSV'}</button><input ref={uploadInput} hidden aria-label="导入发货数据" type="file" accept=".xls,.xlsx,.csv" disabled={busy || dirty() || inflight.current} onChange={e => { upload(e.target.files?.[0]); e.target.value = ''; }} /></div></div>
         {error && <div role="alert" className="finance-warning">{error.message} {stopped.current && error.status !== 409 && <button onClick={() => { stopped.current = false; setError(null); flush(); }}>重试保存</button>}{error.status === 409 && <span>请保留本页，在另一个页面核对最新记录；此页不会自动覆盖。</span>}</div>}
         <div className="finance-scroll"><table className="finance-grid finance-sheet-grid"><thead><tr>{['序号','发货日期','车牌号','货物名称','单位','数量','单价（元）','金额（元）','备注',''].map((label,i)=><th key={i}>{label}</th>)}</tr></thead>
             {groups.map(group => { const sum=totals(group.orders); return <tbody key={group.key}>

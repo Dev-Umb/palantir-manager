@@ -76,3 +76,16 @@ it('allows typing the first detail directly into an empty project', async()=>{
     expect(screen.getByLabelText('第2行货物名称').value).toBe('');
     await act(async()=>vi.advanceTimersByTimeAsync(650));expect(JSON.parse(fetch.mock.calls[0][1].body).orders[0].rows[0].name).toBe('盖板');
 });
+
+it('opens the hidden file picker through the import button and blocks it during unsaved edits', () => {
+    setup();
+    const input = screen.getByLabelText('导入发货数据');
+    const click = vi.spyOn(input, 'click');
+    expect(input.hidden).toBe(true);
+    expect(input.accept).toBe('.xls,.xlsx,.csv');
+    fireEvent.click(screen.getByRole('button', {name:'导入Excel/CSV'}));
+    expect(click).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByLabelText('第1行数量'), {target:{value:'12'}});
+    expect(screen.getByRole('button', {name:'导入Excel/CSV'}).disabled).toBe(true);
+    expect(input.disabled).toBe(true);
+});
