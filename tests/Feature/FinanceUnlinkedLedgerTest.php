@@ -6,6 +6,7 @@ use App\Models\FinanceShipmentLedger;
 use App\Models\ObjectRecord;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\ProjectVisibility;
 use Database\Seeders\XycPrototypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class FinanceUnlinkedLedgerTest extends TestCase
@@ -28,6 +30,16 @@ class FinanceUnlinkedLedgerTest extends TestCase
         $this->finance = User::where('email', 'finance@xyc.test')->sole();
         Storage::fake('local');
         $this->actingAs($this->finance);
+    }
+
+    public function test_overview_checks_each_project_write_permission_only_once(): void
+    {
+        $projects = ObjectRecord::whereRelation('businessObject', 'key', 'project')->get();
+        FinanceShipmentLedger::factory()->create(['project_id' => $projects->first()->id]);
+        $this->partialMock(ProjectVisibility::class, function (MockInterface $mock) use ($projects): void {
+            $mock->shouldReceive('allowsRecordWrite')->times($projects->count())->passthru();
+        });
+        $this->get(route('finance-shipments.index'))->assertOk();
     }
 
     public function test_display_title_is_finance_only_and_keeps_original_source_and_association(): void

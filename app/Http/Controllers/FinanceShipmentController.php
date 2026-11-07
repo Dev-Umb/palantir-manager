@@ -26,6 +26,7 @@ class FinanceShipmentController extends Controller
         $this->access->authorize($request->user());
         $projects = $this->visibility->scope(ObjectRecord::whereRelation('businessObject', 'key', 'project'), $request->user())->orderBy('title')->get();
         $projects = $projects->keyBy('id');
+        $writableProjects = $projects->filter(fn (ObjectRecord $project): bool => $this->visibility->allowsRecordWrite($request->user(), $project));
         $ledgers = FinanceShipmentLedger::where(function ($query) use ($projects, $request): void {
             $query->whereIn('project_id', $projects->modelKeys());
             if ($this->access->allowsUnlinked($request->user())) {
@@ -36,11 +37,11 @@ class FinanceShipmentController extends Controller
             ->groupBy('ledger_id')->map(fn ($items): int => $items->sum(fn ($item): int => $imports->present($item)['pending_outside_ledger']));
         $owners = User::whereIn('id', $projects->pluck('payload.business_owner_user_id')->filter())->get()->keyBy('id');
         $customers = ObjectRecord::whereIn('id', $projects->pluck('payload.customer_id')->filter())->get()->keyBy('id');
-        $rows = $ledgers->map(function (FinanceShipmentLedger $ledger) use ($projects, $owners, $pendingImports, $request): array {
+        $rows = $ledgers->map(function (FinanceShipmentLedger $ledger) use ($projects, $owners, $pendingImports, $writableProjects): array {
             $project = $projects->get($ledger->project_id);
             $owner = $project?->payload['business_owner_user_id'] ?? null;
             $summary = $this->writer->summary($ledger->orders);
-            $canEdit = ! $project || $this->visibility->allowsRecordWrite($request->user(), $project);
+            $canEdit = ! $project || $writableProjects->has($project->id);
 
             return ['id' => 'ledger-'.$ledger->id, 'ledger_id' => $ledger->id, 'revision' => $ledger->revision,
                 'project_id' => $ledger->project_id, 'title' => $ledger->display_title ?: $project?->title ?: $ledger->title ?: '未命名台账',
@@ -59,13 +60,13 @@ class FinanceShipmentController extends Controller
             $rows->push(['id' => $project->id, 'title' => $project->title, 'code' => $project->code,
                 'owner_id' => $owner ?: 'unassigned', 'owner' => $owners->get($owner)?->name ?? '未分配业务员',
                 'tonnes' => null, 'last_date' => null, 'pending' => 0, 'order_count' => 0,
-                'revision' => 0, 'rename_url' => $this->visibility->allowsRecordWrite($request->user(), $project) ? route('finance-shipments.rename', $project) : null,
+                'revision' => 0, 'rename_url' => $writableProjects->has($project->id) ? route('finance-shipments.rename', $project) : null,
                 'url' => route('finance-shipments.show', $project)]);
         }
 
         return Inertia::render('FinanceShipments/Index', [
             'projects' => $rows->sortBy('title')->values(),
-            'projectOptions' => $projects->filter(fn (ObjectRecord $project): bool => $this->visibility->allowsRecordWrite($request->user(), $project))->map(fn (ObjectRecord $project): array => ['value' => $project->id,
+            'projectOptions' => $writableProjects->map(fn (ObjectRecord $project): array => ['value' => $project->id,
                 'label' => implode(' · ', array_filter([$project->title, $customers->get($project->payload['customer_id'] ?? '')?->title,
                     $project->code, $owners->get($project->payload['business_owner_user_id'] ?? '')?->name]))])->values(),
             'canUnlink' => $this->access->allowsUnlinked($request->user()),
