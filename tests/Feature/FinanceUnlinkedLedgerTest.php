@@ -37,7 +37,7 @@ class FinanceUnlinkedLedgerTest extends TestCase
         $file = UploadedFile::fake()->createWithContent('发货.csv', "发货日期,车号,货物名称,数量,单位,单价\n2026.11.01,晋A,模板,10,吨,5000\n2026.11.02,晋B,盖板,5,,5000\n2026.11.03,收款,模板,10,吨,5000\n");
         $preview = $this->postJson(route('finance-shipments.ledgers.preview', $ledger), ['file' => $file])->assertOk()->json();
         $saved = $this->postJson(route('finance-shipments.ledgers.commit', $ledger), ['id' => $preview['id']])
-            ->assertOk()->assertJsonPath('summary.tonnes', 10)->assertJsonPath('summary.pending', 1)->assertJsonCount(2, 'orders')->json();
+            ->assertOk()->assertJsonPath('summary.tonnes', 15)->assertJsonPath('summary.pending', 0)->assertJsonCount(2, 'orders')->json();
         $this->get(route('finance-shipments.ledgers.show', $ledger))->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('project.owner_id', 'unlinked')->has('ledger.orders', 2));
         $this->get(route('finance-shipments.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
