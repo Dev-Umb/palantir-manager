@@ -41,3 +41,9 @@
 #### Scenario: Similar names
 - **WHEN** 来源名称与多个已有项目或客户相似
 - **THEN** 系统 MUST 保留来源并等待关联确认，不自动创建、合并或修改已有业务记录
+
+### Requirement: Visible pending shipment rows
+已关联项目的实际发货行 MUST 可作为待确认明细导入，即使缺单位或日期；原值 MUST 保留，不推断吨数或继承日期。空模板行、开票收款汇总、疑似重复与退货冲减 MUST 不自动导入。
+#### Scenario: Supplement previously processed files
+- **WHEN** 已处理文件中有未进入明细的实际发货行
+- **THEN** 补导 MUST 按来源行幂等追加待确认明细，保留已有编辑与确认吨数；待订正统计 MUST 不重复计数

@@ -45,3 +45,12 @@ it('counts only complete tonne rows; zero and missing are not shipments',()=>{
     const result=totals([order,{...order,rows:[{name:'草稿',unit:'吨',quantity:null},{name:'零',unit:'吨',quantity:0}]}]);
     expect(result.tonnes).toBe(10);expect(result.amount).toBe(50000);expect(result.pending).toBe(3);
 });
+
+it('shows imported unknown units as editable pending rows without double counting', () => {
+    const draft = { ...structuredClone(order), rows:[{id:'pending',name:'盖板',unit:null,quantity:16.94,price:5000}] };
+    const {container} = render(<Show project={{title:'项目',owner:'业务员'}} ledger={{orders:[draft],revision:1}} imports={[{id:'i',name:'历史.xls',imported_at:'2026-11-07',counts:{ready:0,pending:1,excluded:0},pending_outside_ledger:0,records:[]}]} urls={{}} />);
+    expect(screen.getByLabelText('第1单第1行单位').value).toBe('');
+    expect(screen.getByLabelText('第1单第1行数量').value).toBe('16.94');
+    expect(container.querySelector('.finance-summary').textContent).toContain('待补全 / 非吨待定1');
+    expect(totals([draft]).tonnes).toBe(0);
+});
