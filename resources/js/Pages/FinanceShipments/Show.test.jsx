@@ -163,15 +163,15 @@ it('keeps selection within a source sheet and offers keyboard range selection', 
     fireEvent.keyDown(screen.getByLabelText('选择第2行'),{key:'ContextMenu'});
     expect(screen.getByRole('button',{name:'在选区下方插入小计'}).disabled).toBe(false);
 });
-it('defers the native unit picker until a click finishes and suppresses it during a drag', async () => {
-    vi.useFakeTimers(); setup();
-    const select = screen.getByLabelText('第1行单位'); select.showPicker = vi.fn();
+it('opens the unit list after a click but not after a drag', () => {
+    setup();
+    const select = screen.getByLabelText('第1行单位');
     fireEvent.mouseDown(select,{button:0,buttons:1}); fireEvent.mouseUp(select); fireEvent.click(select);
-    await act(async()=>vi.advanceTimersByTimeAsync(0));
-    expect(select.showPicker).toHaveBeenCalledTimes(1);
+    expect(select.size).toBe(4);
+    fireEvent.change(select,{target:{value:'吨'}});
+    expect(select.size).not.toBe(4);
     fireEvent.mouseDown(select,{button:0,buttons:1});
     fireEvent.mouseEnter(screen.getByLabelText('第2行单位').closest('tr'),{buttons:1});
     fireEvent.mouseUp(select); fireEvent.click(select);
-    await act(async()=>vi.advanceTimersByTimeAsync(0));
-    expect(select.showPicker).toHaveBeenCalledTimes(1);
+    expect(select.size).not.toBe(4);
 });

@@ -6,7 +6,7 @@ import './finance.css';
 export default function Show({ project, ledger, imports: initialImports, urls }) {
     const [orders, setOrders] = useState(ledger.orders), [status, setStatus] = useState('已加载'), [error, setError] = useState(null), [menu, setMenu] = useState(null), [imports, setImports] = useState(initialImports), [preview, setPreview] = useState(null), [busy, setBusy] = useState(false);
     const current = useRef(orders), saved = useRef(JSON.stringify(orders)), revision = useRef(ledger.revision), inflight = useRef(false), timer = useRef(), stopped = useRef(false), alive = useRef(true), wrap = useRef(), uploadInput = useRef();
-    const [selection, setSelection] = useState(null);
+    const [selection, setSelection] = useState(null), [unitPicker, setUnitPicker] = useState(null);
     const drag = useRef(null), suppressClick = useRef(false);
     const summary = totals(orders);
     const groups = sheetGroups(orders);
@@ -87,12 +87,12 @@ export default function Show({ project, ledger, imports: initialImports, urls })
     function renderRow({oi, ri, row, source}, index, blank = false) {
         const labels = {date:'发货日期',vehicle:'车牌号',name:'货物名称',unit:'单位',quantity:'数量',price:'单价',note:'备注'};
         const cell = key => <td key={key}>{key === 'unit'
-            ? <select aria-label={`第${index + 1}行单位`} data-cell={`${oi}-${ri}-${key}`} value={row.unit || '吨'} onChange={e => edit(oi, ri, key, e.target.value)} onBlur={flush} onKeyDown={e => keyboard(e, oi, ri, key)}>{['吨','件','台','米'].map(unit => <option key={unit}>{unit}</option>)}</select>
+            ? <select size={unitPicker === row.id ? 4 : undefined} aria-label={`第${index + 1}行单位`} data-cell={`${oi}-${ri}-${key}`} value={row.unit || '吨'} onChange={e => { edit(oi, ri, key, e.target.value); setUnitPicker(null); }} onBlur={() => { setUnitPicker(null); flush(); }} onKeyDown={e => { if (e.key === 'Escape') setUnitPicker(null); keyboard(e, oi, ri, key); }}>{['吨','件','台','米'].map(unit => <option key={unit}>{unit}</option>)}</select>
             : <input aria-label={`第${index + 1}行${labels[key]}`} data-cell={`${oi}-${ri}-${key}`} type={key === 'date' ? 'date' : ['quantity','price'].includes(key) ? 'number' : 'text'} min={['quantity','price'].includes(key) ? '0' : undefined} max={key === 'price' ? '99999.99' : key === 'quantity' ? '99999.999' : undefined} step={key === 'price' ? '0.01' : '0.001'} value={row[key] ?? ''} placeholder={blank && key === 'name' ? '直接输入新明细' : ''} onChange={e => edit(oi, ri, key, e.target.value)} onBlur={flush} onKeyDown={e => keyboard(e, oi, ri, key)} />}</td>;
         return <tr key={row.id} title={source || undefined} aria-selected={!blank && selectedRows.some(item => item.row.id === row.id)} className={!blank && selectedRows.some(item => item.row.id === row.id) ? 'finance-selected-row' : undefined}
-            onMouseDownCapture={e => { if (e.button !== 0 || blank || e.target.closest('button')) return; if (e.shiftKey && selection) { e.preventDefault(); selectTo(row.id); } else { drag.current = { id: row.id }; suppressClick.current = false; if (e.target.tagName === 'SELECT' && e.target.showPicker) e.preventDefault(); setSelection(null); } }}
+            onMouseDownCapture={e => { if (e.button !== 0 || blank || e.target.closest('button')) return; if (e.shiftKey && selection) { e.preventDefault(); selectTo(row.id); } else { drag.current = { id: row.id }; suppressClick.current = false; if (e.target.tagName === 'SELECT' && unitPicker !== row.id) e.preventDefault(); setSelection(null); } }}
             onMouseEnter={e => { if (!blank && drag.current && e.buttons === 1 && (drag.current.id !== row.id || drag.current.moved)) { e.preventDefault(); drag.current.moved = true; suppressClick.current = true; selectTo(row.id, drag.current.id); window.getSelection()?.removeAllRanges(); } }}
-            onMouseUpCapture={e => { if (!suppressClick.current && e.target.tagName === 'SELECT' && e.target.showPicker) { const select = e.target; select.focus(); setTimeout(() => { if (select.isConnected) select.showPicker(); }, 0); } }}
+            onMouseUpCapture={e => { if (!suppressClick.current && e.target.tagName === 'SELECT' && unitPicker !== row.id) { e.target.focus(); setUnitPicker(row.id); } }}
             onClickCapture={e => { if (suppressClick.current) { e.preventDefault(); e.stopPropagation(); suppressClick.current = false; } }}
             onDragStart={e => e.preventDefault()}
             onContextMenu={e => { if (!selectedRows.some(item => item.row.id === row.id)) setSelection(blank ? null : {start:row.id,end:row.id}); context(e, oi, ri); }}>
