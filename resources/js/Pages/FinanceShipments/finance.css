@@ -12,3 +12,5 @@
 .finance-sheet-grid td{position:relative}.finance-sheet-grid select[size="4"]{position:absolute;top:0;left:0;z-index:10;background:white;border:1px solid #277aa5;min-height:110px}
 
 .finance-sheet-grid{min-width:1450px}.finance-sheet-grid thead th{width:auto!important}.finance-sheet-grid thead th[draggable]{cursor:grab}.finance-sheet-grid thead th[draggable]:focus{outline:2px solid #277aa5;outline-offset:-2px}
+
+.finance-title-button{background:transparent;color:inherit;border:0;padding:0;text-align:left;font-weight:600;cursor:text}.finance-title-button:hover{background:#edf4ef}.finance-title-editor input{width:100%;min-width:160px}

@@ -30,6 +30,59 @@ class FinanceUnlinkedLedgerTest extends TestCase
         $this->actingAs($this->finance);
     }
 
+    public function test_display_title_is_finance_only_and_keeps_original_source_and_association(): void
+    {
+        $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
+        $before = ObjectRecord::orderBy('id')->get()->toArray();
+        $ledger = FinanceShipmentLedger::factory()->create(['project_id' => $project->id, 'title' => 'source.xls']);
+        $orders = $ledger->orders;
+        $url = route('finance-shipments.ledgers.rename', $ledger);
+        $this->putJson($url, ['revision' => 0, 'display_title' => '财务新名称'])->assertOk()->assertJsonPath('revision', 1);
+        $this->get(route('finance-shipments.index'))->assertInertia(fn (Assert $page) => $page->where('projects', fn ($rows) => collect($rows)->contains(fn ($row) => ($row['ledger_id'] ?? null) === $ledger->id && $row['title'] === '财务新名称' && $row['project_title'] === $project->title)));
+        $this->get(route('finance-shipments.show', $project))->assertInertia(fn (Assert $page) => $page->where('project.title', '财务新名称'));
+        $this->putJson($url, ['revision' => 0, 'display_title' => '过期修改'])->assertConflict();
+        foreach (['', '   ', str_repeat('字', 256)] as $invalid) {
+            $this->putJson($url, ['revision' => 1, 'display_title' => $invalid])->assertUnprocessable();
+        }
+        $ledger->refresh();
+        $this->assertSame('source.xls', $ledger->title);
+        $this->assertSame($project->id, $ledger->project_id);
+        $this->assertSame($orders, $ledger->orders);
+        $this->assertSame($before, ObjectRecord::orderBy('id')->get()->toArray());
+        $this->assertDatabaseHas('audit_logs', ['action' => 'finance.shipments.rename', 'subject_id' => $ledger->id]);
+        $this->putJson(route('finance-shipments.ledgers.associate', $ledger), ['revision' => 0, 'project_id' => null])->assertConflict();
+        $this->putJson(route('finance-shipments.ledgers.associate', $ledger), ['revision' => 1, 'project_id' => null])->assertOk();
+        $this->get(route('finance-shipments.ledgers.show', $ledger))->assertInertia(fn (Assert $page) => $page->where('project.title', '财务新名称'));
+    }
+
+    public function test_rename_supports_new_and_unlinked_ledgers_without_business_writes(): void
+    {
+        $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
+        $before = $project->getRawOriginal();
+        $this->putJson(route('finance-shipments.rename', $project), ['revision' => 0, 'display_title' => '仅财务名称'])->assertOk();
+        $ledger = FinanceShipmentLedger::where('project_id', $project->id)->sole();
+        $this->assertSame([], $ledger->orders);
+        $this->assertSame($before, $project->fresh()->getRawOriginal());
+        $other = FinanceShipmentLedger::factory()->create(['title' => 'unlinked.xls']);
+        $this->putJson(route('finance-shipments.ledgers.rename', $other), ['revision' => 0, 'display_title' => '独立资料'])->assertOk();
+        $this->assertNull($other->fresh()->project_id);
+        $this->assertSame('unlinked.xls', $other->fresh()->title);
+    }
+
+    public function test_rename_preserves_permission_boundaries(): void
+    {
+        $project = ObjectRecord::whereRelation('businessObject', 'key', 'project')->firstOrFail();
+        $ledger = FinanceShipmentLedger::factory()->create();
+        $input = ['revision' => 0, 'display_title' => '不应保存'];
+        $this->actingAs(User::factory()->create())->putJson(route('finance-shipments.ledgers.rename', $ledger), $input)->assertForbidden();
+        $role = Role::firstOrCreate(['name' => 'business_manager_view'], ['label' => '业务经理']);
+        $this->finance->roles()->attach($role);
+        $this->actingAs($this->finance->fresh())->putJson(route('finance-shipments.ledgers.rename', $ledger), $input)->assertForbidden();
+        $this->putJson(route('finance-shipments.rename', $project), $input)->assertForbidden();
+        $this->get(route('finance-shipments.index'))->assertInertia(fn (Assert $page) => $page->where('projects', fn ($rows) => collect($rows)->every(fn ($row) => empty($row['rename_url']))));
+        $this->assertNull($ledger->fresh()->display_title);
+    }
+
     public function test_unlinked_import_relink_and_unlink_preserve_data_and_files(): void
     {
         $before = ObjectRecord::orderBy('id')->get()->toArray();

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['project_id', 'title', 'source_key', 'orders', 'revision'])]
+#[Fillable(['project_id', 'title', 'display_title', 'source_key', 'orders', 'revision'])]
 class FinanceShipmentLedger extends Model
 {
     use HasFactory;

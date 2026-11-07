@@ -43,3 +43,31 @@ it('keeps a failed association selection and detail entry visible without refres
     expect(screen.getByRole('button',{name:'保存关联'}).disabled).toBe(false);
     expect(screen.getByRole('link',{name:'查看明细 →'})).toBeTruthy();
 });
+it('edits the finance name inline and preserves association and detail entry', async()=>{
+    const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({display_title:'财务新名称',revision:4})});vi.stubGlobal('fetch',fetch);
+    render(<Index projects={[{...unlinked,rename_url:'/ledgers/1/title'}]} />);fireEvent.click(screen.getByRole('button',{name:'查看项目 →'}));
+    fireEvent.click(screen.getByRole('button',{name:'原文件.xls'}));
+    fireEvent.change(screen.getByRole('textbox',{name:'财务项目名称'}),{target:{value:'财务新名称'}});
+    fireEvent.blur(screen.getByRole('textbox',{name:'财务项目名称'}));
+    await waitFor(()=>expect(screen.getByRole('button',{name:'财务新名称'})).toBeTruthy());
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({display_title:'财务新名称',revision:3});
+    expect(screen.getByRole('button',{name:'修改关联'})).toBeTruthy();
+    expect(screen.getByRole('link',{name:'查看明细 →'}).getAttribute('href')).toBe('/ledgers/1');
+});
+it('cancels with Escape and retains invalid or conflicting name input', async()=>{
+    const fetch=vi.fn().mockResolvedValue({ok:false,status:409,json:async()=>({message:'台账已更新'})});vi.stubGlobal('fetch',fetch);
+    render(<Index projects={[{...unlinked,rename_url:'/ledgers/1/title'}]} />);fireEvent.click(screen.getByRole('button',{name:'查看项目 →'}));
+    fireEvent.click(screen.getByRole('button',{name:'原文件.xls'}));fireEvent.change(screen.getByRole('textbox',{name:'财务项目名称'}),{target:{value:'取消'}});
+    fireEvent.keyDown(screen.getByRole('textbox',{name:'财务项目名称'}),{key:'Escape'});
+    expect(fetch).not.toHaveBeenCalled();expect(screen.getByRole('button',{name:'原文件.xls'})).toBeTruthy();
+    fireEvent.click(screen.getByRole('button',{name:'原文件.xls'}));fireEvent.change(screen.getByRole('textbox',{name:'财务项目名称'}),{target:{value:' '}});fireEvent.blur(screen.getByRole('textbox',{name:'财务项目名称'}));
+    expect(screen.getByRole('alert').textContent).toBe('名称不能为空');expect(fetch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole('textbox',{name:'财务项目名称'}),{target:{value:'保留输入'}});fireEvent.blur(screen.getByRole('textbox',{name:'财务项目名称'}));
+    await waitFor(()=>expect(screen.getByRole('alert').textContent).toBe('台账已更新'));
+    expect(screen.getByRole('textbox',{name:'财务项目名称'}).value).toBe('保留输入');expect(router.reload).not.toHaveBeenCalled();
+});
+it('searches renamed and original project names while read-only names remain uneditable',()=>{
+    render(<Index projects={[{...projects[0],title:'财务名称',project_title:'业务原名'}]} />);fireEvent.click(screen.getByRole('button',{name:'查看项目 →'}));
+    fireEvent.change(screen.getByRole('searchbox'),{target:{value:'业务原名'}});
+    expect(screen.getByText('财务名称')).toBeTruthy();expect(screen.queryByRole('button',{name:'财务名称'})).toBeNull();
+});
