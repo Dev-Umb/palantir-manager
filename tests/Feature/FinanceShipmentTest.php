@@ -39,6 +39,29 @@ class FinanceShipmentTest extends TestCase
         ]]];
     }
 
+    public function test_range_subtotals_persist_without_changing_totals_and_reject_invalid_endpoints(): void
+    {
+        $before = $this->project->getRawOriginal();
+        $order = $this->order();
+        $order['rows'][] = $this->order(['quantity' => 2])['rows'][0];
+        $order['rows'][1]['subtotal_starts'] = [$order['rows'][0]['id']];
+        $url = route('finance-shipments.save', $this->project);
+        $this->actingAs($this->finance)->putJson($url, ['revision' => 0, 'orders' => [$order]])
+            ->assertOk()->assertJsonPath('summary.tonnes', 14.345)
+            ->assertJsonPath('orders.0.rows.1.subtotal_starts.0', $order['rows'][0]['id']);
+        $this->get(route('finance-shipments.show', $this->project))->assertInertia(fn (Assert $page) => $page
+            ->where('ledger.orders.0.rows.1.subtotal_starts.0', $order['rows'][0]['id']));
+        $order['rows'][0]['subtotal_starts'] = [$order['rows'][1]['id']];
+        $this->putJson($url, ['revision' => 1, 'orders' => [$order]])->assertUnprocessable();
+        unset($order['rows'][0]['subtotal_starts']);
+        $order['rows'][1]['subtotal_starts'] = [(string) Str::uuid()];
+        $this->putJson($url, ['revision' => 1, 'orders' => [$order]])->assertUnprocessable();
+        $order['rows'][1]['subtotal_starts'] = [];
+        $this->putJson($url, ['revision' => 0, 'orders' => [$order]])->assertConflict();
+        $this->putJson($url, ['revision' => 1, 'orders' => [$order]])->assertOk()->assertJsonPath('summary.tonnes', 14.345);
+        $this->assertSame($before, $this->project->fresh()->getRawOriginal());
+    }
+
     public function test_finance_saves_aggregates_without_changing_any_project_fields(): void
     {
         $before = $this->project->getRawOriginal();

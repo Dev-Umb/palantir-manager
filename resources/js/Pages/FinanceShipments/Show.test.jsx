@@ -107,3 +107,71 @@ it('defaults unspecified units to tonnes and sums without dates while excluding 
     expect(result.last_date).toBeNull();
     expect(result.amount).toBe(1684179);
 });
+
+it('drags from editable cells to select whole rows, saves range metadata and removes only the subtotal', async () => {
+    vi.useFakeTimers(); const fetch = vi.fn().mockResolvedValue({ok:true,json:async()=>({revision:1})}); vi.stubGlobal('fetch',fetch);
+    const {container} = setup();
+    const before = container.querySelector('tfoot').textContent;
+    fireEvent.mouseDown(screen.getByLabelText('第1行数量'), {button:0,buttons:1});
+    fireEvent.mouseEnter(screen.getByLabelText('第2行货物名称').closest('tr'), {buttons:1});
+    fireEvent.mouseUp(document);
+    expect(container.querySelectorAll('tr[aria-selected="true"]')).toHaveLength(2);
+    fireEvent.contextMenu(screen.getByLabelText('第2行备注'));
+    fireEvent.click(screen.getByRole('button',{name:'在选区下方插入小计'}));
+    expect(screen.getByText('第 1–2 行小计')).toBeTruthy();
+    expect(container.querySelector('tfoot').textContent).toBe(before);
+    await act(async()=>vi.advanceTimersByTimeAsync(650));
+    expect(JSON.parse(fetch.mock.calls[0][1].body).orders[0].rows[1].subtotal_starts).toEqual(['row']);
+    fireEvent.click(screen.getByRole('button',{name:'删除小计'}));
+    expect(screen.queryByText('第 1–2 行小计')).toBeNull();
+    expect(screen.getByLabelText('第2行货物名称').value).toBe('连接件');
+});
+it('restores subtotals and recalculates edits and inserted detail without counting them twice', () => {
+    const savedOrder = structuredClone(order); savedOrder.rows[1].subtotal_starts = ['row'];
+    render(<Show project={{title:'项目'}} ledger={{orders:[savedOrder],revision:1}} imports={[]} urls={{}} />);
+    expect(screen.getByText('第 1–2 行小计').closest('tr').textContent).toContain('50,300');
+    fireEvent.change(screen.getByLabelText('第1行数量'),{target:{value:'12'}});
+    expect(screen.getByText('第 1–2 行小计').closest('tr').textContent).toContain('60,300');
+    fireEvent.contextMenu(screen.getByLabelText('第1行货物名称'));
+    fireEvent.click(screen.getByRole('button',{name:'在下方插入明细'}));
+    expect(screen.getByText('第 1–3 行小计')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('第2行货物名称'),{target:{value:'新明细'}});
+    fireEvent.change(screen.getByLabelText('第2行数量'),{target:{value:'2'}});
+    expect(screen.getByText('第 1–3 行小计').closest('tr').textContent).toContain('14 吨');
+});
+it('supports reverse dragging and does not select blank rows or another source sheet', () => {
+    const {container} = setup();
+    fireEvent.mouseDown(screen.getByLabelText('第2行备注'),{button:0,buttons:1});
+    fireEvent.mouseEnter(screen.getByLabelText('第1行车牌号').closest('tr'),{buttons:1});
+    fireEvent.mouseEnter(screen.getByLabelText('第3行货物名称').closest('tr'),{buttons:1});
+    fireEvent.mouseUp(document);
+    expect(container.querySelectorAll('tr[aria-selected="true"]')).toHaveLength(2);
+    fireEvent.mouseDown(screen.getByLabelText('第1行数量'),{button:0});
+    fireEvent.mouseUp(document);
+    expect(container.querySelectorAll('tr[aria-selected="true"]')).toHaveLength(0);
+});
+it('keeps selection within a source sheet and offers keyboard range selection', () => {
+    const other = {...structuredClone(order), id:'other', source:'other.xls / Sheet1',rows:[{id:'other-row',name:'其他',quantity:1,unit:'吨'}]};
+    const {container} = render(<Show project={{title:'项目'}} ledger={{orders:[order,other],revision:0}} imports={[]} urls={{}} />);
+    fireEvent.mouseDown(screen.getByLabelText('第1行数量'),{button:0,buttons:1});
+    fireEvent.mouseEnter(screen.getByLabelText('第3行数量').closest('tr'),{buttons:1});
+    fireEvent.mouseUp(document);
+    expect(container.querySelectorAll('tr[aria-selected="true"]')).toHaveLength(0);
+    fireEvent.keyDown(screen.getByLabelText('选择第1行'),{key:' '});
+    fireEvent.keyDown(screen.getByLabelText('选择第1行'),{key:'ArrowDown',shiftKey:true});
+    expect(container.querySelectorAll('tr[aria-selected="true"]')).toHaveLength(2);
+    fireEvent.keyDown(screen.getByLabelText('选择第2行'),{key:'ContextMenu'});
+    expect(screen.getByRole('button',{name:'在选区下方插入小计'}).disabled).toBe(false);
+});
+it('defers the native unit picker until a click finishes and suppresses it during a drag', async () => {
+    vi.useFakeTimers(); setup();
+    const select = screen.getByLabelText('第1行单位'); select.showPicker = vi.fn();
+    fireEvent.mouseDown(select,{button:0,buttons:1}); fireEvent.mouseUp(select); fireEvent.click(select);
+    await act(async()=>vi.advanceTimersByTimeAsync(0));
+    expect(select.showPicker).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(select,{button:0,buttons:1});
+    fireEvent.mouseEnter(screen.getByLabelText('第2行单位').closest('tr'),{buttons:1});
+    fireEvent.mouseUp(select); fireEvent.click(select);
+    await act(async()=>vi.advanceTimersByTimeAsync(0));
+    expect(select.showPicker).toHaveBeenCalledTimes(1);
+});

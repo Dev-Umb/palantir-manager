@@ -6,3 +6,5 @@
 .finance-sheet-grid th:first-child{width:54px;padding:8px}
 
 .finance-association{min-width:280px}.finance-association fieldset{border:0;padding:0;margin:0}.finance-association .finance-actions{margin-top:8px}
+
+.finance-sheet-grid .finance-selected-row > th,.finance-sheet-grid .finance-selected-row > td,.finance-sheet-grid .finance-selected-row input,.finance-sheet-grid .finance-selected-row select{background:#dceefa;user-select:none}.finance-selected-row{outline:1px solid #277aa5;outline-offset:-1px}
