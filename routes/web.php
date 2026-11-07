@@ -11,6 +11,7 @@ use App\Http\Controllers\AttachmentPreviewController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FeishuEventController;
+use App\Http\Controllers\FinanceShipmentController;
 use App\Http\Controllers\MiniappSessionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OntologyController;
@@ -44,6 +45,11 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    Route::get('/finance-shipments', [FinanceShipmentController::class, 'index'])->name('finance-shipments.index');
+    Route::get('/finance-shipments/{project}', [FinanceShipmentController::class, 'show'])->name('finance-shipments.show');
+    Route::put('/finance-shipments/{project}', [FinanceShipmentController::class, 'save'])->name('finance-shipments.save');
+    Route::post('/finance-shipments/{project}/preview', [FinanceShipmentController::class, 'preview'])->name('finance-shipments.preview');
+    Route::post('/finance-shipments/{project}/commit', [FinanceShipmentController::class, 'commit'])->name('finance-shipments.commit');
     Route::post('/settings/wechat/code', [WechatAccountController::class, 'issue'])->middleware('throttle:6,1')->name('settings.wechat.code');
     Route::delete('/settings/wechat', [WechatAccountController::class, 'destroy'])->middleware('throttle:6,1')->name('settings.wechat.destroy');
     Route::get('/settings', [AccountSettingsController::class, 'index'])->name('settings.index');

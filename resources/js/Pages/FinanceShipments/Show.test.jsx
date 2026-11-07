@@ -1,0 +1,47 @@
+// @vitest-environment jsdom
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import Show from './Show';
+import { totals } from './ledger';
+vi.mock('@inertiajs/react', () => ({ Head: () => null, Link: ({children,href}) => <a href={href}>{children}</a>, router: { on: () => () => {} } }));
+vi.mock('../../Components/Layout', () => ({ default: ({ children }) => <main>{children}</main> }));
+const order = { id:'order', date:'2026-11-06', vehicle:'晋A', rows:[{id:'row',name:'模板',unit:'吨',quantity:10,price:5000},{id:'parts',name:'连接件',unit:'件',quantity:20,price:15}] };
+function setup() { return render(<Show project={{title:'项目',owner:'武华晓',id:'project'}} ledger={{orders:[structuredClone(order)], revision:0}} imports={[]} urls={{index:'/finance',save:'/save',commit:'/commit'}} />); }
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+it('edits inline, saves and preserves adjacent non-ton rows', async () => {
+    vi.useFakeTimers(); const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({revision:1})});vi.stubGlobal('fetch',fetch);setup();
+    fireEvent.change(screen.getByLabelText('第1单第1行数量'),{target:{value:'12'}});
+    await act(async()=>vi.advanceTimersByTimeAsync(650));
+    expect(JSON.parse(fetch.mock.calls[0][1].body).orders[0].rows[0].quantity).toBe('12');
+    expect(screen.getByLabelText('第1单第2行货物名称').value).toBe('连接件');
+    expect(screen.getByRole('status').textContent).toBe('已自动保存');
+    expect(screen.queryByRole('button',{name:'增加明细'})).toBeNull();
+});
+it('inserts under the right clicked row and leaves a continuous blank row', () => {
+    setup();fireEvent.contextMenu(screen.getByLabelText('第1单第1行货物名称'),{clientX:30,clientY:100});
+    fireEvent.click(screen.getByRole('button',{name:'在下方插入明细'}));
+    expect(screen.getByLabelText('第1单第2行货物名称').value).toBe('');
+    expect(screen.getByLabelText('第1单第3行货物名称').value).toBe('连接件');
+    fireEvent.change(screen.getByLabelText('第1单第4行货物名称'),{target:{value:'新明细'}});
+    expect(screen.getByLabelText('第1单第5行货物名称').value).toBe('');
+});
+it('serializes edits during a request without overwriting the newer input',async()=>{
+    vi.useFakeTimers();let resolve;
+    const fetch=vi.fn().mockImplementationOnce(()=>new Promise(r=>{resolve=r;})).mockResolvedValue({ok:true,json:async()=>({revision:2})});vi.stubGlobal('fetch',fetch);setup();
+    fireEvent.change(screen.getByLabelText('第1单第1行数量'),{target:{value:'11'}});await act(async()=>vi.advanceTimersByTimeAsync(650));
+    fireEvent.change(screen.getByLabelText('第1单第1行数量'),{target:{value:'12'}});
+    await act(async()=>{resolve({ok:true,json:async()=>({revision:1})});});
+    await act(async()=>vi.advanceTimersByTimeAsync(650));
+    expect(fetch).toHaveBeenCalledTimes(2);expect(JSON.parse(fetch.mock.calls[1][1].body).revision).toBe(1);
+    expect(screen.getByLabelText('第1单第1行数量').value).toBe('12');
+});
+it('keeps input on failure and retries, while conflicts do not silently overwrite',async()=>{
+    vi.useFakeTimers();const fetch=vi.fn().mockResolvedValue({ok:false,status:409,json:async()=>({message:'台账冲突'})});vi.stubGlobal('fetch',fetch);setup();
+    fireEvent.change(screen.getByLabelText('第1单第1行数量'),{target:{value:'13'}});await act(async()=>vi.advanceTimersByTimeAsync(650));
+    expect(screen.getByRole('alert').textContent).toContain('台账冲突');expect(screen.getByLabelText('第1单第1行数量').value).toBe('13');
+    fireEvent.change(screen.getByLabelText('第1单第1行数量'),{target:{value:'14'}});await act(async()=>vi.advanceTimersByTimeAsync(1000));expect(fetch).toHaveBeenCalledTimes(1);
+});
+it('counts only complete tonne rows; zero and missing are not shipments',()=>{
+    const result=totals([order,{...order,rows:[{name:'草稿',unit:'吨',quantity:null},{name:'零',unit:'吨',quantity:0}]}]);
+    expect(result.tonnes).toBe(10);expect(result.amount).toBe(50000);expect(result.pending).toBe(3);
+});

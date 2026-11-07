@@ -6,6 +6,7 @@ use App\Models\BusinessObject;
 use App\Models\ProjectNotification;
 use App\Models\TenderNotification;
 use App\Support\BusinessWorkspace;
+use App\Support\FinanceShipmentAccess;
 use App\Support\HubAccess;
 use App\Support\QuotationAccess;
 use Illuminate\Http\Request;
@@ -146,6 +147,7 @@ class HandleInertiaRequests extends Middleware
             ['key' => 'ai', 'label' => 'AI 数据助手', 'href' => route('ai.index'), 'visible' => (bool) config('ai.harness_v2') && $can('ai.harness.view'), 'mobile_priority' => 60],
             ...($can('timebook.view') ? [['key' => 'timebook', 'label' => '工日簿', 'href' => route('timebook.index'), 'visible' => true, 'mobile_priority' => 25]] : []),
             ['key' => 'production-workbench', 'label' => '生产管理工作台', 'href' => route('production-workbench'), 'visible' => $can('material-arrivals.view') || $can('template-accessories.view'), 'mobile_priority' => 20],
+            ['key' => 'finance-shipments', 'label' => '财务工作台', 'href' => route('finance-shipments.index'), 'visible' => app(FinanceShipmentAccess::class)->allows($request->user()), 'mobile_priority' => 63],
             ['key' => 'support-library', 'label' => '钢箱梁工作台', 'href' => route('support-library.index'), 'visible' => $can('support-library.view'), 'mobile_priority' => 64],
             ['key' => 'quotations', 'label' => '参考报价', 'href' => route('quotations.index'), 'visible' => QuotationAccess::allows($request->user()), 'mobile_priority' => 62],
         ];
