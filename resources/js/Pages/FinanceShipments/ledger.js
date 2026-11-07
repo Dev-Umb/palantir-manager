@@ -1,13 +1,14 @@
-export const blankRow = () => ({ id: crypto.randomUUID(), name: '', unit: '吨', quantity: null, price: null, note: '' });
+export const blankRow = () => ({ id: crypto.randomUUID(), date: null, vehicle: '', name: '', unit: '吨', quantity: null, price: null, note: '' });
 export const blankOrder = () => ({ id: crypto.randomUUID(), date: new Date().toLocaleDateString('sv-SE'), vehicle: '', source: '', rows: [] });
 export function totals(orders) {
     let milli = 0, cents = 0, pending = 0; const dates = [];
     for (const order of orders) for (const row of order.rows) {
         if (!row.name?.trim() && row.quantity == null && row.price == null) continue;
-        if (!order.date || !row.name?.trim() || row.unit !== '吨' || !(Number(row.quantity) > 0)) { pending++; continue; }
         const quantity = Math.round(Number(row.quantity) * 1000);
-        milli += quantity; dates.push(order.date);
-        if (row.price != null && row.price !== '') cents += Math.round(quantity * Math.round(Number(row.price) * 100) / 1000);
+        if (quantity > 0 && row.price != null && row.price !== '') cents += Math.round(quantity * Math.round(Number(row.price) * 100) / 1000);
+        const date = Object.hasOwn(row, 'date') ? row.date : order.date;
+        if (!date || !row.name?.trim() || row.unit !== '吨' || !(Number(row.quantity) > 0)) { pending++; continue; }
+        milli += quantity; dates.push(date);
     }
     return { tonnes: milli / 1000, amount: cents / 100, last_date: dates.sort().at(-1) || null, pending };
 }
@@ -19,3 +20,15 @@ export async function request(url, body, method = 'POST') {
     return result;
 }
 export const number = value => value == null ? '—' : Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 3 });
+
+export function sheetGroups(orders) {
+    const groups = new Map();
+    orders.forEach((order, oi) => {
+        const key = order.source ? order.source.replace(/ \/ 第\d+行$/, '') : '手工录入';
+        if (!groups.has(key)) groups.set(key, { key, orders: [], rows: [] });
+        const group = groups.get(key); group.orders.push(order);
+        order.rows.forEach((row, ri) => group.rows.push({ oi, ri, row: { ...row, date: Object.hasOwn(row, 'date') ? row.date : order.date, vehicle: Object.hasOwn(row, 'vehicle') ? row.vehicle : order.vehicle }, source: order.source }));
+    });
+    for (const group of groups.values()) group.rows.sort((a,b) => Number(a.source?.match(/第(\d+)行$/)?.[1] || 0) - Number(b.source?.match(/第(\d+)行$/)?.[1] || 0));
+    return [...groups.values()];
+}

@@ -53,32 +53,47 @@ class FinanceShipmentImport
 
     public function present(object $import): array
     {
-        return ['id' => $import->id, 'name' => $import->name, 'imported_at' => $import->imported_at, ...json_decode($import->preview, true, flags: JSON_THROW_ON_ERROR)];
+        $preview = $this->normalizePreview(json_decode($import->preview, true, flags: JSON_THROW_ON_ERROR));
+        $pendingOutside = count(array_filter($preview['records'], fn (array $r): bool => $r['status'] === 'pending' && empty($r['ledger_order_id'])));
+        $importable = array_filter($preview['records'], $this->canImport(...));
+
+        return ['id' => $import->id, 'name' => $import->name, 'imported_at' => $import->imported_at, ...$preview,
+            'pending_outside_ledger' => $pendingOutside, 'importable_count' => count($importable),
+            'draft_count' => count(array_filter($importable, fn (array $r): bool => $r['status'] === 'pending'))];
     }
 
-    public function commit(ObjectRecord $project, string $id, User $user): array
+    public function commit(ObjectRecord $project, string $id, User $user, bool $supplementPending = false): array
     {
         $this->access->authorize($user, $project);
 
-        return DB::transaction(function () use ($project, $id, $user): array {
+        return DB::transaction(function () use ($project, $id, $user, $supplementPending): array {
             $project = ObjectRecord::query()->lockForUpdate()->findOrFail($project->id);
             $import = DB::table('finance_shipment_imports')->where('project_id', $project->id)->where('id', $id)->lockForUpdate()->first();
             abort_unless($import, 404);
-            if ($import->imported_at) {
+            if ($import->imported_at && ! $supplementPending) {
                 return [...$this->writer->current($project), 'import' => $this->present($import)];
             }
-            $preview = json_decode($import->preview, true, flags: JSON_THROW_ON_ERROR);
+            $preview = $this->normalizePreview(json_decode($import->preview, true, flags: JSON_THROW_ON_ERROR));
             $current = $this->writer->current($project);
             $orders = $current['orders'];
+            $sources = collect($orders)->pluck('id', 'source');
+            foreach ($preview['records'] as &$record) {
+                if ($sources->has($record['source'])) {
+                    $record['ledger_order_id'] = $sources[$record['source']];
+                }
+            }
+            unset($record);
             $preview = $this->deduplicate($preview, $orders);
-            foreach ($preview['records'] as $record) {
-                if ($record['status'] !== 'ready') {
+            foreach ($preview['records'] as &$record) {
+                if (! empty($record['ledger_order_id']) || ! $this->canImport($record) || ($import->imported_at && $record['status'] !== 'pending')) {
                     continue;
                 }
-                $orders[] = ['id' => (string) Str::uuid(), 'date' => $record['date'], 'vehicle' => $record['vehicle'], 'source' => $record['source'], 'rows' => [[
-                    'id' => (string) Str::uuid(), 'name' => $record['name'], 'unit' => '吨', 'quantity' => $record['quantity'], 'price' => $record['price'], 'note' => $record['note'],
+                $record['ledger_order_id'] = (string) Str::uuid();
+                $orders[] = ['id' => $record['ledger_order_id'], 'date' => $record['date'], 'vehicle' => $record['vehicle'], 'source' => $record['source'], 'rows' => [[
+                    'id' => (string) Str::uuid(), 'name' => $record['name'], 'unit' => $record['unit'] ?: null, 'quantity' => $record['quantity'], 'price' => $record['price'], 'note' => $record['note'],
                 ]]];
             }
+            unset($record);
             $saved = $this->writer->save($project, ['revision' => $current['revision'], 'orders' => $orders], $user, trustedImport: true);
             DB::table('finance_shipment_imports')->where('id', $id)->update(['preview' => json_encode($preview, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'imported_at' => now(), 'updated_at' => now()]);
 
@@ -161,7 +176,7 @@ class FinanceShipmentImport
             $counts[$record['status']]++;
         }
 
-        return ['records' => $records, 'counts' => $counts];
+        return $this->normalizePreview(['records' => $records, 'counts' => $counts]);
     }
 
     private function deduplicate(array $preview, array $orders): array
@@ -170,13 +185,11 @@ class FinanceShipmentImport
         $seen = [];
         foreach ($orders as $order) {
             foreach ($order['rows'] as $row) {
-                if (($row['unit'] ?? null) === '吨') {
-                    $seen[$key([...$row, 'date' => $order['date'] ?? null, 'vehicle' => $order['vehicle'] ?? null])] = true;
-                }
+                $seen[$key([...$row, 'date' => array_key_exists('date', $row) ? $row['date'] : ($order['date'] ?? null), 'vehicle' => array_key_exists('vehicle', $row) ? $row['vehicle'] : ($order['vehicle'] ?? null)])] = true;
             }
         }
         foreach ($preview['records'] as &$record) {
-            if ($record['status'] !== 'ready') {
+            if (! empty($record['ledger_order_id']) || ! $this->canImport($record)) {
                 continue;
             }
             $identity = $key($record);
@@ -185,6 +198,29 @@ class FinanceShipmentImport
                 $record['reason'] = '与已有明细或本文件其他行疑似重复，待确认';
             }
             $seen[$identity] = true;
+        }
+        unset($record);
+        $preview['counts'] = array_replace(['ready' => 0, 'pending' => 0, 'excluded' => 0], array_count_values(array_column($preview['records'], 'status')));
+
+        return $preview;
+    }
+
+    private function canImport(array $record): bool
+    {
+        return in_array($record['status'], ['ready', 'pending'], true)
+            && trim($record['name']) !== '' && $record['quantity'] > 0 && $record['quantity'] <= 99999.999
+            && in_array($record['unit'], ['', '吨', '件', '台', '米'], true)
+            && ! preg_match('/疑似重复|退货|冲减|无效|单价需|货物名称缺失/u', $record['reason']);
+    }
+
+    private function normalizePreview(array $preview): array
+    {
+        foreach ($preview['records'] as &$record) {
+            if (! trim($record['name']) && $record['quantity'] === null && $record['price'] === null
+                && ! $record['date'] && ! trim($record['vehicle']) && ! trim($record['note']) && ! trim($record['original_amount'])) {
+                $record['status'] = 'excluded';
+                $record['reason'] = '空模板行';
+            }
         }
         unset($record);
         $preview['counts'] = array_replace(['ready' => 0, 'pending' => 0, 'excluded' => 0], array_count_values(array_column($preview['records'], 'status')));

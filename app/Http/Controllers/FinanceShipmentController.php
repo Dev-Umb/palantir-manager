@@ -19,13 +19,13 @@ class FinanceShipmentController extends Controller
 {
     public function __construct(private FinanceShipmentAccess $access, private SaveFinanceShipments $writer, private ProjectVisibility $visibility) {}
 
-    public function index(Request $request): Response
+    public function index(Request $request, FinanceShipmentImport $imports): Response
     {
         $this->access->authorize($request->user());
         $projects = $this->visibility->scope(ObjectRecord::whereRelation('businessObject', 'key', 'project'), $request->user())->orderBy('title')->get();
         $counts = DB::table('finance_shipment_ledgers')->whereIn('project_id', $projects->modelKeys())->get()->keyBy('project_id');
-        $pendingImports = DB::table('finance_shipment_imports')->whereIn('project_id', $projects->modelKeys())->get(['project_id', 'preview'])
-            ->groupBy('project_id')->map(fn ($items): int => $items->sum(fn ($item): int => (int) (json_decode($item->preview, true)['counts']['pending'] ?? 0)));
+        $pendingImports = DB::table('finance_shipment_imports')->whereIn('project_id', $projects->modelKeys())->get()
+            ->groupBy('project_id')->map(fn ($items): int => $items->sum(fn ($item): int => $imports->present($item)['pending_outside_ledger']));
         $owners = User::whereIn('id', $projects->pluck('payload.business_owner_user_id')->filter())->get()->keyBy('id');
 
         return Inertia::render('FinanceShipments/Index', ['projects' => $projects->map(function (ObjectRecord $project) use ($owners, $counts, $pendingImports): array {
@@ -35,7 +35,7 @@ class FinanceShipmentController extends Controller
 
             return ['id' => $project->id, 'title' => $project->title, 'code' => $project->code, 'owner_id' => $owner ?: 'unassigned', 'owner' => $owners->get($owner)?->name ?? '未分配业务员',
                 'tonnes' => $summary['tonnes'] ?? null, 'last_date' => $summary['last_date'] ?? null, 'pending' => ($summary['pending'] ?? 0) + ($pendingImports->get($project->id) ?? 0),
-                'order_count' => $ledger ? count(json_decode($ledger->orders, true)) : 0, 'url' => route('finance-shipments.show', $project)];
+                'order_count' => $ledger ? $this->writer->documentCount(json_decode($ledger->orders, true)) : 0, 'url' => route('finance-shipments.show', $project)];
         })->values(), 'indexUrl' => route('finance-shipments.index')]);
     }
 

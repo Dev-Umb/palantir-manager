@@ -139,4 +139,61 @@ class FinanceShipmentTest extends TestCase
         $this->assertSame($before, $this->project->fresh()->payload);
         $this->assertDatabaseCount('finance_shipment_ledgers', 1);
     }
+
+    public function test_pending_shipments_are_visible_without_guessing_units_or_dates(): void
+    {
+        Storage::fake('local');
+        $before = $this->project->getRawOriginal();
+        $file = UploadedFile::fake()->createWithContent('待确认.csv', "编号,发货日期,车号,货物名称,数量,单位,单价\n1,2026.11.01,晋A,盖板,16.94,,5000\n2,,,,,,\n3,,晋B,模板,3,吨,4000\n4,2026.11.02,晋C,配件,2,件,50\n5,2026.11.02,开票,模板,10,吨,5000\n6,2026.11.03,晋D,退货模板,5,吨,5000\n7,2026.11.01,晋A,盖板,16.94,,5000\n");
+        $preview = $this->actingAs($this->finance)->postJson(route('finance-shipments.preview', $this->project), ['file' => $file])
+            ->assertOk()->assertJsonPath('importable_count', 3)->assertJsonPath('draft_count', 3)->assertJsonPath('counts.excluded', 2)->json();
+        $saved = $this->postJson(route('finance-shipments.commit', $this->project), ['id' => $preview['id']])
+            ->assertOk()->assertJsonCount(3, 'orders')->assertJsonPath('summary.tonnes', 0)->assertJsonPath('summary.pending', 3)
+            ->assertJsonPath('orders.0.rows.0.unit', null)->assertJsonPath('orders.0.rows.0.quantity', 16.94)
+            ->assertJsonPath('orders.1.date', null)->assertJsonPath('import.pending_outside_ledger', 2)->json();
+        $this->postJson(route('finance-shipments.commit', $this->project), ['id' => $preview['id']])->assertOk()->assertJsonCount(3, 'orders');
+        $this->assertSame($before, $this->project->fresh()->getRawOriginal());
+    }
+
+    public function test_supplement_is_idempotent_and_preserves_existing_edits_and_business_data(): void
+    {
+        Storage::fake('local');
+        $before = $this->project->getRawOriginal();
+        $file = UploadedFile::fake()->createWithContent('历史.csv', "发货日期,车号,货物名称,数量,单位,单价\n2026.11.01,晋A,模板,10,吨,5000\n2026.11.02,晋B,盖板,16.94,,5000\n");
+        $service = app(FinanceShipmentImport::class);
+        $preview = $service->preview($this->project, $file->getRealPath(), '历史.csv', $this->finance);
+        $order = $this->order(['quantity' => 12]);
+        $order['source'] = $preview['records'][0]['source'];
+        app(SaveFinanceShipments::class)->save($this->project, ['revision' => 0, 'orders' => [$order]], $this->finance, trustedImport: true);
+        DB::table('finance_shipment_imports')->where('id', $preview['id'])->update(['imported_at' => now()]);
+        $saved = $service->commit($this->project, $preview['id'], $this->finance, supplementPending: true);
+        $this->assertCount(2, $saved['orders']);
+        $this->assertEquals(12, $saved['orders'][0]['rows'][0]['quantity']);
+        $this->assertEquals(12, $saved['summary']['tonnes']);
+        $this->assertSame(0, $saved['import']['pending_outside_ledger']);
+        $repeated = $service->commit($this->project, $preview['id'], $this->finance, supplementPending: true);
+        $this->assertSame($saved['revision'], $repeated['revision']);
+        $this->assertSame($saved['orders'], $repeated['orders']);
+        $this->assertSame($before, $this->project->fresh()->getRawOriginal());
+    }
+
+    public function test_row_dates_and_vehicles_are_independent_and_documents_are_not_split_by_vehicle(): void
+    {
+        $before = $this->project->getRawOriginal();
+        $first = $this->order(['date' => '2026-11-01', 'vehicle' => '晋B']);
+        $first['source'] = '发货.xls / Sheet1 / 第3行';
+        $second = $this->order(['date' => null, 'vehicle' => '晋C', 'quantity' => 2]);
+        $second['source'] = '发货.xls / Sheet1 / 第4行';
+        $first['rows'][] = $second['rows'][0];
+        $writer = app(SaveFinanceShipments::class);
+        $saved = $writer->save($this->project, ['revision' => 0, 'orders' => [$first]], $this->finance, trustedImport: true);
+        $this->assertSame('2026-11-01', $saved['summary']['last_date']);
+        $this->assertEquals(12.345, $saved['summary']['tonnes']);
+        $this->assertEquals(71725, $saved['summary']['amount']);
+        $this->assertSame('晋B', $saved['orders'][0]['rows'][0]['vehicle']);
+        $this->assertSame('晋C', $saved['orders'][0]['rows'][1]['vehicle']);
+        $this->assertNull($saved['orders'][0]['rows'][1]['date']);
+        $this->assertSame(1, $writer->documentCount([$first, $second]));
+        $this->assertSame($before, $this->project->fresh()->getRawOriginal());
+    }
 }
