@@ -4,3 +4,5 @@
 .finance-sheet-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.finance-sheet-toolbar h2{font-size:20px;margin:0}.finance-sheet{gap:16px}.finance-sheet-grid{min-width:1150px;background:white}.finance-sheet-grid th:nth-child(2){width:145px}.finance-sheet-grid th:nth-child(3){width:120px}.finance-sheet-grid th:nth-child(4){width:180px}.finance-sheet-grid th:nth-child(5){width:70px}.finance-sheet-grid th:nth-child(9){width:180px}.finance-sheet-grid .finance-sheet-source th{font-size:12px;font-weight:400;color:#627068;padding:7px 10px}.finance-sheet-grid .finance-sheet-subtotal th,.finance-sheet-grid .finance-sheet-subtotal td{background:#f5f7f5;padding:9px}.finance-import-history{font-size:13px}
 
 .finance-sheet-grid th:first-child{width:54px;padding:8px}
+
+.finance-association{min-width:280px}.finance-association fieldset{border:0;padding:0;margin:0}.finance-association .finance-actions{margin-top:8px}

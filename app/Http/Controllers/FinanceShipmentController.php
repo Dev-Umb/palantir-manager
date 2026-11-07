@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Actions\SaveFinanceShipments;
 use App\Http\Requests\SaveFinanceShipmentRequest;
+use App\Models\AuditLog;
+use App\Models\FinanceShipmentLedger;
 use App\Models\ObjectRecord;
 use App\Models\User;
 use App\Support\FinanceShipmentAccess;
@@ -23,33 +25,133 @@ class FinanceShipmentController extends Controller
     {
         $this->access->authorize($request->user());
         $projects = $this->visibility->scope(ObjectRecord::whereRelation('businessObject', 'key', 'project'), $request->user())->orderBy('title')->get();
-        $counts = DB::table('finance_shipment_ledgers')->whereIn('project_id', $projects->modelKeys())->get()->keyBy('project_id');
-        $pendingImports = DB::table('finance_shipment_imports')->whereIn('project_id', $projects->modelKeys())->get()
-            ->groupBy('project_id')->map(fn ($items): int => $items->sum(fn ($item): int => $imports->present($item)['pending_outside_ledger']));
+        $projects = $projects->keyBy('id');
+        $ledgers = FinanceShipmentLedger::where(function ($query) use ($projects, $request): void {
+            $query->whereIn('project_id', $projects->modelKeys());
+            if ($this->access->allowsUnlinked($request->user())) {
+                $query->orWhereNull('project_id');
+            }
+        })->orderBy('id')->get();
+        $pendingImports = DB::table('finance_shipment_imports')->whereIn('ledger_id', $ledgers->modelKeys())->get()
+            ->groupBy('ledger_id')->map(fn ($items): int => $items->sum(fn ($item): int => $imports->present($item)['pending_outside_ledger']));
         $owners = User::whereIn('id', $projects->pluck('payload.business_owner_user_id')->filter())->get()->keyBy('id');
+        $customers = ObjectRecord::whereIn('id', $projects->pluck('payload.customer_id')->filter())->get()->keyBy('id');
+        $rows = $ledgers->map(function (FinanceShipmentLedger $ledger) use ($projects, $owners, $pendingImports, $request): array {
+            $project = $projects->get($ledger->project_id);
+            $owner = $project?->payload['business_owner_user_id'] ?? null;
+            $summary = $this->writer->summary($ledger->orders);
 
-        return Inertia::render('FinanceShipments/Index', ['projects' => $projects->map(function (ObjectRecord $project) use ($owners, $counts, $pendingImports): array {
+            return ['id' => 'ledger-'.$ledger->id, 'ledger_id' => $ledger->id, 'revision' => $ledger->revision,
+                'project_id' => $ledger->project_id, 'title' => $project?->title ?: $ledger->title ?: '未命名台账',
+                'source_title' => $ledger->title, 'code' => $project?->code,
+                'owner_id' => $project ? ($owner ?: 'unassigned') : 'unlinked',
+                'owner' => $project ? ($owners->get($owner)?->name ?? '未分配业务员') : '待关联资料',
+                'tonnes' => $summary['tonnes'], 'last_date' => $summary['last_date'],
+                'pending' => $summary['pending'] + ($pendingImports->get($ledger->id) ?? 0),
+                'order_count' => $this->writer->documentCount($ledger->orders),
+                'url' => route('finance-shipments.ledgers.show', $ledger),
+                'association_url' => ! $project || $this->visibility->allowsRecordWrite($request->user(), $project) ? route('finance-shipments.ledgers.associate', $ledger) : null];
+        });
+        foreach ($projects->except($ledgers->pluck('project_id')->filter()->all()) as $project) {
             $owner = $project->payload['business_owner_user_id'] ?? null;
-            $ledger = $counts->get($project->id);
-            $summary = $ledger ? $this->writer->summary(json_decode($ledger->orders, true)) : null;
+            $rows->push(['id' => $project->id, 'title' => $project->title, 'code' => $project->code,
+                'owner_id' => $owner ?: 'unassigned', 'owner' => $owners->get($owner)?->name ?? '未分配业务员',
+                'tonnes' => null, 'last_date' => null, 'pending' => 0, 'order_count' => 0,
+                'url' => route('finance-shipments.show', $project)]);
+        }
 
-            return ['id' => $project->id, 'title' => $project->title, 'code' => $project->code, 'owner_id' => $owner ?: 'unassigned', 'owner' => $owners->get($owner)?->name ?? '未分配业务员',
-                'tonnes' => $summary['tonnes'] ?? null, 'last_date' => $summary['last_date'] ?? null, 'pending' => ($summary['pending'] ?? 0) + ($pendingImports->get($project->id) ?? 0),
-                'order_count' => $ledger ? $this->writer->documentCount(json_decode($ledger->orders, true)) : 0, 'url' => route('finance-shipments.show', $project)];
-        })->values(), 'indexUrl' => route('finance-shipments.index')]);
+        return Inertia::render('FinanceShipments/Index', [
+            'projects' => $rows->sortBy('title')->values(),
+            'projectOptions' => $projects->filter(fn (ObjectRecord $project): bool => $this->visibility->allowsRecordWrite($request->user(), $project))->map(fn (ObjectRecord $project): array => ['value' => $project->id,
+                'label' => implode(' · ', array_filter([$project->title, $customers->get($project->payload['customer_id'] ?? '')?->title,
+                    $project->code, $owners->get($project->payload['business_owner_user_id'] ?? '')?->name]))])->values(),
+            'canUnlink' => $this->access->allowsUnlinked($request->user()),
+            'indexUrl' => route('finance-shipments.index'),
+        ]);
     }
 
     public function show(Request $request, ObjectRecord $project, FinanceShipmentImport $imports): Response
     {
         $this->access->authorize($request->user(), $project);
+        $ledger = FinanceShipmentLedger::where('project_id', $project->id)->oldest('id')->first();
+        if ($ledger) {
+            return $this->showLedger($request, $ledger, $imports);
+        }
         $owner = User::find($project->payload['business_owner_user_id'] ?? null);
 
         return Inertia::render('FinanceShipments/Show', ['project' => ['id' => $project->id, 'title' => $project->title, 'code' => $project->code,
             'owner' => $owner?->name ?? '未分配业务员', 'owner_id' => $owner?->id ?? 'unassigned', 'local_source' => $project->payload['finance_local_source'] ?? null],
             'ledger' => $this->writer->current($project),
-            'imports' => DB::table('finance_shipment_imports')->where('project_id', $project->id)->latest()->get()->map($imports->present(...))->values(),
+            'imports' => [],
             'urls' => ['index' => route('finance-shipments.index'), 'save' => route('finance-shipments.save', $project), 'preview' => route('finance-shipments.preview', $project),
                 'commit' => route('finance-shipments.commit', $project), 'business' => route('objects.index', ['object' => 'project'])]]);
+    }
+
+    public function showLedger(Request $request, FinanceShipmentLedger $ledger, FinanceShipmentImport $imports): Response
+    {
+        $this->access->authorize($request->user(), $ledger);
+        $project = $ledger->project;
+        $owner = $project ? User::find($project->payload['business_owner_user_id'] ?? null) : null;
+
+        return Inertia::render('FinanceShipments/Show', [
+            'project' => ['id' => $project?->id, 'title' => $project?->title ?: $ledger->title ?: '未关联台账',
+                'code' => $project?->code, 'owner_id' => $project ? ($owner?->id ?? 'unassigned') : 'unlinked',
+                'owner' => $owner?->name ?? '待关联资料'],
+            'ledger' => $this->writer->current($ledger),
+            'imports' => DB::table('finance_shipment_imports')->where('ledger_id', $ledger->id)->latest()->get()->map($imports->present(...))->values(),
+            'urls' => ['index' => route('finance-shipments.index'), 'save' => route('finance-shipments.ledgers.save', $ledger),
+                'preview' => route('finance-shipments.ledgers.preview', $ledger), 'commit' => route('finance-shipments.ledgers.commit', $ledger)],
+        ]);
+    }
+
+    public function saveLedger(SaveFinanceShipmentRequest $request, FinanceShipmentLedger $ledger): JsonResponse
+    {
+        return response()->json($this->writer->save($ledger, $request->validated(), $request->user()));
+    }
+
+    public function previewLedger(Request $request, FinanceShipmentLedger $ledger, FinanceShipmentImport $imports): JsonResponse
+    {
+        $this->access->authorize($request->user(), $ledger);
+        $request->validate(['file' => ['required', 'file', 'max:20480', 'extensions:xls,xlsx,csv', 'mimes:xls,xlsx,csv,txt']]);
+        $file = $request->file('file');
+
+        return response()->json($imports->preview($ledger, $file->getRealPath(), $file->getClientOriginalName(), $request->user()));
+    }
+
+    public function commitLedger(Request $request, FinanceShipmentLedger $ledger, FinanceShipmentImport $imports): JsonResponse
+    {
+        $this->access->authorize($request->user(), $ledger);
+        $input = $request->validate(['id' => ['required', 'uuid']]);
+
+        return response()->json($imports->commit($ledger, $input['id'], $request->user()));
+    }
+
+    public function associate(Request $request, FinanceShipmentLedger $ledger): JsonResponse
+    {
+        $this->access->authorize($request->user(), $ledger);
+        $input = $request->validate(['project_id' => ['present', 'nullable', 'uuid', 'exists:object_records,id'], 'revision' => ['required', 'integer', 'min:0']]);
+
+        return DB::transaction(function () use ($request, $ledger, $input): JsonResponse {
+            $ledger = FinanceShipmentLedger::lockForUpdate()->findOrFail($ledger->id);
+            $this->access->authorize($request->user(), $ledger);
+            $target = $input['project_id'] ? ObjectRecord::findOrFail($input['project_id']) : null;
+            if ($target) {
+                $this->access->authorize($request->user(), $target);
+            } else {
+                abort_unless($this->access->allowsUnlinked($request->user()), 403);
+            }
+            abort_unless($ledger->revision === (int) $input['revision'], 409, '台账已更新，请刷新后重新关联。');
+            $before = $ledger->project_id;
+            if ($before !== $target?->id) {
+                $ledger->update(['project_id' => $target?->id, 'revision' => $ledger->revision + 1,
+                    'title' => $ledger->title ?: $ledger->project?->title ?: '未关联台账']);
+                AuditLog::create(['user_id' => $request->user()->id, 'action' => 'finance.shipments.associate',
+                    'subject_type' => 'finance_shipment_ledger', 'subject_id' => $ledger->id,
+                    'payload' => ['before' => $before, 'after' => $target?->id, 'revision' => $ledger->revision]]);
+            }
+
+            return response()->json(['revision' => $ledger->revision, 'project_id' => $ledger->project_id]);
+        });
     }
 
     public function save(SaveFinanceShipmentRequest $request, ObjectRecord $project): JsonResponse

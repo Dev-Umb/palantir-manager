@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Http\Requests\SaveFinanceShipmentRequest;
 use App\Models\AuditLog;
+use App\Models\FinanceShipmentLedger;
 use App\Models\ObjectRecord;
 use App\Models\User;
 use App\Support\FinanceShipmentAccess;
@@ -14,12 +15,29 @@ class SaveFinanceShipments
 {
     public function __construct(private FinanceShipmentAccess $access) {}
 
-    public function current(ObjectRecord $project): array
+    public function current(ObjectRecord|FinanceShipmentLedger $project): array
     {
-        $ledger = DB::table('finance_shipment_ledgers')->where('project_id', $project->id)->first();
-        $orders = $ledger ? json_decode($ledger->orders, true, flags: JSON_THROW_ON_ERROR) : [];
+        $ledger = $project instanceof FinanceShipmentLedger ? $project->fresh() : FinanceShipmentLedger::where('project_id', $project->id)->oldest('id')->first();
+        $orders = $ledger?->orders ?? [];
 
         return ['revision' => (int) ($ledger->revision ?? 0), 'orders' => $orders, 'summary' => $this->summary($orders)];
+    }
+
+    public function resolve(ObjectRecord|FinanceShipmentLedger $project, User $user): FinanceShipmentLedger
+    {
+        return DB::transaction(function () use ($project, $user): FinanceShipmentLedger {
+            if ($project instanceof FinanceShipmentLedger) {
+                $ledger = FinanceShipmentLedger::lockForUpdate()->findOrFail($project->id);
+                $this->access->authorize($user, $ledger);
+
+                return $ledger;
+            }
+            $project = ObjectRecord::lockForUpdate()->findOrFail($project->id);
+            $this->access->authorize($user, $project);
+
+            return FinanceShipmentLedger::where('project_id', $project->id)->oldest('id')->first()
+                ?? FinanceShipmentLedger::create(['project_id' => $project->id]);
+        });
     }
 
     public function summary(array $orders): array
@@ -57,17 +75,16 @@ class SaveFinanceShipments
             ? preg_replace('/ \/ 第\d+行$/u', '', $order['source']) : '手工录入')->unique()->count();
     }
 
-    public function save(ObjectRecord $project, array $input, User $user, bool $trustedImport = false): array
+    public function save(ObjectRecord|FinanceShipmentLedger $project, array $input, User $user, bool $trustedImport = false): array
     {
         $this->access->authorize($user, $project);
         $input = Validator::make($input, SaveFinanceShipmentRequest::ledgerRules())->validate();
 
         return DB::transaction(function () use ($project, $input, $user, $trustedImport): array {
-            $project = ObjectRecord::query()->lockForUpdate()->findOrFail($project->id);
-            $this->access->authorize($user, $project);
-            DB::table('finance_shipment_ledgers')->insertOrIgnore(['project_id' => $project->id, 'revision' => 0, 'orders' => '[]', 'created_at' => now(), 'updated_at' => now()]);
-            $ledger = DB::table('finance_shipment_ledgers')->where('project_id', $project->id)->lockForUpdate()->sole();
-            $before = json_decode($ledger->orders, true, flags: JSON_THROW_ON_ERROR);
+            $project = $this->resolve($project, $user);
+            $ledger = FinanceShipmentLedger::lockForUpdate()->findOrFail($project->id);
+            $this->access->authorize($user, $ledger);
+            $before = $ledger->orders;
             $oldSources = collect($before)->pluck('source', 'id');
             foreach ($input['orders'] as &$order) {
                 $order['source'] = $oldSources->has($order['id']) ? $oldSources[$order['id']] : ($trustedImport ? ($order['source'] ?? null) : null);
@@ -82,7 +99,7 @@ class SaveFinanceShipments
                 'orders' => json_encode($input['orders'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'revision' => $ledger->revision + 1, 'updated_at' => now(),
             ]);
             abort_unless($changed === 1, 409, '台账版本已变化，未覆盖其他人的更新。');
-            AuditLog::create(['user_id' => $user->id, 'action' => 'finance.shipments.save', 'subject_type' => 'project', 'subject_id' => $project->id,
+            AuditLog::create(['user_id' => $user->id, 'action' => 'finance.shipments.save', 'subject_type' => 'finance_shipment_ledger', 'subject_id' => $ledger->id,
                 'payload' => ['before' => $before, 'after' => $input['orders'], 'summary' => $summary, 'revision' => $ledger->revision + 1]]);
 
             return $this->current($project);

@@ -46,6 +46,11 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/finance-shipments', [FinanceShipmentController::class, 'index'])->name('finance-shipments.index');
+    Route::get('/finance-shipments/ledgers/{ledger}', [FinanceShipmentController::class, 'showLedger'])->name('finance-shipments.ledgers.show');
+    Route::put('/finance-shipments/ledgers/{ledger}', [FinanceShipmentController::class, 'saveLedger'])->name('finance-shipments.ledgers.save');
+    Route::post('/finance-shipments/ledgers/{ledger}/preview', [FinanceShipmentController::class, 'previewLedger'])->name('finance-shipments.ledgers.preview');
+    Route::post('/finance-shipments/ledgers/{ledger}/commit', [FinanceShipmentController::class, 'commitLedger'])->name('finance-shipments.ledgers.commit');
+    Route::put('/finance-shipments/ledgers/{ledger}/association', [FinanceShipmentController::class, 'associate'])->name('finance-shipments.ledgers.associate');
     Route::get('/finance-shipments/{project}', [FinanceShipmentController::class, 'show'])->name('finance-shipments.show');
     Route::put('/finance-shipments/{project}', [FinanceShipmentController::class, 'save'])->name('finance-shipments.save');
     Route::post('/finance-shipments/{project}/preview', [FinanceShipmentController::class, 'preview'])->name('finance-shipments.preview');
