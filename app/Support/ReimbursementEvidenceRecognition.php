@@ -22,6 +22,7 @@ class ReimbursementEvidenceRecognition
             'items' => ['present', 'array', 'max:100'],
             'items.*.page' => ['required', 'integer', Rule::in($pages)],
             'items.*.region' => ['required', 'string', 'max:100'],
+            'items.*.type' => ['sometimes', Rule::in(config('reimbursements.types'))],
             'items.*.kind' => ['required', Rule::in(['invoice', 'receipt', 'payment'])],
             'items.*.status' => ['required', Rule::in(['issued', 'paid', 'unpaid', 'failed', 'refunded', 'unknown'])],
             'items.*.currency' => ['required', 'string', 'max:10'],
@@ -70,7 +71,7 @@ class ReimbursementEvidenceRecognition
             }
             $items[] = [
                 'id' => $page.'-'.$counts[$page], 'page' => $page, 'region' => $item['region'],
-                'kind' => $item['kind'], 'amount' => $amount, 'number' => $item['number'],
+                'type' => $item['type'] ?? '其他', 'kind' => $item['kind'], 'amount' => $amount, 'number' => $item['number'],
                 'invoice_date' => $item['kind'] === 'invoice' ? $item['date'] : null,
                 'payment_date' => $item['kind'] !== 'invoice' ? $item['date'] : null,
                 'description' => $item['description'].($item['number'] ? "\n凭证号码：".$item['number'] : '').($item['kind'] !== 'invoice' && $item['date'] ? "\n支付日期：".$item['date'] : ''),

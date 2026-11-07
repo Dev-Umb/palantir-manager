@@ -100,9 +100,20 @@ class ReimbursementBatchService
                 return;
             }
             $pending = $this->files($batch)->where('status', 'recognized')->whereNull('draft_id')->orderBy('id')->get();
-            foreach ($pending->groupBy(fn ($f) => $f->result['type'] ?? '其他') as $type => $group) {
-                foreach ($group->chunk(50) as $chunk) {
-                    $draft = ReimbursementDraft::create(['user_id' => $batch->user_id, 'id' => (string) Str::uuid(), 'batch_id' => $batch->id, 'revision' => 1, 'payload' => ['title' => $type.'报销', 'type' => $type, 'note' => '', 'cc' => [], 'items' => $chunk->map(fn ($f) => ['description' => $f->result['description'] ?? '', 'amount' => $f->result['amount'] ?? '', 'invoice_date' => $f->result['invoice_date'] ?? null, 'attachments' => [$f->upload_id]])->values()->all()]]);
+            $newTypes = $pending->filter(fn ($file) => array_key_exists('sources', $file->result))->map(fn ($file) => $file->result['type'] ?? '其他')->unique();
+            $combinedType = $newTypes->count() === 1 ? $newTypes->first() : '其他';
+            foreach ($pending->groupBy(fn ($file) => array_key_exists('sources', $file->result) ? $combinedType : ($file->result['type'] ?? '其他')) as $type => $group) {
+                foreach ($group->chunkWhile(fn ($file, $key, $chunk) => $chunk->sum(fn ($f) => max(1, count($f->result['sources'] ?? [1]))) + max(1, count($file->result['sources'] ?? [1])) <= 50 && $chunk->sum('size') + $file->size <= 200 * 1024 * 1024) as $chunk) {
+                    $draft = ReimbursementDraft::create(['user_id' => $batch->user_id, 'id' => (string) Str::uuid(), 'batch_id' => $batch->id, 'revision' => 1, 'payload' => ['title' => $type.'报销', 'type' => $type, 'note' => '', 'cc' => [], 'items' => $chunk->flatMap(function ($file) {
+                        if (! array_key_exists('sources', $file->result)) {
+                            return [['description' => $file->result['description'] ?? '', 'amount' => $file->result['amount'] ?? '', 'invoice_date' => $file->result['invoice_date'] ?? null, 'attachments' => [$file->upload_id]]];
+                        }
+                        if (! $file->result['sources']) {
+                            return [['description' => $file->name.'：请手工补录费用', 'amount' => '', 'invoice_date' => null, 'attachments' => [$file->upload_id]]];
+                        }
+
+                        return array_map(fn ($source) => ['description' => mb_substr($source['description']."\n来源：".$file->name.'，第 '.$source['page'].' 页 '.($source['region'] ?? ''), 0, 500), 'amount' => $source['amount'] ?? '', 'invoice_date' => $source['invoice_date'] ?? null, 'attachments' => [$file->upload_id], 'evidence_source' => ['upload_id' => $file->upload_id, 'candidate_id' => $source['id']]], $file->result['sources']);
+                    })->values()->all()]]);
                     foreach ($chunk as $file) {
                         $file->update(['draft_id' => $draft->id]);
                         ReimbursementUpload::whereKey($file->upload_id)->update(['draft_id' => $draft->id]);

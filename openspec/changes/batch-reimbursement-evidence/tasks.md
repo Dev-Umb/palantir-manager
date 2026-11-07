@@ -18,3 +18,8 @@
 - [ ] Verify actual mini-program and Android device preview/upload flows; distinguish uploaded builds from published versions.
 
 Verification: Aimon processed all five private sample PDFs (44 pages). Lodging/fuel produced 10/8 amounts; toll produced 18 amounts with unresolved content retained; miscellaneous has unclear courier slips; courier sample yields three explicit 60.00 expense amounts with manual-payment/duplicate checks. This is extraction evidence, not full accounting acceptance. Mini-program WXML/WXSS compiled; Android debug APK built. Real-device picker/preview and deployed API acceptance remain pending. No production reimbursement data was created or modified.
+
+## Entry-point regression correction
+- [ ] Route the existing batch upload job through the same paged Aimon recognizer; preserve historical single-item batch payloads and categories.
+- [ ] Generate one expense per recognized candidate, respecting 50-item/200 MB draft bounds without splitting one original across claims.
+- [ ] Run five provided PDFs through actual signed upload, confirm, queue, generated draft, and reopen APIs using a dedicated test batch; do not submit approval or modify existing user batches.
