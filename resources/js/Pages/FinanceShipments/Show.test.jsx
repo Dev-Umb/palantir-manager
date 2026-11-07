@@ -117,6 +117,7 @@ it('drags from editable cells to select whole rows, saves range metadata and rem
     fireEvent.mouseUp(document);
     expect(container.querySelectorAll('tr[aria-selected="true"]')).toHaveLength(2);
     fireEvent.contextMenu(screen.getByLabelText('第2行备注'));
+    expect(screen.getByText('已选中 2 行')).toBeTruthy();
     fireEvent.click(screen.getByRole('button',{name:'在选区下方插入小计'}));
     expect(screen.getByText('第 1–2 行小计')).toBeTruthy();
     expect(container.querySelector('tfoot').textContent).toBe(before);
