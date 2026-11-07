@@ -107,3 +107,10 @@ it('new reimbursement categories coexist with historical filters', () => {
         expect(screen.getByRole('option', { name })).toBeInTheDocument();
     }
 });
+
+it('shows multi-ticket source while preserving original preview and manual description', () => {
+ render(<Show record={{...record,items:[{...record.items[0],description:'手工核对金额',evidence_source:{upload_id:'a',candidate_id:'3-2'}}]}} />);
+ expect(screen.getByText('凭证来源：第 3 页 · 凭证 2')).toBeVisible();
+ expect(screen.getByText('1. 手工核对金额')).toBeVisible();
+ expect(screen.getByRole('button',{name:'预览 发票.pdf'})).toBeVisible();
+});

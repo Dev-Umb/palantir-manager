@@ -9,6 +9,33 @@ import 'package:palantir_mobile/reimbursements.dart';
 
 void main() {
   testWidgets(
+    'multi-ticket results add two editable expenses without overwriting on retry',
+    (tester) async {
+      final api = EvidenceApi();
+      await tester.pumpWidget(MaterialApp(home: ReimbursementForm(api: api)));
+      await tester.pumpAndSettle();
+      final dynamic state = tester.state(find.byType(ReimbursementForm));
+      final file = <String, dynamic>{'id': 'pdf', 'name': '多票.pdf'};
+      state.rows.first['attachments'].add(file);
+      await state.recognizeEvidence(file);
+      await tester.pumpAndSettle();
+      expect(state.rows.length, 2);
+      expect(state.rows.first['amount'].text, '10.00');
+      state.rows.first['amount'].text = '12.00';
+      state.rows.first['description'].text = '手工核对';
+      await state.recognizeEvidence(file, retry: true);
+      await tester.pumpAndSettle();
+      expect(state.rows.length, 2);
+      expect(state.rows.first['amount'].text, '12.00');
+      expect(
+        state.draftPayload()['items'][1]['evidence_source']['candidate_id'],
+        '2-1',
+      );
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
     'restore prompt keeps old draft when starting new and autosaves restored incomplete input',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1800));
@@ -541,6 +568,41 @@ class DraftApi extends ReimbursementApi {
       if (fail) throw ApiFailure('断网');
       return {
         'draft': {'revision': body['revision'] + 1},
+      };
+    }
+    return super.send(path, body, method: method);
+  }
+}
+
+class EvidenceApi extends ReimbursementApi {
+  @override
+  Future<Map<String, dynamic>> send(
+    String path,
+    Map<String, dynamic> body, {
+    String method = 'POST',
+  }) async {
+    if (path.endsWith('/evidence')) {
+      return {
+        'status': 'completed',
+        'result': {
+          'items': [
+            {
+              'id': '1-1',
+              'page': 1,
+              'amount': '10.00',
+              'description': '住宿',
+              'number': 'A12345678',
+            },
+            {
+              'id': '2-1',
+              'page': 2,
+              'amount': '20.00',
+              'description': '交通',
+              'number': 'B12345678',
+            },
+          ],
+          'issues': [],
+        },
       };
     }
     return super.send(path, body, method: method);

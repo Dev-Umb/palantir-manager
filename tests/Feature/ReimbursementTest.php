@@ -246,6 +246,38 @@ class ReimbursementTest extends TestCase
         ReimbursementWorkflow::findOrFail(1)->update(['definition' => ['nodes' => array_map(fn ($ids) => ['name' => '审批', 'mode' => $mode, 'people' => $ids], $groups), 'cc' => $cc, 'triggers' => $triggers]]);
     }
 
+    public function test_evidence_failures_block_submission_until_explicit_manual_resolution(): void
+    {
+        $input = $this->input();
+        $id = $input['items'][0]['attachments'][0];
+        foreach (['queued', 'processing', 'attention', 'failed'] as $status) {
+            ReimbursementUpload::findOrFail($id)->forceFill(['evidence_status' => $status])->save();
+            $this->actingAs($this->owner)->postJson('/reimbursements', $input)->assertUnprocessable();
+        }
+        $this->postJson('/reimbursements/uploads/'.$id.'/evidence/review')->assertOk();
+        $this->postJson('/reimbursements', $input)->assertCreated();
+        $this->postJson('/reimbursements/uploads/'.$id.'/evidence/review')->assertConflict();
+    }
+
+    public function test_multi_ticket_original_submits_once_and_retains_manual_values_and_sources(): void
+    {
+        $input = $this->input();
+        $id = $input['items'][0]['attachments'][0];
+        ReimbursementUpload::findOrFail($id)->forceFill(['evidence_status' => 'completed', 'evidence_result' => ['items' => [['id' => '1-1'], ['id' => '2-1']]]])->save();
+        $input['items'] = array_map(fn ($candidate) => [...$input['items'][0], 'description' => '手工核对', 'amount' => '8.88', 'evidence_source' => ['upload_id' => $id, 'candidate_id' => $candidate]], ['1-1', '2-1']);
+        $result = $this->actingAs($this->owner)->postJson('/reimbursements', $input)->assertCreated();
+        $result->assertJsonPath('record.items.0.amount', '8.88')->assertJsonPath('record.items.1.evidence_source.candidate_id', '2-1');
+        $response = $this->get($result->json('record.zip_url'))->assertOk();
+        $path = $response->baseResponse->getFile()->getPathname();
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($path));
+        $this->assertSame(1, $zip->numFiles);
+        $zip->close();
+        unlink($path);
+        $this->postJson('/reimbursements', $input)->assertCreated();
+        $this->assertDatabaseCount('reimbursements', 1);
+    }
+
     private function input(?User $owner = null): array
     {
         $owner ??= $this->owner;

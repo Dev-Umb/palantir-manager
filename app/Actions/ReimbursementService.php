@@ -13,6 +13,7 @@ use App\Models\ReimbursementWorkflow;
 use App\Models\StoredAttachment;
 use App\Models\User;
 use App\Support\BusinessFileStorage;
+use App\Support\ReimbursementEvidenceSources;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -99,6 +100,7 @@ class ReimbursementService
             $cc = $this->participants($data['cc']);
             $items = [];
             $allIds = [];
+            app(ReimbursementEvidenceSources::class)->validate($data['items'], true);
             foreach ($data['items'] as $index => $item) {
                 $parts = explode('.', (string) $item['amount']);
                 $cents = ((int) $parts[0] * 100) + (int) str_pad($parts[1] ?? '', 2, '0');
@@ -108,8 +110,11 @@ class ReimbursementService
                 $files = [];
                 foreach ($item['attachments'] as $id) {
                     $upload = ReimbursementUpload::whereKey($id)->lockForUpdate()->first();
-                    if (! $upload || $upload->user_id !== $actor->id || ($upload->reimbursement_id !== null && $upload->reimbursement_id !== $request?->id) || ($upload->draft_id !== null && $upload->draft_id !== $draft?->id && $upload->reimbursement_id === null) || in_array($id, $allIds, true)) {
+                    if (! $upload || $upload->user_id !== $actor->id || ($upload->reimbursement_id !== null && $upload->reimbursement_id !== $request?->id) || ($upload->draft_id !== null && $upload->draft_id !== $draft?->id && $upload->reimbursement_id === null)) {
                         throw ValidationException::withMessages(["items.$index.attachments" => '发票不存在、重复使用或不属于此申请。']);
+                    }
+                    if (in_array($upload->evidence_status, ['queued', 'processing', 'attention', 'failed'], true)) {
+                        throw ValidationException::withMessages(["items.$index.attachments" => '请等待识别完成，并手工核对红点附件后提交。']);
                     }
                     $batchFile = ReimbursementBatchFile::where('upload_id', $upload->id)->first();
                     if ($batchFile) {
@@ -121,9 +126,9 @@ class ReimbursementService
                     $files[] = ['id' => $upload->id, 'name' => $stored->original_name, 'mime' => $stored->mime_type, 'size' => (int) $stored->size];
                     $allIds[] = $id;
                 }
-                $items[] = ['invoice_date' => $item['invoice_date'] ?? null, 'description' => $item['description'], 'amount' => number_format($cents / 100, 2, '.', ''), 'cents' => $cents, 'attachments' => $files];
+                $items[] = ['invoice_date' => $item['invoice_date'] ?? null, 'description' => $item['description'], 'amount' => number_format($cents / 100, 2, '.', ''), 'cents' => $cents, 'attachments' => $files, ...isset($item['evidence_source']) ? ['evidence_source' => $item['evidence_source']] : []];
             }
-            if (collect($items)->flatMap(fn ($item) => $item['attachments'])->sum('size') > 200 * 1024 * 1024) {
+            if (collect($items)->flatMap(fn ($item) => $item['attachments'])->unique('id')->sum('size') > 200 * 1024 * 1024) {
                 throw ValidationException::withMessages(['items' => '单次提交的发票合计不能超过 200 MB。']);
             }
             $request ??= Reimbursement::create(['user_id' => $actor->id, 'latest_version' => 0]);

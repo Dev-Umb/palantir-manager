@@ -3,6 +3,7 @@
 use App\Http\Controllers\ReimbursementBatchController;
 use App\Http\Controllers\ReimbursementController;
 use App\Http\Controllers\ReimbursementDraftController;
+use App\Http\Controllers\ReimbursementEvidenceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'reimbursement-access'])->prefix('reimbursements')->name('reimbursements.')->group(function (): void {
@@ -24,6 +25,10 @@ Route::middleware(['auth', 'reimbursement-access'])->prefix('reimbursements')->n
     Route::post('/', [ReimbursementController::class, 'submit'])->middleware('throttle:30,1')->name('submit');
     Route::post('/uploads', [ReimbursementController::class, 'upload'])->middleware('throttle:30,1')->name('upload');
     Route::post('/uploads/{upload}/recognize', [ReimbursementController::class, 'recognizeInvoice'])->middleware('throttle:12,1')->name('uploads.recognize');
+    Route::get('/uploads/{upload}/evidence', [ReimbursementEvidenceController::class, 'show'])->name('uploads.evidence');
+    Route::post('/uploads/{upload}/evidence', [ReimbursementEvidenceController::class, 'start'])->middleware('throttle:60,1')->name('uploads.evidence.start');
+    Route::post('/uploads/{upload}/evidence/review', [ReimbursementEvidenceController::class, 'review'])->middleware('throttle:60,1')->name('uploads.evidence.review');
+    Route::get('/uploads/{upload}/preview', [ReimbursementEvidenceController::class, 'preview'])->name('uploads.preview');
     Route::get('/workflow', [ReimbursementController::class, 'workflow'])->name('workflow');
     Route::put('/workflow', [ReimbursementController::class, 'saveWorkflow'])->name('workflow.save');
     Route::get('/notices', [ReimbursementController::class, 'notices'])->name('notices');

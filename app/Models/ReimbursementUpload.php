@@ -14,6 +14,6 @@ class ReimbursementUpload extends Model
 
     protected function casts(): array
     {
-        return ['user_id' => 'integer', 'reimbursement_id' => 'integer'];
+        return ['evidence_result' => 'array', 'user_id' => 'integer', 'reimbursement_id' => 'integer'];
     }
 }

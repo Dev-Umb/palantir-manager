@@ -187,7 +187,7 @@ class ReimbursementController extends Controller
                     $drafts->authorize($request->user(), $currentDraft);
                     abort_unless($currentDraft->revision === (int) $context['revision'], 409, '草稿已更新，请重新打开后上传。');
                 }
-                abort_unless(ReimbursementDraft::whereKey($context['id'])->exists() || $request->file('file')?->getMimeType() === 'application/pdf', 422, '首次草稿需要 PDF 发票。');
+                abort_unless(ReimbursementDraft::whereKey($context['id'])->exists() || in_array($request->file('file')?->getMimeType(), ['application/pdf', 'image/jpeg', 'image/png'], true), 422, '请选择 PDF 或图片凭证。');
                 $draft = $drafts->save($request->user(), $context['id'], $context, true);
                 $response = $this->storeUpload($request);
                 $body = $response->getData(true);
@@ -260,7 +260,7 @@ class ReimbursementController extends Controller
     public function zip(Request $request, ReimbursementVersion $version): BinaryFileResponse
     {
         $this->service->authorizeVersion($request->user(), $version);
-        $bytes = collect($version->items)->flatMap(fn ($item) => $item['attachments'])->sum('size');
+        $bytes = collect($version->items)->flatMap(fn ($item) => $item['attachments'])->unique('id')->sum('size');
         abort_if($bytes > 200 * 1024 * 1024, 422, '发票合计超过 200 MB，请逐张下载。');
         $temp = tempnam(sys_get_temp_dir(), 'reimbursement-');
         $parts = [];
@@ -269,8 +269,13 @@ class ReimbursementController extends Controller
             if ($zip->open($temp, ZipArchive::OVERWRITE) !== true) {
                 throw new \RuntimeException('无法创建发票压缩包。');
             }
+            $included = [];
             foreach ($version->items as $i => $item) {
                 foreach ($item['attachments'] as $j => $file) {
+                    if (isset($included[$file['id']])) {
+                        continue;
+                    }
+                    $included[$file['id']] = true;
                     $stored = $this->attachment($version, $file['id']);
                     $this->files->verify($stored->disk, $stored->object_key, $stored->size, $stored->sha256);
                     $part = tempnam(sys_get_temp_dir(), 'invoice-');
