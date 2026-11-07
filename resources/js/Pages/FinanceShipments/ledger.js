@@ -7,8 +7,8 @@ export function totals(orders) {
         const quantity = Math.round(Number(row.quantity) * 1000);
         if (quantity > 0 && row.price != null && row.price !== '') cents += Math.round(quantity * Math.round(Number(row.price) * 100) / 1000);
         const date = Object.hasOwn(row, 'date') ? row.date : order.date;
-        if (!date || !row.name?.trim() || row.unit !== '吨' || !(Number(row.quantity) > 0)) { pending++; continue; }
-        milli += quantity; dates.push(date);
+        if (!row.name?.trim() || (row.unit || '吨') !== '吨' || !(Number(row.quantity) > 0)) { pending++; continue; }
+        milli += quantity; if (date) dates.push(date);
     }
     return { tonnes: milli / 1000, amount: cents / 100, last_date: dates.sort().at(-1) || null, pending };
 }

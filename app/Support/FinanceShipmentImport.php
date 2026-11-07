@@ -89,7 +89,7 @@ class FinanceShipmentImport
             unset($record);
             $preview = $this->deduplicate($preview, $orders);
             foreach ($preview['records'] as &$record) {
-                if (! empty($record['ledger_order_id']) || ! $this->canImport($record) || ($import->imported_at && $record['status'] !== 'pending')) {
+                if (! empty($record['ledger_order_id']) || ! $this->canImport($record)) {
                     continue;
                 }
                 $record['ledger_order_id'] = (string) Str::uuid();
@@ -111,7 +111,6 @@ class FinanceShipmentImport
         $aliases = ['date' => ['发货时间', '发货日期'], 'arrival_date' => ['到货日期'], 'vehicle' => ['车号', '车牌号'], 'name' => ['货物名称', '发货名称', '物资名称', '产品名称', '材料名称', '名称'], 'quantity' => ['原发数量', '数量', '吨数', '实收数量', '重量', '重量（吨）', '数量（吨）', '数量(吨)', '回单数量'], 'unit' => ['单位', '计量单位'], 'price' => ['单价', '结算单价'], 'amount' => ['金额', '结算金额'], 'note' => ['备注']];
         foreach ($sheets as $sheet) {
             $map = [];
-            $tonnes = false;
             $receiptOnly = false;
             $recognized = false;
             foreach ($sheet['rows'] as $index => $cells) {
@@ -133,7 +132,6 @@ class FinanceShipmentImport
                 if (isset($candidate['name'], $candidate['quantity']) && (isset($candidate['date']) || isset($candidate['arrival_date']))) {
                     $recognized = true;
                     $map = $candidate;
-                    $tonnes = in_array($cells[$map['quantity']], ['吨数', '重量（吨）', '数量（吨）', '数量(吨)'], true);
                     $receiptOnly = $labels[$map['quantity']] === '回单数量';
 
                     continue;
@@ -151,24 +149,18 @@ class FinanceShipmentImport
                     $reason = '非实际发货：开票、收款、汇总或费用行';
                 }
                 $date = $this->date($get('date'));
-                $unit = $get('unit') ?: ($tonnes ? '吨' : '');
+                $unit = $get('unit') ?: '吨';
                 $quantity = is_numeric($get('quantity')) ? round((float) $get('quantity'), 3) : null;
                 $price = is_numeric($get('price')) ? round((float) $get('price'), 2) : null;
                 $problems = [];
                 if ($receiptOnly) {
                     $problems[] = '仅有回单数量，实际发货数量待确认';
                 }
-                if (isset($map['arrival_date']) && ! isset($map['date'])) {
-                    $problems[] = '到货日期不作为发货日期';
-                }
-                if (! $date) {
-                    $problems[] = '发货日期缺失或无法识别';
-                }
                 if (! $get('name')) {
                     $problems[] = '货物名称缺失';
                 }
                 if ($unit !== '吨') {
-                    $problems[] = $unit ? '非吨明细待定' : '单位未标明';
+                    $problems[] = '非吨明细待定';
                 }
                 if ($quantity === null || $quantity <= 0 || $quantity > 99999.999) {
                     $problems[] = '发货数量无效或需核对';
@@ -245,6 +237,14 @@ class FinanceShipmentImport
     private function normalizePreview(array $preview): array
     {
         foreach ($preview['records'] as &$record) {
+            $record['unit'] = $record['unit'] ?: '吨';
+            if ($record['status'] === 'pending') {
+                $reasons = array_diff(explode('；', $record['reason']), ['单位未标明', '发货日期缺失或无法识别', '到货日期不作为发货日期']);
+                $record['reason'] = implode('；', $reasons);
+                if ($record['reason'] === '') {
+                    $record['status'] = 'ready';
+                }
+            }
             if (! trim($record['name']) && $record['quantity'] === null && $record['price'] === null
                 && ! $record['date'] && ! trim($record['vehicle']) && ! trim($record['note']) && ! trim($record['original_amount'])) {
                 $record['status'] = 'excluded';

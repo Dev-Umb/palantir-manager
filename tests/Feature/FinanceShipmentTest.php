@@ -96,7 +96,7 @@ class FinanceShipmentTest extends TestCase
             ['2026.11.02', '晋A', '模板', 15, '', 5000],
             ['2026.11.02', '晋A', '配件', 15, '件', 50],
         ]]], 'test.xlsx');
-        $this->assertSame(['ready' => 1, 'pending' => 2, 'excluded' => 2], $result['counts']);
+        $this->assertSame(['ready' => 2, 'pending' => 1, 'excluded' => 2], $result['counts']);
     }
 
     public function test_csv_preview_and_idempotent_confirm_use_server_snapshot(): void
@@ -146,10 +146,10 @@ class FinanceShipmentTest extends TestCase
         $before = $this->project->getRawOriginal();
         $file = UploadedFile::fake()->createWithContent('待确认.csv', "编号,发货日期,车号,货物名称,数量,单位,单价\n1,2026.11.01,晋A,盖板,16.94,,5000\n2,,,,,,\n3,,晋B,模板,3,吨,4000\n4,2026.11.02,晋C,配件,2,件,50\n5,2026.11.02,开票,模板,10,吨,5000\n6,2026.11.03,晋D,退货模板,5,吨,5000\n7,2026.11.01,晋A,盖板,16.94,,5000\n");
         $preview = $this->actingAs($this->finance)->postJson(route('finance-shipments.preview', $this->project), ['file' => $file])
-            ->assertOk()->assertJsonPath('importable_count', 3)->assertJsonPath('draft_count', 3)->assertJsonPath('counts.excluded', 2)->json();
+            ->assertOk()->assertJsonPath('importable_count', 3)->assertJsonPath('draft_count', 1)->assertJsonPath('counts.excluded', 2)->json();
         $saved = $this->postJson(route('finance-shipments.commit', $this->project), ['id' => $preview['id']])
-            ->assertOk()->assertJsonCount(3, 'orders')->assertJsonPath('summary.tonnes', 0)->assertJsonPath('summary.pending', 3)
-            ->assertJsonPath('orders.0.rows.0.unit', null)->assertJsonPath('orders.0.rows.0.quantity', 16.94)
+            ->assertOk()->assertJsonCount(3, 'orders')->assertJsonPath('summary.tonnes', 19.94)->assertJsonPath('summary.pending', 1)
+            ->assertJsonPath('orders.0.rows.0.unit', '吨')->assertJsonPath('orders.0.rows.0.quantity', 16.94)
             ->assertJsonPath('orders.1.date', null)->assertJsonPath('import.pending_outside_ledger', 2)->json();
         $this->postJson(route('finance-shipments.commit', $this->project), ['id' => $preview['id']])->assertOk()->assertJsonCount(3, 'orders');
         $this->assertSame($before, $this->project->fresh()->getRawOriginal());
@@ -169,7 +169,7 @@ class FinanceShipmentTest extends TestCase
         $saved = $service->commit($this->project, $preview['id'], $this->finance, supplementPending: true);
         $this->assertCount(2, $saved['orders']);
         $this->assertEquals(12, $saved['orders'][0]['rows'][0]['quantity']);
-        $this->assertEquals(12, $saved['summary']['tonnes']);
+        $this->assertEquals(28.94, $saved['summary']['tonnes']);
         $this->assertSame(0, $saved['import']['pending_outside_ledger']);
         $repeated = $service->commit($this->project, $preview['id'], $this->finance, supplementPending: true);
         $this->assertSame($saved['revision'], $repeated['revision']);
@@ -188,7 +188,7 @@ class FinanceShipmentTest extends TestCase
         $writer = app(SaveFinanceShipments::class);
         $saved = $writer->save($this->project, ['revision' => 0, 'orders' => [$first]], $this->finance, trustedImport: true);
         $this->assertSame('2026-11-01', $saved['summary']['last_date']);
-        $this->assertEquals(12.345, $saved['summary']['tonnes']);
+        $this->assertEquals(14.345, $saved['summary']['tonnes']);
         $this->assertEquals(71725, $saved['summary']['amount']);
         $this->assertSame('晋B', $saved['orders'][0]['rows'][0]['vehicle']);
         $this->assertSame('晋C', $saved['orders'][0]['rows'][1]['vehicle']);
@@ -215,12 +215,28 @@ class FinanceShipmentTest extends TestCase
             ['name' => '无表头', 'rows' => [['2026.11.01', '晋B', '模板', 5]]],
         ], 'legacy.xls');
         $this->assertSame(18.96, $result['records'][0]['quantity']);
-        $this->assertSame('', $result['records'][0]['unit']);
+        $this->assertSame('吨', $result['records'][0]['unit']);
         $this->assertNull($result['records'][1]['date']);
         $this->assertSame('吨', $result['records'][1]['unit']);
         $this->assertEquals(2, $result['records'][2]['quantity']);
         $this->assertSame('件', $result['records'][2]['unit']);
         $this->assertSame('pending', $result['records'][3]['status']);
         $this->assertSame(['2026.11.01', '晋B', '模板', '5'], $result['records'][3]['raw']);
+    }
+
+    public function test_confirmed_tonnes_without_dates_are_summed_without_inventing_dates(): void
+    {
+        $before = $this->project->getRawOriginal();
+        $orders = [];
+        foreach ([19.58, 17.46, 25.12, 24.52, 26.18, 27.48, 26.16, 31.14, 31.5] as $quantity) {
+            $order = $this->order(['quantity' => $quantity, 'price' => 7350, 'date' => null]);
+            $orders[] = $order;
+        }
+        $orders[] = $this->order(['unit' => '件', 'quantity' => 25, 'price' => null]);
+        $orders[] = $this->order(['unit' => null, 'quantity' => 10, 'price' => null, 'date' => null]);
+        $this->actingAs($this->finance)->putJson(route('finance-shipments.save', $this->project), ['revision' => 0, 'orders' => $orders])
+            ->assertOk()->assertJsonPath('summary.tonnes', 239.14)
+            ->assertJsonPath('summary.amount', 1684179)->assertJsonPath('summary.last_date', null);
+        $this->assertSame($before, $this->project->fresh()->getRawOriginal());
     }
 }

@@ -46,13 +46,13 @@ it('counts only complete tonne rows; zero and missing are not shipments',()=>{
     expect(result.tonnes).toBe(10);expect(result.amount).toBe(50300);expect(result.pending).toBe(3);
 });
 
-it('shows imported unknown units as editable pending rows without double counting', () => {
+it('defaults historical unspecified units to tonnes without double counting', () => {
     const draft = { ...structuredClone(order), rows:[{id:'pending',name:'盖板',unit:null,quantity:16.94,price:5000}] };
     const {container} = render(<Show project={{title:'项目',owner:'业务员'}} ledger={{orders:[draft],revision:1}} imports={[{id:'i',name:'历史.xls',imported_at:'2026-11-07',counts:{ready:0,pending:1,excluded:0},pending_outside_ledger:0,records:[]}]} urls={{}} />);
-    expect(screen.getByLabelText('第1行单位').value).toBe('');
+    expect(screen.getByLabelText('第1行单位').value).toBe('吨');
     expect(screen.getByLabelText('第1行数量').value).toBe('16.94');
-    expect(container.querySelector('tfoot').textContent).toContain('1 行待定');
-    expect(totals([draft]).tonnes).toBe(0);
+    expect(container.querySelector('tfoot').textContent).not.toContain('行待定');
+    expect(totals([draft]).tonnes).toBe(16.94);
 });
 
 it('renders one Excel grid with independent date and vehicle cells and no explanation cards', async () => {
@@ -88,4 +88,22 @@ it('opens the hidden file picker through the import button and blocks it during 
     fireEvent.change(screen.getByLabelText('第1行数量'), {target:{value:'12'}});
     expect(screen.getByRole('button', {name:'导入Excel/CSV'}).disabled).toBe(true);
     expect(input.disabled).toBe(true);
+});
+
+it('defaults unspecified units to tonnes and sums without dates while excluding pieces',()=>{
+    const quantities=[19.58,17.46,25.12,24.52,26.18,27.48,26.16,31.14,31.5];
+    const rows=quantities.map((quantity,i)=>({id:String(i),name:'箱梁',quantity,unit:null,price:7350,date:null}));
+    const sample={id:'shipment',date:'2026-11-06',rows};
+    const {container}=render(<Show project={{title:'项目'}} ledger={{orders:[sample],revision:0}} imports={[]} urls={{}}/>);
+    expect(container.querySelector('tfoot').textContent).toContain('229.14 吨');
+    fireEvent.change(screen.getByLabelText('第1行单位'),{target:{value:'件'}});
+    expect(container.querySelector('tfoot').textContent).toContain('209.56 吨');
+    fireEvent.change(screen.getByLabelText('第1行单位'),{target:{value:'吨'}});
+    expect(container.querySelector('tfoot').textContent).toContain('229.14 吨');
+    expect(container.querySelector('.finance-sheet-subtotal').textContent).toContain('229.14 吨');
+    expect(screen.getByLabelText('第1行发货日期').value).toBe('');
+    const result=totals([{...sample,rows:[...rows.map(row=>({...row,unit:'吨'})),{name:'配件',unit:'件',quantity:100},{name:'未知',unit:null,quantity:20,date:null}]}]);
+    expect(result.tonnes).toBe(249.14);
+    expect(result.last_date).toBeNull();
+    expect(result.amount).toBe(1684179);
 });

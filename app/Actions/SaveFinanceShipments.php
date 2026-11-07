@@ -56,13 +56,15 @@ class SaveFinanceShipments
                     $cents += (int) round($quantity * (int) round((float) $row['price'] * 100) / 1000);
                 }
                 $date = array_key_exists('date', $row) ? $row['date'] : ($order['date'] ?? null);
-                if (empty($date) || ! trim($row['name'] ?? '') || ($row['unit'] ?? null) !== '吨' || (float) ($row['quantity'] ?? 0) <= 0) {
+                if (! trim($row['name'] ?? '') || (($row['unit'] ?? '') ?: '吨') !== '吨' || (float) ($row['quantity'] ?? 0) <= 0) {
                     $pending++;
 
                     continue;
                 }
                 $milli += $quantity;
-                $dates[] = $date;
+                if ($date) {
+                    $dates[] = $date;
+                }
             }
         }
 
