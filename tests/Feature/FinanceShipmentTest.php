@@ -39,6 +39,45 @@ class FinanceShipmentTest extends TestCase
         ]]];
     }
 
+    public function test_reference_prices_save_without_changing_amounts_and_validate_input(): void
+    {
+        $order = $this->order(['quantity' => 2, 'price' => 100, 'net_price' => 80, 'processing_fee' => 30]);
+        $before = $this->project->getRawOriginal();
+        $url = route('finance-shipments.save', $this->project);
+        $this->actingAs($this->finance)->putJson($url, ['revision' => 0, 'orders' => [$order]])->assertOk()
+            ->assertJsonPath('summary.amount', 200)->assertJsonPath('summary.tonnes', 2)
+            ->assertJsonPath('orders.0.rows.0.net_price', 80)->assertJsonPath('orders.0.rows.0.processing_fee', 30);
+        $this->get(route('finance-shipments.show', $this->project))->assertInertia(fn (Assert $page) => $page
+            ->where('ledger.orders.0.rows.0.net_price', 80)->where('ledger.orders.0.rows.0.processing_fee', 30));
+        foreach (['net_price', 'processing_fee'] as $field) {
+            foreach ([-1, 100000, 'bad', '1.234'] as $invalid) {
+                $bad = $order;
+                $bad['rows'][0][$field] = $invalid;
+                $this->putJson($url, ['revision' => 1, 'orders' => [$bad]])->assertUnprocessable();
+            }
+        }
+        $order['rows'][0]['net_price'] = 0;
+        $order['rows'][0]['processing_fee'] = null;
+        $this->putJson($url, ['revision' => 0, 'orders' => [$order]])->assertConflict();
+        $this->putJson($url, ['revision' => 1, 'orders' => [$order]])->assertOk()
+            ->assertJsonPath('orders.0.rows.0.net_price', 0)->assertJsonPath('orders.0.rows.0.processing_fee', null)
+            ->assertJsonPath('summary.amount', 200);
+        $this->assertSame($before, $this->project->fresh()->getRawOriginal());
+    }
+
+    public function test_import_preserves_reference_prices_and_blocks_invalid_values(): void
+    {
+        Storage::fake('local');
+        $file = UploadedFile::fake()->createWithContent('reference.csv', "发货日期,货物名称,数量,单价,网价（元）,加工费(元)\n2026.11.01,模板,2,100,80,30\n2026.11.02,模板B,3,100,0,\n2026.11.03,模板C,1,100,错误,20\n2026.11.04,模板D,1,100,80,-1\n");
+        $preview = $this->actingAs($this->finance)->postJson(route('finance-shipments.preview', $this->project), ['file' => $file])
+            ->assertOk()->assertJsonPath('counts.ready', 2)->assertJsonPath('counts.pending', 2)
+            ->assertJsonPath('records.0.net_price', 80)->assertJsonPath('records.0.processing_fee', 30)->json();
+        $this->postJson(route('finance-shipments.commit', $this->project), ['id' => $preview['id']])->assertOk()
+            ->assertJsonCount(2, 'orders')->assertJsonPath('summary.amount', 500)
+            ->assertJsonPath('orders.0.rows.0.net_price', 80)->assertJsonPath('orders.0.rows.0.processing_fee', 30)
+            ->assertJsonPath('orders.1.rows.0.net_price', 0)->assertJsonPath('orders.1.rows.0.processing_fee', null);
+    }
+
     public function test_range_subtotals_persist_without_changing_totals_and_reject_invalid_endpoints(): void
     {
         $before = $this->project->getRawOriginal();

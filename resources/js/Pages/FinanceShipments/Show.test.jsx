@@ -3,11 +3,12 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest';
 import Show from './Show';
 import { totals } from './ledger';
-vi.mock('@inertiajs/react', () => ({ Head: () => null, Link: ({children,href}) => <a href={href}>{children}</a>, router: { on: () => () => {} } }));
+const sessionUser = vi.hoisted(() => ({id:42}));
+vi.mock('@inertiajs/react', () => ({ usePage: () => ({props:{auth:{user:sessionUser}}}), Head: () => null, Link: ({children,href}) => <a href={href}>{children}</a>, router: { on: () => () => {} } }));
 vi.mock('../../Components/Layout', () => ({ default: ({ children }) => <main>{children}</main> }));
 const order = { id:'order', date:'2026-11-06', vehicle:'晋A', rows:[{id:'row',name:'模板',unit:'吨',quantity:10,price:5000},{id:'parts',name:'连接件',unit:'件',quantity:20,price:15}] };
 function setup() { return render(<Show project={{title:'项目',owner:'武华晓',id:'project'}} ledger={{orders:[structuredClone(order)], revision:0}} imports={[]} urls={{index:'/finance',save:'/save',commit:'/commit'}} />); }
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); sessionUser.id = 42; });
 it('edits inline, saves and preserves adjacent non-ton rows', async () => {
     vi.useFakeTimers(); const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({revision:1})});vi.stubGlobal('fetch',fetch);setup();
     fireEvent.change(screen.getByLabelText('第1行数量'),{target:{value:'12'}});
@@ -175,4 +176,44 @@ it('opens the unit list after a click but not after a drag', () => {
     fireEvent.mouseEnter(screen.getByLabelText('第2行单位').closest('tr'),{buttons:1});
     fireEvent.mouseUp(select); fireEvent.click(select);
     expect(select.size).not.toBe(4);
+});
+it('autosaves independent reference prices and leaves all totals unchanged', async () => {
+    vi.useFakeTimers(); const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({revision:1})});vi.stubGlobal('fetch',fetch);
+    const savedOrder = structuredClone(order); savedOrder.rows[1].subtotal_starts=['row'];
+    const {container}=render(<Show project={{title:'项目'}} ledger={{orders:[savedOrder],revision:0}} imports={[]} urls={{save:'/save'}} />);
+    const total = container.querySelector('tfoot').textContent;
+    const subtotal = screen.getByText('第 1–2 行小计').closest('tr').textContent;
+    expect(screen.getByLabelText('第1行网价').value).toBe('');
+    fireEvent.change(screen.getByLabelText('第1行网价'),{target:{value:'80'}});
+    fireEvent.change(screen.getByLabelText('第1行加工费'),{target:{value:'30'}});
+    expect(container.querySelector('tfoot').textContent).toBe(total);
+    expect(screen.getByText('第 1–2 行小计').closest('tr').textContent).toBe(subtotal);
+    await act(async()=>vi.advanceTimersByTimeAsync(650));
+    const saved = JSON.parse(fetch.mock.calls[0][1].body).orders;
+    expect(saved[0].rows[0]).toMatchObject({net_price:'80',processing_fee:'30',price:5000,quantity:10});
+    cleanup();render(<Show project={{title:'项目'}} ledger={{orders:saved,revision:1}} imports={[]} urls={{}} />);
+    expect(screen.getByLabelText('第1行加工费').value).toBe('30');
+    fireEvent.change(screen.getByLabelText('第1行网价'),{target:{value:''}});
+    fireEvent.change(screen.getByLabelText('第1行加工费'),{target:{value:'0'}});
+    await act(async()=>vi.advanceTimersByTimeAsync(650));
+    expect(JSON.parse(fetch.mock.calls[1][1].body).orders[0].rows[0]).toMatchObject({net_price:null,processing_fee:'0'});
+});
+it('drags headers, aligns totals by field, and restores only the current user preference', () => {
+    const values = new Map();vi.spyOn(window,'localStorage','get').mockReturnValue({getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)});
+    let view = setup();
+    const from=screen.getByRole('columnheader',{name:'金额（元）'}), to=screen.getByRole('columnheader',{name:'发货日期'});
+    fireEvent.dragStart(from,{dataTransfer:{setData:vi.fn()}});fireEvent.dragOver(to);fireEvent.drop(to);
+    expect(screen.getAllByRole('columnheader')[1].textContent).toBe('金额（元）');
+    expect(view.container.querySelector('tfoot tr').children[1].textContent).toBe('50,300');
+    fireEvent.mouseDown(screen.getByLabelText('第1行网价'),{button:0,buttons:1});
+    fireEvent.mouseEnter(screen.getByLabelText('第2行网价').closest('tr'),{buttons:1});
+    fireEvent.mouseUp(document);
+    expect(view.container.querySelectorAll('tr[aria-selected="true"]')).toHaveLength(2);
+    expect(screen.getByLabelText('第1行数量').value).toBe('10');
+    cleanup();view=setup();
+    expect(screen.getAllByRole('columnheader')[1].textContent).toBe('金额（元）');
+    fireEvent.keyDown(screen.getByRole('columnheader',{name:'金额（元）'}),{altKey:true,key:'ArrowRight'});
+    expect(screen.getAllByRole('columnheader')[2].textContent).toBe('金额（元）');
+    cleanup();sessionUser.id=73;setup();
+    expect(screen.getAllByRole('columnheader')[1].textContent).toBe('发货日期');
 });
