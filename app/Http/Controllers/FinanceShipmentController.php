@@ -35,7 +35,7 @@ class FinanceShipmentController extends Controller
 
             return ['id' => $project->id, 'title' => $project->title, 'code' => $project->code, 'owner_id' => $owner ?: 'unassigned', 'owner' => $owners->get($owner)?->name ?? '未分配业务员',
                 'tonnes' => $summary['tonnes'] ?? null, 'last_date' => $summary['last_date'] ?? null, 'pending' => ($summary['pending'] ?? 0) + ($pendingImports->get($project->id) ?? 0),
-                'order_count' => $ledger ? count(json_decode($ledger->orders, true)) : 0, 'url' => route('finance-shipments.show', $project)];
+                'order_count' => $ledger ? $this->writer->documentCount(json_decode($ledger->orders, true)) : 0, 'url' => route('finance-shipments.show', $project)];
         })->values(), 'indexUrl' => route('finance-shipments.index')]);
     }
 

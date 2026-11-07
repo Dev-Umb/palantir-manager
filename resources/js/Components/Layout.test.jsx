@@ -4,13 +4,15 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Layout from './Layout';
 
+const layoutUser = vi.hoisted(() => ({name: '技术员'}));
+
 vi.mock('@inertiajs/react', () => ({
     Link: ({ href, children, ...props }) => <a href={href} {...props}>{children}</a>,
     router: { post: vi.fn() },
     usePage: () => ({
         url: '/objects/drawing',
         props: {
-            auth: { user: { name: '技术员' }, roles: [{ id: 1, label: '技术' }] },
+            auth: { user: layoutUser, roles: [{ id: 1, label: '技术' }] },
             flash: {},
             nav: [{
                 key: 'ontology',
@@ -117,4 +119,16 @@ describe('Layout workflow task navigation', () => {
         expect(container.querySelector('.app-shell').classList.contains('cockpit-rail-collapsed')).toBe(false);
     });
 
+});
+
+it('compacts the finance reminder while preserving the password entry and default notice elsewhere', () => {
+    layoutUser.is_password_changed = false;
+    try {
+        const {rerender}=render(<Layout hideHeader compactNotice title="财务工作台"><div>明细</div></Layout>);
+        expect(screen.queryByText('为保障账号安全，请修改密码。修改完成前将持续提醒。')).toBeNull();
+        expect(screen.getByRole('link',{name:'修改密码'})).toBeTruthy();
+        expect(screen.queryByRole('heading',{name:'财务工作台'})).toBeNull();
+        rerender(<Layout title="其他页面"><div>内容</div></Layout>);
+        expect(screen.getByText('为保障账号安全，请修改密码。修改完成前将持续提醒。')).toBeTruthy();
+    } finally {delete layoutUser.is_password_changed;cleanup();}
 });

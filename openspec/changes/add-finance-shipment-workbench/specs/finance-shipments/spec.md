@@ -47,3 +47,9 @@
 #### Scenario: Supplement previously processed files
 - **WHEN** 已处理文件中有未进入明细的实际发货行
 - **THEN** 补导 MUST 按来源行幂等追加待确认明细，保留已有编辑与确认吨数；待订正统计 MUST 不重复计数
+
+### Requirement: Excel-shaped project ledger
+详情 MUST 使用连续表格，表头包含发货日期、车牌号、货物名称、单位、数量、单价、金额、备注；日期和车牌 MUST 为行字段，不以车辆拆单。导入来源工作表与手工记录分别自动小计，项目显示合计。原行、来源、历史日期车号与自动保存/右键/末尾空白行 MUST 保留。详情 MUST 去除重复页面标题、统计卡和操作说明，仅保留项目识别、返回、导入及保存状态；安全规则不变。
+#### Scenario: Independent row vehicles
+- **WHEN** 财务修改同一表格某行日期或车牌
+- **THEN** 仅该行 MUST 改变，其他行及原业务资料不变；多车记录在同一张表内显示

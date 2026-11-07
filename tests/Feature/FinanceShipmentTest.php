@@ -176,4 +176,24 @@ class FinanceShipmentTest extends TestCase
         $this->assertSame($saved['orders'], $repeated['orders']);
         $this->assertSame($before, $this->project->fresh()->getRawOriginal());
     }
+
+    public function test_row_dates_and_vehicles_are_independent_and_documents_are_not_split_by_vehicle(): void
+    {
+        $before = $this->project->getRawOriginal();
+        $first = $this->order(['date' => '2026-11-01', 'vehicle' => '晋B']);
+        $first['source'] = '发货.xls / Sheet1 / 第3行';
+        $second = $this->order(['date' => null, 'vehicle' => '晋C', 'quantity' => 2]);
+        $second['source'] = '发货.xls / Sheet1 / 第4行';
+        $first['rows'][] = $second['rows'][0];
+        $writer = app(SaveFinanceShipments::class);
+        $saved = $writer->save($this->project, ['revision' => 0, 'orders' => [$first]], $this->finance, trustedImport: true);
+        $this->assertSame('2026-11-01', $saved['summary']['last_date']);
+        $this->assertEquals(12.345, $saved['summary']['tonnes']);
+        $this->assertEquals(71725, $saved['summary']['amount']);
+        $this->assertSame('晋B', $saved['orders'][0]['rows'][0]['vehicle']);
+        $this->assertSame('晋C', $saved['orders'][0]['rows'][1]['vehicle']);
+        $this->assertNull($saved['orders'][0]['rows'][1]['date']);
+        $this->assertSame(1, $writer->documentCount([$first, $second]));
+        $this->assertSame($before, $this->project->fresh()->getRawOriginal());
+    }
 }

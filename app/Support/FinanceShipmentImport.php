@@ -185,7 +185,7 @@ class FinanceShipmentImport
         $seen = [];
         foreach ($orders as $order) {
             foreach ($order['rows'] as $row) {
-                $seen[$key([...$row, 'date' => $order['date'] ?? null, 'vehicle' => $order['vehicle'] ?? null])] = true;
+                $seen[$key([...$row, 'date' => array_key_exists('date', $row) ? $row['date'] : ($order['date'] ?? null), 'vehicle' => array_key_exists('vehicle', $row) ? $row['vehicle'] : ($order['vehicle'] ?? null)])] = true;
             }
         }
         foreach ($preview['records'] as &$record) {

@@ -33,21 +33,28 @@ class SaveFinanceShipments
                 if (! trim($row['name'] ?? '') && ($row['quantity'] ?? null) === null && ($row['price'] ?? null) === null) {
                     continue;
                 }
-                if (empty($order['date']) || ! trim($row['name'] ?? '') || ($row['unit'] ?? null) !== '吨' || (float) ($row['quantity'] ?? 0) <= 0) {
+                $quantity = (int) round((float) ($row['quantity'] ?? 0) * 1000);
+                if ($quantity > 0 && ($row['price'] ?? null) !== null && $row['price'] !== '') {
+                    $cents += (int) round($quantity * (int) round((float) $row['price'] * 100) / 1000);
+                }
+                $date = array_key_exists('date', $row) ? $row['date'] : ($order['date'] ?? null);
+                if (empty($date) || ! trim($row['name'] ?? '') || ($row['unit'] ?? null) !== '吨' || (float) ($row['quantity'] ?? 0) <= 0) {
                     $pending++;
 
                     continue;
                 }
-                $quantity = (int) round((float) $row['quantity'] * 1000);
                 $milli += $quantity;
-                $dates[] = $order['date'];
-                if (($row['price'] ?? null) !== null && $row['price'] !== '') {
-                    $cents += (int) round($quantity * (int) round((float) $row['price'] * 100) / 1000);
-                }
+                $dates[] = $date;
             }
         }
 
         return ['tonnes' => $milli / 1000, 'amount' => $cents / 100, 'last_date' => $dates ? max($dates) : null, 'pending' => $pending];
+    }
+
+    public function documentCount(array $orders): int
+    {
+        return collect($orders)->map(fn (array $order): string => ! empty($order['source'])
+            ? preg_replace('/ \/ 第\d+行$/u', '', $order['source']) : '手工录入')->unique()->count();
     }
 
     public function save(ObjectRecord $project, array $input, User $user, bool $trustedImport = false): array
