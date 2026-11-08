@@ -112,7 +112,50 @@ Future<void> editor(
   await tester.pumpAndSettle();
 }
 
+class YearApi extends ContactApi {
+  String firstDate = '2016';
+  @override
+  Future<Map<String, dynamic>> get(String path) async {
+    final result = await super.get(path);
+    if (path.startsWith('/objects/project')) {
+      result['currentObject'] = {
+        'fields': <Map<String, dynamic>>[
+          {
+            'key': 'first_shipment_date',
+            'label': '首次发货日期',
+            'type': 'date',
+            'allow_year': true,
+          },
+          {'key': 'last_shipment_date', 'label': '末次发货日期', 'type': 'date'},
+        ],
+      };
+      final payload = (result['selectedRecord'] as Map)['payload'] as Map;
+      payload['first_shipment_date'] = firstDate;
+      payload['last_shipment_date'] = '2022-06-01';
+    }
+    return result;
+  }
+}
+
 void main() {
+  testWidgets(
+    'year edit preserves raw precision, full dates and draft on save failure',
+    (tester) async {
+      final api = YearApi()..failWrite = true;
+      await editor(tester, api);
+      final input = find.widgetWithText(TextField, '首次发货日期');
+      expect(tester.widget<TextField>(input).controller?.text, '2016');
+      await tester.enterText(input, '2022');
+      await tester.tap(find.text('保存修改'));
+      await tester.pumpAndSettle();
+      final payload = mapOf(mapOf(api.requests.last['body'])['payload']);
+      expect(payload['first_shipment_date'], '2022');
+      expect(payload['last_shipment_date'], '2022-06-01');
+      expect(find.text('2022'), findsOneWidget);
+      expect(find.text('保存失败，输入已保留'), findsNWidgets(2));
+    },
+  );
+
   testWidgets(
     'informed people select inline with matching input decoration and no route',
     (tester) async {

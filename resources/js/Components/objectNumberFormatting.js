@@ -1,4 +1,7 @@
 export function formatObjectNumber(objectKey, field, value) {
+    if (objectKey === 'project' && field?.key === 'first_shipment_date' && /^[1-9]\d{3}$/.test(String(value ?? ''))) {
+        return `${value}年（月日不详）`;
+    }
     if (
         objectKey !== 'project'
         || field?.type !== 'number'

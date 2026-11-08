@@ -125,12 +125,17 @@ String? validateFilterValue(Map<String, dynamic> field, RecordFilter rule) {
   }
   if (field['type'] == 'date') {
     for (final value in values) {
+      if (field['allow_year'] == true &&
+          RegExp(r'^[1-9][0-9]{3}$').hasMatch(value))
+        continue;
       final date = DateTime.tryParse(value);
       if (date == null || date.toIso8601String().substring(0, 10) != value) {
         return '请选择有效日期';
       }
     }
-    if (values.length == 2 && values[0].compareTo(values[1]) > 0) {
+    final start = values[0].length == 4 ? '${values[0]}-01-01' : values[0];
+    final end = values.last.length == 4 ? '${values.last}-12-31' : values.last;
+    if (values.length == 2 && start.compareTo(end) > 0) {
       return '开始日期不能晚于结束日期';
     }
   }
@@ -570,7 +575,7 @@ class _FilterSheetState extends State<FilterSheet> {
     String label,
     ValueChanged<String> changed,
   ) {
-    if (field['type'] == 'date') {
+    if (field['type'] == 'date' && field['allow_year'] != true) {
       return TextFormField(
         key: ValueKey('$label-$value'),
         initialValue: value,
@@ -595,7 +600,12 @@ class _FilterSheetState extends State<FilterSheet> {
     }
     return TextFormField(
       initialValue: value,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: field['allow_year'] == true
+            ? 'YYYY 或 YYYY-MM-DD；范围须包含完整年份'
+            : null,
+      ),
       keyboardType: ['number', 'range'].contains(field['type'])
           ? const TextInputType.numberWithOptions(decimal: true, signed: true)
           : TextInputType.text,

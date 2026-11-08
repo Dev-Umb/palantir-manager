@@ -481,6 +481,7 @@ function ObjectListControls({ objectKey, params, records, fields = [], relationO
                                 );
                             })}
                         </div>
+                        {filters.some((filter) => filterable.find((field) => field.key === filter.field)?.allow_year) && <small>首次发货日期可填年份或完整日期；仅年份记录按全年范围筛选，不推断具体月日。</small>}
                         <div className="advanced-filter-actions">
                             <button type="button" className="advanced-filter-add" onClick={() => setFilters((current) => [...current, emptyFilter(filterable)])}>
                                 <Plus size={15} /> 添加条件
@@ -539,7 +540,7 @@ function FilterValueInput({ field, operator, name, value, onChange, relationOpti
     if (['is_empty', 'is_not_empty'].includes(operator)) return <input type="hidden" name={name} value="1" />;
     if (operator === 'between') {
         const [start = '', end = ''] = String(value || '').split('..', 2);
-        const type = field?.type === 'date' ? 'date' : 'number';
+        const type = field?.allow_year ? 'text' : field?.type === 'date' ? 'date' : 'number';
         return <div className="filter-range"><input type={type} value={start} onChange={(event) => onChange(`${event.target.value}..${end}`)} aria-label={`${field?.label}起始值`} /><span>至</span><input type={type} value={end} onChange={(event) => onChange(`${start}..${event.target.value}`)} aria-label={`${field?.label}结束值`} /><input type="hidden" name={name} value={value || ''} /></div>;
     }
     if (field?.type === 'select') {
@@ -552,7 +553,7 @@ function FilterValueInput({ field, operator, name, value, onChange, relationOpti
         const options = relationOptions[field.key]?.items || [];
         return <select name={name} value={value || ''} onChange={(event) => onChange(event.target.value)}><option value="">请选择</option>{options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select>;
     }
-    return <input name={name} type={field?.type === 'date' ? 'date' : field?.type === 'number' || field?.type === 'range' ? 'number' : 'text'} value={value || ''} onChange={(event) => onChange(event.target.value)} placeholder="筛选值" />;
+    return <input name={name} title={field?.allow_year ? '可输入年份或完整日期；范围只包含整个已知年份，不推断具体月日' : undefined} type={field?.allow_year ? 'text' : field?.type === 'date' ? 'date' : field?.type === 'number' || field?.type === 'range' ? 'number' : 'text'} value={value || ''} onChange={(event) => onChange(event.target.value)} placeholder={field?.allow_year ? 'YYYY 或 YYYY-MM-DD' : '筛选值'} />;
 }
 
 function clearFilterUrl(objectKey, params) {

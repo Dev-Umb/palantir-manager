@@ -220,6 +220,24 @@ describe('ObjectGrid date editing', () => {
         vi.restoreAllMocks();
     });
 
+    it('keeps the year editor open until all four digits are entered and explicitly committed', async () => {
+        render(<ObjectGrid object={{ key: 'project' }}
+            records={[{ id: 'project-year', title: '年份项目', payload: { first_shipment_date: '2016' }, display: {} }]}
+            fields={[{ key: 'first_shipment_date', label: '首次发货日期', type: 'date', allow_year: true }]}
+            can={{ update: true, delete: false }} selectedRecordId={null} relationOptions={{}} onRecordChange={() => {}} />);
+        const cell = await screen.findByRole('gridcell', { name: '2016年（月日不详）' });
+        fireEvent.click(cell);
+        fireEvent.keyDown(cell, { key: 'Enter', code: 'Enter' });
+        const input = await screen.findByLabelText('首次发货日期');
+        for (const value of ['2', '20', '202', '2022']) {
+            fireEvent.change(input, { target: { value } });
+            expect(globalThis.fetch).not.toHaveBeenCalled();
+        }
+        fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+        expect(JSON.parse(globalThis.fetch.mock.calls[0][1].body).payload.first_shipment_date).toBe('2022');
+    });
+
     it('commits a changed date as soon as the date control changes', async () => {
         render(
             <ObjectGrid

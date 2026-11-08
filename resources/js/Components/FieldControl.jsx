@@ -1,3 +1,4 @@
+import FirstShipmentDateControl from './FirstShipmentDateControl';
 import ComboBox from './ComboBox';
 import CreatableComboBox from './CreatableComboBox';
 import LocalizedFileInput from './LocalizedFileInput';
@@ -128,6 +129,10 @@ export function FieldControl({ field, value, onChange, relationOptions = {}, aut
         ];
 
         return <ComboBox value={common.value} options={options} onChange={(next) => onChange(field.key, next)} autoFocus={autoFocus} />;
+    }
+
+    if (field.type === 'date' && field.allow_year) {
+        return <FirstShipmentDateControl field={field} value={value} onChange={onChange} autoFocus={autoFocus} />;
     }
 
     if (field.type === 'date') {

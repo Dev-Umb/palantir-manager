@@ -1239,7 +1239,11 @@ class _ProjectEditorState extends State<ProjectEditor> {
             : TextInputType.text,
         decoration: InputDecoration(
           labelText: label,
-          hintText: type == 'date' ? 'YYYY-MM-DD' : null,
+          hintText: type == 'date'
+              ? (f['allow_year'] == true
+                    ? 'YYYY（仅年份）或 YYYY-MM-DD'
+                    : 'YYYY-MM-DD')
+              : null,
         ),
         onChanged: (v) {
           payload[key] = type == 'number'

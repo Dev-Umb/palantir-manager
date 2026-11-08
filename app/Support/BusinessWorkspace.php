@@ -163,7 +163,8 @@ class BusinessWorkspace
     {
         $writable = array_flip($this->writableFieldKeys($object, $user));
 
-        return collect($object->fields ?? [])->map(function (array $field) use ($writable): array {
+        return collect($object->fields ?? [])->map(function (array $field) use ($writable, $object): array {
+            $field['allow_year'] = $object->key === 'project' && $field['key'] === 'first_shipment_date';
             $intrinsicallyReadonly = ($field['readonly'] ?? false)
                 || in_array($field['type'] ?? null, ['readonly', 'lookup', 'derived'], true);
             if (! $intrinsicallyReadonly && ! isset($writable[$field['key'] ?? ''])) {

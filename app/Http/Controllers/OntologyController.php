@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Support\AttachmentPreview;
 use App\Support\BusinessFileStorage;
 use App\Support\BusinessWorkspace;
+use App\Support\FirstShipmentDate;
 use App\Support\ObjectRelations;
 use App\Support\ProjectVisibility;
 use Illuminate\Database\Eloquent\Builder;
@@ -790,7 +791,11 @@ class OntologyController extends Controller
             return;
         }
 
-        $fields = collect($object->fields ?? [])->keyBy('key');
+        $fields = collect($object->fields ?? [])->map(function (array $field) use ($object): array {
+            $field['allow_year'] = $object->key === 'project' && $field['key'] === 'first_shipment_date';
+
+            return $field;
+        })->keyBy('key');
         $logic = $request->query('filter_logic') === 'or' ? 'or' : 'and';
         $query->where(function (Builder $group) use ($filters, $fields, $logic): void {
             foreach ($filters as $filter) {
@@ -847,6 +852,12 @@ class OntologyController extends Controller
         }
         if ($operator === 'is_not_empty') {
             $query->whereNotNull($column)->where($column, '!=', '');
+
+            return;
+        }
+
+        if ($field['allow_year'] ?? false) {
+            FirstShipmentDate::filter($query, $operator, $value);
 
             return;
         }
@@ -956,6 +967,9 @@ class OntologyController extends Controller
                 ? "(SELECT users.name FROM users WHERE CAST(users.id AS TEXT) = object_records.payload->>'{$key}' LIMIT 1)"
                 : "(SELECT users.name FROM users WHERE CAST(users.id AS TEXT) = CAST(json_extract(object_records.payload, '$.{$key}') AS TEXT) LIMIT 1)";
             $query->orderByRaw("{$expression} {$direction}");
+        } elseif ($object->key === 'project' && $field['key'] === 'first_shipment_date') {
+            $query->orderByRaw(FirstShipmentDate::expression().' '.$direction)
+                ->orderBy('payload->first_shipment_date', $direction);
         } elseif (in_array($field['type'] ?? null, ['number', 'range'], true)) {
             $driver = DB::connection()->getDriverName();
             $key = str_replace('"', '', (string) $field['key']);
@@ -1099,6 +1113,9 @@ class OntologyController extends Controller
             $request->attributes->set('removed_other_attachment_tokens', $removed);
             $existingPayload['other_attachments'] = $this->retainedProjectOtherAttachments($existingPayload, $removed);
             $input = (array) $request->input('payload', []);
+            if (array_key_exists('first_shipment_date', $input)) {
+                $input['first_shipment_date'] = FirstShipmentDate::normalize($input['first_shipment_date']);
+            }
             foreach (AttachmentPreview::PROJECT_FIELDS as $key) {
                 if ($request->hasFile("payload.{$key}")) {
                     abort_unless(in_array($key, $this->workspace->writableFieldKeys($object, $request->user()), true), 403);
@@ -1315,7 +1332,12 @@ class OntologyController extends Controller
         $rules = array_values(array_filter([
             ! empty($field['required']) ? 'required' : 'nullable',
             in_array($type, ['number', 'range'], true) ? ($type === 'range' ? 'integer' : 'numeric') : 'string',
-            in_array($type, ['date', 'datetime'], true) ? 'date' : null,
+            in_array($type, ['date', 'datetime'], true) ? ($object->key === 'project' && $field['key'] === 'first_shipment_date'
+                ? function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! FirstShipmentDate::valid($value)) {
+                        $fail('首次发货日期须为四位年份或有效的 YYYY-MM-DD 日期。');
+                    }
+                } : 'date') : null,
         ]));
 
         if ($type === 'select' && ! empty($field['options'])) {
@@ -1582,7 +1604,7 @@ class OntologyController extends Controller
     {
         $first = $payload['first_shipment_date'] ?? null;
         $last = $payload['last_shipment_date'] ?? null;
-        if (is_string($first) && $first !== '' && is_string($last) && $last !== '' && $last < $first) {
+        if (is_string($first) && $first !== '' && is_string($last) && $last !== '' && $last < FirstShipmentDate::lower($first)) {
             throw ValidationException::withMessages([
                 'payload.last_shipment_date' => '末次发货日期不能早于首次发货日期。',
             ]);
