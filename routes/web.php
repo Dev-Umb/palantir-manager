@@ -22,6 +22,7 @@ use App\Http\Controllers\RbacController;
 use App\Http\Controllers\RelationOptionsController;
 use App\Http\Controllers\TenderConversionController;
 use App\Http\Controllers\VisualizationController;
+use App\Http\Controllers\WebWechatLoginController;
 use App\Http\Controllers\WechatAccountController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,7 +38,16 @@ Route::get('/miniapp/session', [MiniappSessionController::class, 'show'])->name(
 Route::post('/miniapp/session', [MiniappSessionController::class, 'store'])->middleware('throttle:login')->name('miniapp.session.store');
 Route::delete('/miniapp/session', [MiniappSessionController::class, 'destroy'])->name('miniapp.session.destroy');
 
+Route::middleware(['auth', 'throttle:30,1'])->group(function () {
+    Route::get('/miniapp/web-login/{id}', [WebWechatLoginController::class, 'inspect']);
+    Route::post('/miniapp/web-login/{id}', [WebWechatLoginController::class, 'decide']);
+});
+
 Route::middleware('guest')->group(function () {
+    Route::post('/login/wechat', [WebWechatLoginController::class, 'create'])->middleware('throttle:6,1');
+    Route::get('/login/wechat/{id}', [WebWechatLoginController::class, 'status'])->middleware('throttle:60,1');
+    Route::post('/login/wechat/{id}/consume', [WebWechatLoginController::class, 'consume'])->middleware('throttle:10,1');
+
     Route::get('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/login', [AuthController::class, 'authenticate'])->middleware('throttle:login')->name('login.store');
     Route::get('/register', [AuthController::class, 'register'])->name('register');

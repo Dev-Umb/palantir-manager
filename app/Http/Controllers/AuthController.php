@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Support\WechatLogin;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +17,7 @@ class AuthController extends Controller
 {
     public function login(): Response
     {
-        return Inertia::render('Auth/Login');
+        return Inertia::render('Auth/Login', ['wechatConfigured' => app(WechatLogin::class)->configured()]);
     }
 
     public function authenticate(Request $request): RedirectResponse
@@ -71,7 +72,7 @@ class AuthController extends Controller
         return redirect()->route('login');
     }
 
-    private function loginFallback(User $user): string
+    public function loginFallback(User $user): string
     {
         if ($user->canDo('timebook.view') && ! $user->canDo('dashboard.view') && ! $user->canDo('object.project.view')) {
             return route('timebook.index');

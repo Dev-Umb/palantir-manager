@@ -1,0 +1,13 @@
+<navigation-bar title="电脑端登录" back="{{false}}" color="#192b42" background="#ffffff"/>
+<view class="confirm-page">
+ <view class="heading">鑫源昌智造中枢</view>
+ <view wx:if="{{loading}}">正在检查登录请求…</view>
+ <view wx:elif="{{error}}" class="error">{{error}}</view>
+ <block wx:elif="{{status==='pending'}}">
+  <view class="account">登录账号：{{account}}</view>
+  <view class="hint">确认后，你刚刚扫码的电脑将登录此账号。请仅确认自己发起的登录。</view>
+  <button class="primary" loading="{{busy}}" disabled="{{busy}}" bindtap="decide" data-confirm="yes">确认登录电脑端</button>
+  <button disabled="{{busy}}" bindtap="decide" data-confirm="no">取消</button>
+ </block>
+ <view wx:else class="account">{{status==='confirmed'?'已确认，请返回电脑端':'已取消，请在电脑端重新扫码'}}</view>
+</view>

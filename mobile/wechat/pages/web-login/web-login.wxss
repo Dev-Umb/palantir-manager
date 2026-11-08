@@ -1,0 +1,1 @@
+.confirm-page{padding:64rpx 36rpx;color:#192b42}.heading{font-size:42rpx;font-weight:600;margin-bottom:48rpx}.account{font-size:32rpx;margin-bottom:28rpx}.hint{color:#65758b;line-height:1.7;margin-bottom:48rpx}button{margin-top:24rpx;width:100%}.primary{background:#2865a7;color:#fff}.error{color:#bd2828;line-height:1.7}

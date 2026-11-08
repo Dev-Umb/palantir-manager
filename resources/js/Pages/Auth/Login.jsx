@@ -1,6 +1,8 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 
-export default function Login() {
+import WechatScanLogin from '../../Components/WechatScanLogin';
+
+export default function Login({ wechatConfigured = false }) {
     const form = useForm({ email: '', password: '', remember: false });
 
     function submit(event) {
@@ -18,6 +20,7 @@ export default function Login() {
                     <p>登录后可按职责查看经营数据、业务资料和待办任务。基础角色默认只能看大盘和提交采购申请。</p>
                 </div>
                 <form onSubmit={submit} className="auth-form">
+                    {wechatConfigured && <WechatScanLogin />}
                     <label><span>邮箱</span><input value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} type="email" required autoFocus /></label>
                     <label><span>密码</span><input value={form.data.password} onChange={(e) => form.setData('password', e.target.value)} type="password" required /></label>
                     {form.errors.email && <p className="form-error">{form.errors.email}</p>}
