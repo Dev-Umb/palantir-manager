@@ -34,3 +34,15 @@ The system SHALL preserve existing permissions, manual data, submission idempote
 #### Scenario: Existing multi-attachment expense
 - **WHEN** an older reimbursement is viewed or resubmitted
 - **THEN** its existing amounts and attachments remain intact without automatic repartitioning.
+
+### Requirement: Batch recognition skips confirmed non-evidence pages
+The batch entry SHALL skip pages explicitly identified as blank or non-evidence without creating empty expenses, while preserving originals, valid receipts, actionable failures and existing single-upload behavior.
+#### Scenario: Mixed receipt and unrelated image
+- **WHEN** a batch PDF contains valid receipts and explicitly classified non-evidence pages
+- **THEN** receipt drafts retain original page references and unrelated pages do not create recognition errors or expenses.
+#### Scenario: No receipts in a file
+- **WHEN** all pages are explicitly classified as non-evidence
+- **THEN** processing completes without a draft or failed-file indication and the original is retained.
+#### Scenario: Unreadable receipt or processing failure
+- **WHEN** a receipt amount is unclear, a page is unaccounted for, or page processing fails
+- **THEN** the actionable issue remains visible and valid recognized items are preserved.

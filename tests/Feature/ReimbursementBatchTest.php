@@ -259,8 +259,8 @@ class ReimbursementBatchTest extends TestCase
         $progress = ['status' => 'processing', 'items' => array_slice($items, 0, 5), 'issues' => [], 'pages' => 10, 'done_pages' => range(1, 5)];
         $complete = ['status' => 'completed', 'items' => $items, 'issues' => [], 'pages' => 10, 'done_pages' => range(1, 10)];
         $recognizer = \Mockery::mock(ReimbursementEvidenceRecognition::class);
-        $recognizer->shouldReceive('recognize')->with(\Mockery::type(StoredAttachment::class), [])->once()->andReturn($progress);
-        $recognizer->shouldReceive('recognize')->with(\Mockery::type(StoredAttachment::class), $progress)->once()->andReturn($complete);
+        $recognizer->shouldReceive('recognize')->with(\Mockery::type(StoredAttachment::class), [], true)->once()->andReturn($progress);
+        $recognizer->shouldReceive('recognize')->with(\Mockery::type(StoredAttachment::class), $progress, true)->once()->andReturn($complete);
         $job = new ProcessReimbursementInvoice($file->id);
         $job->handle($recognizer, app(ReimbursementBatchService::class));
         $this->assertDatabaseCount('reimbursement_drafts', 0);
@@ -273,6 +273,40 @@ class ReimbursementBatchTest extends TestCase
         $this->assertSame('completed', $upload->fresh()->evidence_status);
         $this->actingAs($this->owner)->getJson('/reimbursements/drafts/'.$draft->id)->assertOk()->assertJsonCount(10, 'draft.payload.items');
         $this->assertDatabaseCount('reimbursements', 0);
+    }
+
+    public function test_non_evidence_file_completes_without_empty_draft_and_preserves_original(): void
+    {
+        Queue::fake();
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        $upload = ReimbursementUpload::factory()->create(['user_id' => $this->owner->id]);
+        $file = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'status' => 'queued', 'upload_id' => $upload->id]);
+        ReimbursementUpload::factory()->create(['user_id' => $this->owner->id, 'stored_attachment_id' => $upload->stored_attachment_id]);
+        $recognizer = \Mockery::mock(ReimbursementEvidenceRecognition::class);
+        $recognizer->shouldReceive('recognize')->with(\Mockery::type(StoredAttachment::class), [], true)->once()
+            ->andReturn(['status' => 'completed', 'items' => [], 'issues' => [], 'pages' => 1, 'done_pages' => [1]]);
+        $service = app(ReimbursementBatchService::class);
+        (new ProcessReimbursementInvoice($file->id))->handle($recognizer, $service);
+        $this->assertDatabaseCount('reimbursement_drafts', 0);
+        $this->assertModelExists($upload);
+        $this->assertModelExists(StoredAttachment::findOrFail($upload->stored_attachment_id));
+        $presented = $service->present($batch->fresh());
+        $this->assertSame('completed', $presented['status']);
+        $this->assertSame(1, $presented['processed']);
+        $this->assertSame([], $presented['failed_names']);
+        $this->recognized($batch, '住宿费');
+        $service->finish($batch);
+        $this->assertCount(1, ReimbursementDraft::sole()->payload['items']);
+    }
+
+    public function test_empty_recognition_with_real_issue_still_creates_manual_review_draft(): void
+    {
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+        $file = $this->recognized($batch);
+        $file->update(['result' => ['sources' => [], 'recognition' => ['status' => 'attention']], 'issues' => ['读取失败'], 'reviewed' => false]);
+        app(ReimbursementBatchService::class)->finish($batch);
+        $this->assertCount(1, ReimbursementDraft::sole()->payload['items']);
+        $this->assertSame('attention', $batch->fresh()->status);
     }
 
     public function test_new_multifile_batch_combines_mixed_expenses_in_one_draft(): void
