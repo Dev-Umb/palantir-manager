@@ -8,6 +8,7 @@
    <view wx:for="{{fields}}" wx:key="key" class="editor-field"><view class="field-label">{{item.label}}<text wx:if="{{item.required}}" class="required"> *</text></view>
     <button wx:if="{{item.relation}}" class="relation-control" data-key="{{item.key}}" bindtap="choose"><text class="relation-label">{{item.selectedText}}</text><text class="chevron">›</text></button>
     <picker wx:elif="{{item.type==='select'}}" range="{{item.options}}" data-key="{{item.key}}" bindchange="select"><view class="field-select"><text>{{values[item.key] || '请选择'}}</text><text class="chevron">⌄</text></view></picker>
+    <block wx:elif="{{item.type==='date' && item.allow_year}}"><input value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="input" placeholder="YYYY（仅年份）或 YYYY-MM-DD"/><picker mode="date" data-key="{{item.key}}" bindchange="date"><view class="field-select">选择完整日期</view></picker></block>
     <picker wx:elif="{{item.type==='date'}}" mode="date" value="{{values[item.key]}}" data-key="{{item.key}}" bindchange="date"><view class="field-select"><text>{{values[item.key] || '请选择日期'}}</text><text class="chevron">⌄</text></view></picker>
     <textarea wx:elif="{{item.type==='textarea'}}" class="field-textarea" value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="input" maxlength="-1" placeholder="请输入{{item.label}}"/>
     <input wx:else class="field-input" value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="input" maxlength="-1" placeholder="请输入{{item.label}}"/>

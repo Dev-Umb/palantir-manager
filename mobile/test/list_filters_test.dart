@@ -114,6 +114,53 @@ Future<void> chooseFilter(WidgetTester tester, bool project) async {
 
 void main() {
   test(
+    'year filters retain precision and other date fields require a full date',
+    () {
+      final field = {'type': 'date', 'allow_year': true};
+      for (final value in ['2016', '2016-02-29']) {
+        expect(
+          validateFilterValue(
+            field,
+            RecordFilter('first_shipment_date', 'equals', value),
+          ),
+          isNull,
+        );
+      }
+      expect(
+        validateFilterValue(
+          field,
+          const RecordFilter(
+            'first_shipment_date',
+            'between',
+            '2016-06-01..2016',
+          ),
+        ),
+        isNull,
+      );
+      for (final value in ['0000', '0999', '10000', '2016-02-30']) {
+        expect(
+          validateFilterValue(
+            field,
+            RecordFilter('first_shipment_date', 'equals', value),
+          ),
+          isNotNull,
+        );
+      }
+      expect(
+        validateFilterValue({
+          'type': 'date',
+        }, const RecordFilter('last_shipment_date', 'equals', '2016')),
+        isNotNull,
+      );
+      expect(
+        const ListFilters(
+          rules: [RecordFilter('first_shipment_date', 'equals', '2016')],
+        ).query['filters[0][value]'],
+        '2016',
+      );
+    },
+  );
+  test(
     'query uses existing filters contract and preserves keyword and pagination',
     () {
       const filters = ListFilters(

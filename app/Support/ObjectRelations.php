@@ -169,6 +169,11 @@ class ObjectRelations
                     ->all();
                 $payload[$field['key']] = $value;
             }
+            if ($record->businessObject->key === 'project' && $field['key'] === 'first_shipment_date' && FirstShipmentDate::isYear($value)) {
+                $display[$field['key']] = $value.'年（月日不详）';
+
+                continue;
+            }
             $display[$field['key']] = match ($field['type'] ?? null) {
                 'relation', 'creatable_relation' => $this->relationDisplayLabel(
                     $payload,

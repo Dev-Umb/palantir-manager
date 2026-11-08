@@ -455,7 +455,7 @@ function GridEditor({ value, onValueChange, stopEditing, fieldConfig, relationOp
                 value={value ?? ''}
                 onChange={(_, next) => {
                     onValueChange(next);
-                    if (fieldConfig.type === 'date') {
+                    if (fieldConfig.type === 'date' && !fieldConfig.allow_year) {
                         setTimeout(() => stopEditing(), 0);
                     }
                 }}
@@ -664,7 +664,7 @@ export function columnBounds(field) {
         return { min: MIN_DATA_COLUMN_WIDTH, preferred: 280, max: 360 };
     }
     if (field.type === 'date') {
-        return { min: MIN_DATA_COLUMN_WIDTH, preferred: 120, max: 132 };
+        return { min: MIN_DATA_COLUMN_WIDTH, preferred: field.allow_year ? 190 : 120, max: field.allow_year ? 240 : 132 };
     }
     if (numericField(field)) {
         return { min: MIN_DATA_COLUMN_WIDTH, preferred: 118, max: 160 };
