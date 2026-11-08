@@ -99,7 +99,8 @@ class ReimbursementBatchService
             if ($batch->status === 'uploading' || $this->files($batch)->whereIn('status', ['queued', 'processing'])->exists()) {
                 return;
             }
-            $pending = $this->files($batch)->where('status', 'recognized')->whereNull('draft_id')->orderBy('id')->get();
+            $pending = $this->files($batch)->where('status', 'recognized')->whereNull('draft_id')->orderBy('id')->get()
+                ->reject(fn ($file) => ($file->result['sources'] ?? null) === [] && ($file->result['recognition']['status'] ?? null) === 'completed' && ! $file->issues);
             $newTypes = $pending->filter(fn ($file) => array_key_exists('sources', $file->result))->map(fn ($file) => $file->result['type'] ?? '其他')->unique();
             $combinedType = $newTypes->count() === 1 ? $newTypes->first() : '其他';
             foreach ($pending->groupBy(fn ($file) => array_key_exists('sources', $file->result) ? $combinedType : ($file->result['type'] ?? '其他')) as $type => $group) {

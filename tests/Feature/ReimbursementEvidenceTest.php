@@ -47,6 +47,27 @@ class ReimbursementEvidenceTest extends TestCase
         $this->assertSame(2, $result['issues'][0]['page']);
     }
 
+    public function test_batch_skips_only_explicit_non_evidence_and_preserves_receipts_and_errors(): void
+    {
+        $response = ['items' => [$this->candidate(['kind' => 'receipt', 'amount' => '60.00'])], 'page_issues' => [['page' => 3, 'message' => '金额模糊']], 'skipped_pages' => [2]];
+        $result = app(ReimbursementEvidenceRecognition::class)->normalize($response, [1, 2, 3, 4], true);
+        $this->assertSame('60.00', $result['items'][0]['amount']);
+        $this->assertNotContains(2, array_column($result['issues'], 'page'));
+        $this->assertContains(3, array_column($result['issues'], 'page'));
+        $this->assertContains(4, array_column($result['issues'], 'page'));
+        $single = app(ReimbursementEvidenceRecognition::class)->normalize($response, [1, 2, 3, 4]);
+        $this->assertContains(2, array_column($single['issues'], 'page'));
+    }
+
+    public function test_skipped_page_cannot_hide_explicit_failure_or_reference_another_page(): void
+    {
+        $recognizer = app(ReimbursementEvidenceRecognition::class);
+        $result = $recognizer->normalize(['items' => [], 'skipped_pages' => [1], 'page_issues' => [['page' => 1, 'message' => '读取失败']]], [1], true);
+        $this->assertSame('读取失败', $result['issues'][0]['message']);
+        $this->expectException(ValidationException::class);
+        $recognizer->normalize(['items' => [], 'skipped_pages' => [2], 'page_issues' => []], [1], true);
+    }
+
     public function test_uncertain_non_cny_failed_or_refunded_payment_cannot_create_positive_expense(): void
     {
         foreach ([['uncertain' => true], ['currency' => 'USD'], ['kind' => 'receipt', 'status' => 'failed'], ['kind' => 'receipt', 'status' => 'refunded'], ['kind' => 'payment', 'status' => 'issued'], ['amount' => '0']] as $overrides) {
@@ -148,6 +169,22 @@ class ReimbursementEvidenceTest extends TestCase
         $this->assertSame('completed', $result['status']);
         $this->assertCount(2, $result['items']);
         $this->assertSame([1], $result['done_pages']);
+    }
+
+    public function test_batch_image_uses_skip_instructions_and_finishes_without_candidates(): void
+    {
+        Storage::fake('local');
+        $bytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aKAAAAABJRU5ErkJggg==');
+        Storage::disk('local')->put('image.png', $bytes);
+        $this->mock(InvoiceMemoryWorkspace::class)->shouldReceive('run')->once()->andReturnUsing(fn ($callback) => $callback(Storage::disk('local')->path('')));
+        ReimbursementEvidenceAgent::fake([json_encode(['items' => [], 'page_issues' => [], 'skipped_pages' => [1]])])->preventStrayPrompts();
+        $result = app(ReimbursementEvidenceRecognition::class)->recognize(new StoredAttachment(['disk' => 'local', 'object_key' => 'image.png', 'mime_type' => 'image/png', 'size' => strlen($bytes), 'sha256' => hash('sha256', $bytes)]), skipNonEvidence: true);
+        $this->assertSame('completed', $result['status']);
+        $this->assertSame([], $result['items']);
+        $this->assertSame([], $result['issues']);
+        $this->assertSame([1], $result['done_pages']);
+        ReimbursementEvidenceAgent::assertPrompted(fn ($prompt) => $prompt->agent->skipNonEvidence && str_contains($prompt->agent->instructions(), 'skipped_pages'));
+        $this->assertStringNotContainsString('skipped_pages', (new ReimbursementEvidenceAgent)->instructions());
     }
 
     public function test_chunk_job_persists_progress_and_continues_without_repeating_finished_work(): void

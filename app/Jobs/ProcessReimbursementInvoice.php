@@ -47,7 +47,7 @@ class ProcessReimbursementInvoice implements ShouldQueue
         try {
             $upload = ReimbursementUpload::findOrFail($file->upload_id);
             $stored = StoredAttachment::findOrFail($upload->stored_attachment_id);
-            $result = $recognizer->recognize($stored, $file->result['recognition'] ?? []);
+            $result = $recognizer->recognize($stored, $file->result['recognition'] ?? [], skipNonEvidence: true);
             $upload->forceFill(['evidence_status' => $result['status'], 'evidence_result' => $result])->save();
             if ($result['status'] === 'processing') {
                 $file->update(['result' => ['recognition' => $result]]);
@@ -62,6 +62,12 @@ class ProcessReimbursementInvoice implements ShouldQueue
             $r = ['type' => $types->count() === 1 ? $types->first() : '其他', 'sources' => $result['items'], 'recognition' => $result];
             $issues = array_map(fn ($issue) => '第 '.$issue['page'].' 页：'.$issue['message'], $result['issues']);
             $batch = ReimbursementBatch::findOrFail($file->batch_id);
+            if (! $r['sources'] && ! $issues) {
+                $file->update(['status' => 'recognized', 'result' => $r, 'issues' => [], 'reviewed' => true, 'error' => null]);
+                $service->finish($batch);
+
+                return;
+            }
             DB::transaction(function () use ($file, $batch, $upload, $r, &$issues): void {
                 User::whereKey($batch->user_id)->lockForUpdate()->firstOrFail();
                 $other = ReimbursementBatchFile::where('id', '!=', $file->id)->whereNotIn('status', ['excluded', 'uploading'])->whereIn('batch_id', ReimbursementBatch::where('user_id', $batch->user_id)->select('id'))->get();

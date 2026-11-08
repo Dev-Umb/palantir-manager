@@ -16,9 +16,11 @@ class ReimbursementEvidenceRecognition
 {
     public function __construct(private InvoiceMemoryWorkspace $workspace) {}
 
-    public function normalize(array $response, array $pages): array
+    public function normalize(array $response, array $pages, bool $skipNonEvidence = false): array
     {
         $data = Validator::make($response, [
+            'skipped_pages' => ['sometimes', 'array', 'max:50'],
+            'skipped_pages.*' => ['required', 'integer', 'distinct', Rule::in($pages)],
             'items' => ['present', 'array', 'max:100'],
             'items.*.page' => ['required', 'integer', Rule::in($pages)],
             'items.*.region' => ['required', 'string', 'max:100'],
@@ -82,7 +84,7 @@ class ReimbursementEvidenceRecognition
             }
         }
         foreach ($pages as $page) {
-            if (! isset($counts[$page]) && ! collect($issues)->contains('page', $page)) {
+            if (! isset($counts[$page]) && ! ($skipNonEvidence && in_array($page, $data['skipped_pages'] ?? [], true)) && ! collect($issues)->contains('page', $page)) {
                 $issues[] = ['page' => $page, 'message' => '此页未识别到凭证，请核对原件。'];
             }
         }
@@ -90,9 +92,9 @@ class ReimbursementEvidenceRecognition
         return ['items' => $items, 'issues' => $issues];
     }
 
-    public function recognize(StoredAttachment $attachment, array $previous = []): array
+    public function recognize(StoredAttachment $attachment, array $previous = [], bool $skipNonEvidence = false): array
     {
-        return $this->workspace->run(function (string $directory) use ($attachment, $previous): array {
+        return $this->workspace->run(function (string $directory) use ($attachment, $previous, $skipNonEvidence): array {
             $source = Storage::disk($attachment->disk)->readStream($attachment->object_key);
             if (! is_resource($source)) {
                 throw new UnexpectedValueException('附件无法读取。');
@@ -139,8 +141,8 @@ class ReimbursementEvidenceRecognition
             }
             $items = $previous['items'] ?? [];
             if ($images) {
-                $response = ReimbursementEvidenceAgent::make()->prompt('按附件顺序对应原文件页码：'.implode('、', $imagePages).'。输出这些原始页码，逐页提取所有独立凭证。', attachments: $images, provider: 'aimon', timeout: 100);
-                $result = $this->normalize(json_decode($response->text, true, flags: JSON_THROW_ON_ERROR), $imagePages);
+                $response = ReimbursementEvidenceAgent::make(skipNonEvidence: $skipNonEvidence)->prompt('按附件顺序对应原文件页码：'.implode('、', $imagePages).'。输出这些原始页码，逐页提取所有独立凭证。', attachments: $images, provider: 'aimon', timeout: 100);
+                $result = $this->normalize(json_decode($response->text, true, flags: JSON_THROW_ON_ERROR), $imagePages, $skipNonEvidence);
                 foreach ($result['items'] as $item) {
                     $index = collect($items)->search(fn ($old) => $old['id'] === $item['id']);
                     if ($index === false) {
