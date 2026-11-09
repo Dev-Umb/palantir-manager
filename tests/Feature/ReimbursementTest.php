@@ -217,6 +217,52 @@ class ReimbursementTest extends TestCase
         $this->assertDatabaseHas('reimbursement_uploads', ['id' => $response->json('file.id'), 'user_id' => $this->owner->id]);
     }
 
+    public function test_administrator_inbox_filters_before_pagination_without_changing_review_scope(): void
+    {
+        $this->admin->roles()->attach(Role::firstOrCreate(['name' => 'admin'], ['label' => '管理员']));
+        $flow = ['nodes' => [['name' => '审批', 'mode' => 'all', 'people' => [['id' => $this->admin->id, 'name' => '管理员'], ['id' => $this->reviewer->id, 'name' => '审批人']]]], 'cc' => [], 'triggers' => []];
+        $make = function (array $attributes = []) use ($flow): ReimbursementVersion {
+            $version = ReimbursementVersion::factory()->create([...['status' => 'pending', 'flow' => $flow], ...$attributes]);
+            DB::table('reimbursement_access')->insert(['version_id' => $version->id, 'user_id' => $this->admin->id, 'kind' => 'approver']);
+
+            return $version;
+        };
+        $eligible = collect(range(1, 21))->map(fn () => $make());
+        $make(['decisions' => [['node' => 0, 'user_id' => $this->admin->id, 'name' => '管理员', 'decision' => 'approve', 'note' => '']]]);
+        $make(['flow' => [...$flow, 'nodes' => [['name' => '前置', 'mode' => 'any', 'people' => [['id' => $this->reviewer->id, 'name' => '审批人']]], ...$flow['nodes']]]]);
+        $make(['status' => 'approved']);
+        $historical = $make();
+        DB::table('reimbursements')->where('id', $historical->reimbursement_id)->update(['latest_version' => 2]);
+        $deleted = $this->person();
+        $make(['flow' => [...$flow, 'nodes' => [['name' => '失效会签', 'mode' => 'all', 'people' => [['id' => $this->admin->id, 'name' => '管理员'], ['id' => $deleted->id, 'name' => '失效人员']]]]]]);
+        $deleted->delete();
+        $this->actingAs($this->admin)->getJson('/reimbursements/approvals')->assertOk()->assertJsonPath('records.total', 21)->assertJsonCount(20, 'records.data')->assertJsonPath('records.data.0.id', $eligible->last()->id);
+        $this->getJson('/reimbursements/approvals?page=2')->assertOk()->assertJsonCount(1, 'records.data')->assertJsonPath('records.data.0.id', $eligible->first()->id);
+        $this->getJson('/reimbursements?scope=review&status=pending')->assertOk()->assertJsonPath('records.total', 24)->assertJsonPath('pending_count', 24);
+        $this->getJson('/reimbursements/approvals?page=0')->assertUnprocessable();
+        $this->actingAs($this->reviewer)->getJson('/reimbursements/approvals')->assertForbidden();
+        $this->actingAs($this->owner)->getJson('/reimbursements?scope=mine')->assertOk();
+    }
+
+    public function test_admin_inbox_tracks_decisions_and_preserves_assigned_non_admin_pc_approval(): void
+    {
+        $this->admin->roles()->attach(Role::firstOrCreate(['name' => 'admin'], ['label' => '管理员']));
+        $this->flow([[$this->admin->id, $this->reviewer->id]], 'all');
+        $record = $this->submit($this->input());
+        $this->actingAs($this->admin)->getJson('/reimbursements/approvals')->assertJsonPath('records.total', 1);
+        $this->decision($this->admin, $record, 'reject')->assertUnprocessable();
+        $this->decision($this->admin, $record)->assertOk()->assertJsonPath('record.status', 'pending');
+        $this->getJson('/reimbursements/approvals')->assertJsonPath('records.total', 0);
+        $this->decision($this->admin, $record)->assertForbidden();
+        $this->decision($this->reviewer, $record)->assertOk()->assertJsonPath('record.status', 'approved');
+        $this->flow([[$this->reviewer->id]]);
+        $other = $this->submit($this->input());
+        $this->actingAs($this->admin)->getJson('/reimbursements/approvals')->assertJsonPath('records.total', 0);
+        $this->decision($this->admin, $other)->assertForbidden();
+        $this->admin->roles()->attach(Role::firstOrCreate(['name' => 'timebook_operator'], ['label' => '工日簿']));
+        $this->actingAs($this->admin->fresh())->getJson('/reimbursements/approvals')->assertForbidden();
+    }
+
     public function test_invoice_recognition_is_owner_scoped_cached_and_does_not_submit(): void
     {
         $input = $this->input();

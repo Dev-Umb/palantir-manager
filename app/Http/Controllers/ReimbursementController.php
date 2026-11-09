@@ -68,6 +68,16 @@ class ReimbursementController extends Controller
         return $this->page($request, 'Index', ['records' => $records, 'pending_count' => $pendingCount, 'filters' => [...$filters, 'scope' => $scope], ...$this->capabilities($request)]);
     }
 
+    public function approvals(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->roles()->where('name', 'admin')->exists(), 403);
+        $data = $request->validate(['page' => ['sometimes', 'integer', 'min:1', 'max:100000']]);
+        $records = $this->service->pendingApprovals($request->user(), (int) ($data['page'] ?? 1))
+            ->through(fn ($version) => $this->service->present($request->user(), $version));
+
+        return response()->json(['records' => $records])->header('Cache-Control', 'no-store, private');
+    }
+
     private function capabilities(Request $request): array
     {
         return ['capabilities' => ['submit' => $request->user()->canDo('reimbursements.submit'), 'manage' => $request->user()->canDo('reimbursements.manage'), 'configure' => $request->user()->canDo('reimbursements.configure')]];

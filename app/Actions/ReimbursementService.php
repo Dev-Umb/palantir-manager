@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Support\BusinessFileStorage;
 use App\Support\ReimbursementEvidenceSources;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,6 +30,30 @@ class ReimbursementService
 
         return $query->whereExists(fn ($q) => $q->selectRaw('1')->from('reimbursement_access')
             ->whereColumn('version_id', 'reimbursement_versions.id')->where('user_id', $user->id));
+    }
+
+    public function pendingApprovals(User $actor, int $page): LengthAwarePaginator
+    {
+        $candidates = $this->visible($actor)->where('status', 'pending')
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('reimbursements')
+                ->whereColumn('reimbursements.id', 'reimbursement_versions.reimbursement_id')
+                ->whereColumn('latest_version', 'reimbursement_versions.number'))
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('reimbursement_access')
+                ->whereColumn('version_id', 'reimbursement_versions.id')->where('user_id', $actor->id)->where('kind', 'approver'));
+        $total = 0;
+        $items = [];
+        // shortcut: scan assigned pending snapshots for exact shared-rule totals; index current assignees if backlog grows.
+        foreach ($candidates->orderByDesc('id')->lazy(100) as $version) {
+            if (! $this->canDecide($actor, $version)) {
+                continue;
+            }
+            if ($total >= ($page - 1) * 20 && $total < $page * 20) {
+                $items[] = $version;
+            }
+            $total++;
+        }
+
+        return new LengthAwarePaginator($items, $total, 20, $page, ['path' => LengthAwarePaginator::resolveCurrentPath()]);
     }
 
     public function authorizeVersion(User $user, ReimbursementVersion $version): void

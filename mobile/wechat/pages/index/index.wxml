@@ -1,5 +1,6 @@
 <navigation-bar title="工作台" back="{{false}}" color="#182331" background="#ffffff" /><scroll-view class="scrollarea" scroll-y type="list"><view class="content preview-screen"><view wx:if="{{error}}" class="error">{{error}}<button class="small" bindtap="refresh">重试</button></view><view wx:if="{{loading}}" class="loading">正在加载…</view><block wx:if="{{user}}">
 <view wx:if="{{canProcurement}}" class="box procurement-entry" data-kind="procurement" bindtap="openTool"><view class="name">招采信息 <text>›</text></view><view class="sub">按采购方式筛选 · 查看完整公告</view></view>
+<button wx:if="{{canApprove}}" class="box" bindtap="approvals">OA 审批 · 报销待办 ›</button>
 <view class="overview box">
  <view class="row"><text class="label">未回款 · 元</text><button class="text-button" bindtap="projects">查看项目 ›</button></view>
  <view class="hero-money">{{unpaid}}</view>
