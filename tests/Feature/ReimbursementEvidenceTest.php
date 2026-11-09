@@ -39,6 +39,33 @@ class ReimbursementEvidenceTest extends TestCase
         return [...['page' => 1, 'region' => '上半页', 'kind' => 'invoice', 'status' => 'issued', 'currency' => 'CNY', 'amount' => '101.00', 'date' => '2026-11-07', 'number' => '12345678', 'description' => '住宿费', 'uncertain' => false, 'warnings' => []], ...$overrides];
     }
 
+    public function test_lodging_autofill_caps_per_night_without_raising_lower_amounts(): void
+    {
+        foreach ([['80.00', 1, '80.00'], ['100.00', 1, '100.00'], ['100.01', 1, '100.00'], ['450.00', 3, '300.00'], ['299.99', 3, '299.99']] as [$original, $nights, $expected]) {
+            $result = app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [$this->candidate(['type' => '住宿费', 'lodging_nights' => $nights, 'amount' => $original])], 'page_issues' => []], [1]);
+            $this->assertSame($expected, $result['items'][0]['amount']);
+            $this->assertSame($original, $result['items'][0]['original_amount']);
+            $this->assertSame($nights, $result['items'][0]['lodging_nights']);
+            $this->assertStringContainsString('可手动修改', $result['items'][0]['description']);
+            $this->assertEmpty($result['issues']);
+        }
+    }
+
+    public function test_lodging_unknown_nights_and_invalid_payments_are_not_guessed_and_other_types_are_unchanged(): void
+    {
+        foreach ([['type' => '住宿费'], ['type' => '住宿费', 'lodging_nights' => null], ['type' => '住宿费', 'lodging_nights' => 3, 'uncertain' => true], ['type' => '住宿费', 'lodging_nights' => 3, 'kind' => 'payment', 'status' => 'refunded']] as $overrides) {
+            $result = app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [$this->candidate(['amount' => '450.00', ...$overrides])], 'page_issues' => []], [1]);
+            $this->assertNull($result['items'][0]['amount']);
+            $this->assertNotEmpty($result['issues']);
+        }
+        $result = app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [$this->candidate(['type' => '加油费', 'amount' => '450.00', 'lodging_nights' => 1])], 'page_issues' => []], [1]);
+        $this->assertSame('450.00', $result['items'][0]['amount']);
+        $this->assertNull($result['items'][0]['lodging_nights']);
+        $this->assertEmpty($result['issues']);
+        $this->expectException(ValidationException::class);
+        app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [$this->candidate(['type' => '住宿费', 'lodging_nights' => 0])], 'page_issues' => []], [1]);
+    }
+
     public function test_multiple_candidates_keep_exact_amounts_and_region_sources(): void
     {
         $result = app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [$this->candidate(), $this->candidate(['amount' => '202.1', 'region' => '下半页', 'number' => '87654321'])], 'page_issues' => []], [1, 2]);

@@ -16,6 +16,7 @@ use App\Models\StoredAttachment;
 use App\Models\User;
 use App\Support\BusinessFileStorage;
 use App\Support\InvoicePdfRecognition;
+use App\Support\ReimbursementEvidenceRecognition;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -276,6 +277,29 @@ class ReimbursementTest extends TestCase
         unlink($path);
         $this->postJson('/reimbursements', $input)->assertCreated();
         $this->assertDatabaseCount('reimbursements', 1);
+    }
+
+    public function test_lodging_ai_amount_can_be_overridden_saved_reopened_and_submitted_above_nightly_cap(): void
+    {
+        $input = $this->input();
+        $input['type'] = '住宿费';
+        $upload = ReimbursementUpload::findOrFail($input['items'][0]['attachments'][0]);
+        $result = app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [['page' => 1, 'region' => '整页', 'type' => '住宿费', 'kind' => 'invoice', 'status' => 'issued', 'currency' => 'CNY', 'amount' => '450.00', 'lodging_nights' => 3, 'date' => null, 'number' => 'lodging-1', 'description' => '住宿', 'uncertain' => false, 'warnings' => []]], 'page_issues' => []], [1]);
+        $source = $result['items'][0];
+        $this->assertSame('300.00', $source['amount']);
+        $upload->forceFill(['evidence_status' => 'completed', 'evidence_result' => $result])->save();
+        $input['items'][0] = [...$input['items'][0], 'description' => $source['description'], 'amount' => $source['amount'], 'evidence_source' => ['upload_id' => $upload->id, 'candidate_id' => $source['id']]];
+        $payload = array_intersect_key($input, array_flip(['title', 'type', 'note', 'items', 'cc']));
+        $draft = app(ReimbursementDraftService::class)->save($this->owner, (string) Str::uuid(), ['revision' => 0, 'payload' => $payload], true);
+        $url = '/reimbursements/drafts/'.$draft->id;
+        foreach (['90.00', '450.00'] as $manual) {
+            $payload['items'][0]['amount'] = $manual;
+            $this->actingAs($this->owner)->putJson($url, ['revision' => $draft->fresh()->revision, 'payload' => $payload])->assertOk();
+            $this->getJson($url)->assertOk()->assertJsonPath('draft.payload.items.0.amount', $manual);
+        }
+        $record = $this->submit([...$input, 'items' => $payload['items'], 'draft_id' => $draft->id, 'draft_revision' => $draft->fresh()->revision]);
+        $this->assertSame('450.00', $record['items'][0]['amount']);
+        $this->assertSame('450.00', $upload->fresh()->evidence_result['items'][0]['original_amount']);
     }
 
     private function input(?User $owner = null): array

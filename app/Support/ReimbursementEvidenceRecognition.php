@@ -25,6 +25,7 @@ class ReimbursementEvidenceRecognition
             'items.*.page' => ['required', 'integer', Rule::in($pages)],
             'items.*.region' => ['required', 'string', 'max:100'],
             'items.*.type' => ['sometimes', Rule::in(config('reimbursements.types'))],
+            'items.*.lodging_nights' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:3650'],
             'items.*.kind' => ['required', Rule::in(['invoice', 'receipt', 'payment'])],
             'items.*.status' => ['required', Rule::in(['issued', 'paid', 'unpaid', 'failed', 'refunded', 'unknown'])],
             'items.*.currency' => ['required', 'string', 'max:10'],
@@ -58,6 +59,7 @@ class ReimbursementEvidenceRecognition
             } else {
                 $amount = sprintf('%d.%02d', intdiv($cents, 100), $cents % 100);
             }
+            $originalAmount = $amount;
             if ($item['number'] && isset($numbers[$item['number']])) {
                 $amount = null;
                 $warnings[] = '识别到重复凭证号，请核对是否为同一票据的重复联或截图。';
@@ -65,12 +67,26 @@ class ReimbursementEvidenceRecognition
             if ($item['number']) {
                 $numbers[$item['number']] = true;
             }
+            $nights = ($item['type'] ?? null) === '住宿费' && isset($item['lodging_nights']) ? (int) $item['lodging_nights'] : null;
+            $lodgingNote = '';
+            if (($item['type'] ?? null) === '住宿费' && $amount !== null) {
+                if ($nights === null) {
+                    $amount = null;
+                    $warnings[] = '住宿晚数不明确，未自动填入金额，请核对晚数后手工填写。';
+                    $lodgingNote = "\n原票金额：{$originalAmount} 元；住宿晚数待核对。";
+                } else {
+                    $cappedCents = min($cents, $nights * 10000);
+                    $amount = sprintf('%d.%02d', intdiv($cappedCents, 100), $cappedCents % 100);
+                    $lodgingNote = "\n原票金额：{$originalAmount} 元；住宿 {$nights} 晚，按每晚最多 100 元自动填入 {$amount} 元，可手动修改。";
+                }
+            }
             $items[] = [
                 'id' => $page.'-'.$counts[$page], 'page' => $page, 'region' => $item['region'],
+                'original_amount' => $originalAmount, 'lodging_nights' => $nights,
                 'type' => $item['type'] ?? '其他', 'kind' => $item['kind'], 'amount' => $amount, 'number' => $item['number'],
                 'invoice_date' => $item['kind'] === 'invoice' ? $item['date'] : null,
                 'payment_date' => $item['kind'] !== 'invoice' ? $item['date'] : null,
-                'description' => $item['description'].($item['number'] ? "\n凭证号码：".$item['number'] : '').($item['kind'] !== 'invoice' && $item['date'] ? "\n支付日期：".$item['date'] : ''),
+                'description' => $item['description'].$lodgingNote.($item['number'] ? "\n凭证号码：".$item['number'] : '').($item['kind'] !== 'invoice' && $item['date'] ? "\n支付日期：".$item['date'] : ''),
                 'warnings' => $warnings,
             ];
             if ($warnings) {
