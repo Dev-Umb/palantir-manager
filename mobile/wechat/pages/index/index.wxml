@@ -1,6 +1,5 @@
 <navigation-bar title="工作台" back="{{false}}" color="#182331" background="#ffffff" /><scroll-view class="scrollarea" scroll-y type="list"><view class="content preview-screen"><view wx:if="{{error}}" class="error">{{error}}<button class="small" bindtap="refresh">重试</button></view><view wx:if="{{loading}}" class="loading">正在加载…</view><block wx:if="{{user}}">
 <view wx:if="{{canProcurement}}" class="box procurement-entry" data-kind="procurement" bindtap="openTool"><view class="name">招采信息 <text>›</text></view><view class="sub">按采购方式筛选 · 查看完整公告</view></view>
-<button wx:if="{{canApprove}}" class="box" bindtap="approvals">OA 审批 · 报销待办 ›</button>
 <view class="overview box">
  <view class="row"><text class="label">未回款 · 元</text><button class="text-button" bindtap="projects">查看项目 ›</button></view>
  <view class="hero-money">{{unpaid}}</view>
@@ -11,6 +10,7 @@
   <view class="stat"><view class="label">项目</view><view class="stat-value">{{projectCount}}</view></view>
  </view>
 </view>
+<button wx:if="{{canApprove}}" class="oa-entry" bindtap="approvals"><text>OA 审批</text><text class="oa-entry-action">报销待办 ›</text></button>
 <view wx:if="{{canReimburse}}" class="quick business-actions reimbursement-actions"><button class="manual-reimbursement" bindtap="createReimbursement">发起报销</button><button class="batch-reimbursement" bindtap="batchReimbursement">批量报销</button></view>
 <view class="quick business-actions project-actions"><button class="new-project" wx:if="{{canCreate}}" bindtap="create">＋ 新建项目</button><button class="search-project" bindtap="projects">⌕ 查询项目</button></view>
 <view class="section row"><text class="heading">待处理</text><button class="text-button" data-kind="notifications" bindtap="openTool">全部通知 {{count}} ›</button></view>
