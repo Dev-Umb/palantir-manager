@@ -1,21 +1,21 @@
 ## ADDED Requirements
-### Requirement: Nightly cap applies only to AI lodging autofill
-The system SHALL fill lodging expenses with the lesser of the valid recognized original amount and 100 CNY multiplied by confirmed nights, preserving original evidence and allowing manual override.
+### Requirement: Fixed daily allowance applies only to AI lodging autofill
+The system SHALL fill lodging expenses with 100 CNY multiplied by confirmed nights for valid recognized lodging evidence, regardless of whether its original amount is lower or higher, preserving original evidence and allowing manual override.
 
-#### Scenario: Three nights above the cap
+#### Scenario: Three nights
 - **WHEN** AI recognizes a valid lodging amount of 450 CNY for three confirmed nights
 - **THEN** the auto-filled amount is 300 CNY and the original amount and nights remain visible
 
-#### Scenario: Below the cap
+#### Scenario: Original amount below the allowance
 - **WHEN** the recognized lodging amount is 80 CNY for one night
-- **THEN** the auto-filled amount remains 80 CNY
+- **THEN** the auto-filled amount is 100 CNY and the original amount remains 80 CNY
 
 #### Scenario: Nights cannot be established
 - **WHEN** lodging nights are unknown and the single-room fallback does not apply
 - **THEN** the amount is not auto-filled and manual verification is requested without assuming one night
 
 #### Scenario: Manual override and other expenses
-- **WHEN** a user changes lodging amount to above the automatic cap or saves another expense type
+- **WHEN** a user changes lodging amount to above or below the automatic allowance or saves another expense type
 - **THEN** normal save and submission validation applies without a nightly cap and existing records remain unchanged
 
 #### Scenario: One room without stay dates

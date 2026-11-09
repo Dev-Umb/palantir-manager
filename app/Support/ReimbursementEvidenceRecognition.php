@@ -75,9 +75,8 @@ class ReimbursementEvidenceRecognition
                     $warnings[] = '住宿晚数不明确，未自动填入金额，请核对晚数后手工填写。';
                     $lodgingNote = "\n原票金额：{$originalAmount} 元；住宿晚数待核对。";
                 } else {
-                    $cappedCents = min($cents, $nights * 10000);
-                    $amount = sprintf('%d.%02d', intdiv($cappedCents, 100), $cappedCents % 100);
-                    $lodgingNote = "\n原票金额：{$originalAmount} 元；住宿 {$nights} 晚，按每晚最多 100 元自动填入 {$amount} 元，可手动修改。";
+                    $amount = sprintf('%d.00', $nights * 100);
+                    $lodgingNote = "\n原票金额：{$originalAmount} 元；住宿 {$nights} 晚，按每天固定 100 元自动填入 {$amount} 元，可手动修改。";
                 }
             }
             $items[] = [

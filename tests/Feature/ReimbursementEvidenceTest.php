@@ -39,13 +39,14 @@ class ReimbursementEvidenceTest extends TestCase
         return [...['page' => 1, 'region' => '上半页', 'kind' => 'invoice', 'status' => 'issued', 'currency' => 'CNY', 'amount' => '101.00', 'date' => '2026-11-07', 'number' => '12345678', 'description' => '住宿费', 'uncertain' => false, 'warnings' => []], ...$overrides];
     }
 
-    public function test_lodging_autofill_caps_per_night_without_raising_lower_amounts(): void
+    public function test_lodging_autofill_uses_fixed_daily_allowance_regardless_of_original_amount(): void
     {
-        foreach ([['80.00', 1, '80.00'], ['100.00', 1, '100.00'], ['100.01', 1, '100.00'], ['450.00', 3, '300.00'], ['299.99', 3, '299.99']] as [$original, $nights, $expected]) {
+        foreach ([['80.00', 1, '100.00'], ['100.00', 1, '100.00'], ['100.01', 1, '100.00'], ['450.00', 3, '300.00'], ['299.99', 3, '300.00']] as [$original, $nights, $expected]) {
             $result = app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [$this->candidate(['type' => '住宿费', 'lodging_nights' => $nights, 'amount' => $original])], 'page_issues' => []], [1]);
             $this->assertSame($expected, $result['items'][0]['amount']);
             $this->assertSame($original, $result['items'][0]['original_amount']);
             $this->assertSame($nights, $result['items'][0]['lodging_nights']);
+            $this->assertStringContainsString('按每天固定 100 元', $result['items'][0]['description']);
             $this->assertStringContainsString('可手动修改', $result['items'][0]['description']);
             $this->assertEmpty($result['issues']);
         }
