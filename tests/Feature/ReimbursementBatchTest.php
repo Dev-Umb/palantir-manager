@@ -10,6 +10,7 @@ use App\Models\ReimbursementBatchFile;
 use App\Models\ReimbursementDraft;
 use App\Models\ReimbursementNotice;
 use App\Models\ReimbursementUpload;
+use App\Models\ReimbursementVersion;
 use App\Models\ReimbursementWorkflow;
 use App\Models\Role;
 use App\Models\StoredAttachment;
@@ -157,7 +158,7 @@ class ReimbursementBatchTest extends TestCase
         $s->reserve($batch, [...$data, 'id' => (string) Str::uuid()]);
     }
 
-    public function test_confirm_validates_content_and_same_batch_duplicates(): void
+    public function test_confirm_accepts_identical_files_but_validates_content_and_is_idempotent(): void
     {
         $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id]);
         $s = app(ReimbursementBatchService::class);
@@ -178,7 +179,10 @@ class ReimbursementBatchTest extends TestCase
         $this->assertSame($bytes, Storage::disk('local')->get($file->object_key));
         $duplicate = $make();
         $s->confirm($duplicate);
-        $this->assertSame('excluded', $duplicate->fresh()->status);
+        $this->assertSame('uploaded', $duplicate->fresh()->status);
+        $this->assertSame([], $duplicate->fresh()->issues);
+        $s->confirm($duplicate);
+        $this->assertDatabaseCount('reimbursement_uploads', 2);
         $bad = $make();
         Storage::disk('local')->put($bad->object_key.'.upload', 'bad');
         $this->actingAs($this->owner)->postJson('/reimbursements/batches/'.$batch->id.'/files/'.$bad->id.'/confirm')->assertUnprocessable();
@@ -273,6 +277,37 @@ class ReimbursementBatchTest extends TestCase
         $this->assertSame('completed', $upload->fresh()->evidence_status);
         $this->actingAs($this->owner)->getJson('/reimbursements/drafts/'.$draft->id)->assertOk()->assertJsonCount(10, 'draft.payload.items');
         $this->assertDatabaseCount('reimbursements', 0);
+    }
+
+    public function test_recognition_ignores_other_evidence_and_history_but_keeps_real_issues(): void
+    {
+        foreach ([[], [['page' => 1, 'message' => '金额模糊，请核对']]] as $issues) {
+            $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'processing']);
+            $upload = ReimbursementUpload::factory()->create(['user_id' => $this->owner->id]);
+            $stored = StoredAttachment::findOrFail($upload->stored_attachment_id);
+            $file = ReimbursementBatchFile::factory()->create(['batch_id' => $batch->id, 'upload_id' => $upload->id, 'sha256' => $stored->sha256, 'status' => 'queued']);
+            ReimbursementUpload::factory()->create(['user_id' => $this->owner->id, 'stored_attachment_id' => $stored->id]);
+            $otherBatch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id, 'status' => 'completed']);
+            ReimbursementBatchFile::factory()->create(['batch_id' => $otherBatch->id, 'status' => 'recognized', 'sha256' => $stored->sha256, 'result' => ['sources' => [['number' => 'INV123']]]]);
+            $oldDraft = ReimbursementDraft::create(['id' => (string) Str::uuid(), 'user_id' => $this->owner->id, 'payload' => ['items' => [['description' => '凭证号码：INV123']]]]);
+            $oldVersion = ReimbursementVersion::factory()->create(['user_id' => $this->owner->id, 'items' => [['description' => '发票号码：INV123']]]);
+            $result = ['status' => $issues ? 'attention' : 'completed', 'items' => [['id' => '1-1', 'page' => 1, 'type' => '话费', 'amount' => '50.00', 'invoice_date' => null, 'description' => '话费', 'number' => 'INV123']], 'issues' => $issues, 'pages' => 1, 'done_pages' => [1]];
+            $recognizer = \Mockery::mock(ReimbursementEvidenceRecognition::class);
+            $recognizer->shouldReceive('recognize')->once()->andReturn($result);
+            $job = new ProcessReimbursementInvoice($file->id);
+            $job->handle($recognizer, app(ReimbursementBatchService::class));
+            $job->handle($recognizer, app(ReimbursementBatchService::class));
+            $this->assertSame($result, $upload->fresh()->evidence_result);
+            $this->assertSame($issues ? ['第 1 页：金额模糊，请核对'] : [], $file->fresh()->issues);
+            $this->assertSame(! $issues, $file->fresh()->reviewed);
+            $this->assertSame($result['status'], $batch->fresh()->status);
+            $draft = ReimbursementDraft::where('batch_id', $batch->id)->sole();
+            $this->assertCount(1, $draft->payload['items']);
+            $this->assertSame('50.00', $draft->payload['items'][0]['amount']);
+            $this->assertSame($oldDraft->payload, $oldDraft->fresh()->payload);
+            $this->assertSame($oldVersion->items, $oldVersion->fresh()->items);
+            $this->assertModelExists($stored);
+        }
     }
 
     public function test_non_evidence_file_completes_without_empty_draft_and_preserves_original(): void

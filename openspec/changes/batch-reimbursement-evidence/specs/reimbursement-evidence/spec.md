@@ -46,3 +46,12 @@ The batch entry SHALL skip pages explicitly identified as blank or non-evidence 
 #### Scenario: Unreadable receipt or processing failure
 - **WHEN** a receipt amount is unclear, a page is unaccounted for, or page processing fails
 - **THEN** the actionable issue remains visible and valid recognized items are preserved.
+
+### Requirement: Batch recognition does not audit repeated submissions
+The batch upload and recognition pipeline SHALL process separately selected uploads without excluding identical file contents or comparing evidence against the owner's other uploads, batches, drafts or historical reimbursements. It SHALL retain source authorization, integrity checks, submission validation and retry idempotency.
+#### Scenario: Identical contents uploaded as separate files
+- **WHEN** two different upload reservations contain identical valid bytes
+- **THEN** both become uploaded without a duplicate warning, while confirming either reservation again creates no additional upload.
+#### Scenario: Evidence matches an earlier upload or reimbursement
+- **WHEN** recognized evidence shares a file hash or evidence number with the owner's other evidence, drafts or reimbursement history
+- **THEN** recognition adds no cross-file duplicate warning and retains the extracted expense and original, while actual recognition issues still require review.
