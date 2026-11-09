@@ -205,16 +205,18 @@ class ReimbursementEvidenceTest extends TestCase
         $bytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aKAAAAABJRU5ErkJggg==');
         Storage::disk('local')->put('image.png', $bytes);
         $this->mock(InvoiceMemoryWorkspace::class)->shouldReceive('run')->once()->andReturnUsing(fn ($callback) => $callback(Storage::disk('local')->path('')));
-        ReimbursementEvidenceAgent::fake([json_encode(['items' => [$this->candidate(), $this->candidate(['number' => '98765432', 'amount' => '20.00']), $this->candidate(['number' => 'single-room', 'type' => '住宿费', 'amount' => '180.00', 'lodging_nights' => 1, 'description' => '明细1间，未明确住宿日期，按约定计1天'])], 'page_issues' => []])])->preventStrayPrompts();
+        ReimbursementEvidenceAgent::fake([json_encode(['items' => [$this->candidate(), $this->candidate(['number' => '98765432', 'amount' => '20.00']), $this->candidate(['number' => 'single-room', 'type' => '住宿费', 'amount' => '180.00', 'lodging_nights' => 1, 'description' => '明细1间，未明确住宿日期，按约定计1天']), $this->candidate(['number' => 'missing-duration', 'type' => '住宿费', 'amount' => '90.00', 'lodging_nights' => 1, 'description' => '未注明住宿天数、数量及入住离店日期，按约定默认1天'])], 'page_issues' => []])])->preventStrayPrompts();
         $result = app(ReimbursementEvidenceRecognition::class)->recognize(new StoredAttachment(['disk' => 'local', 'object_key' => 'image.png', 'mime_type' => 'image/png', 'size' => strlen($bytes), 'sha256' => hash('sha256', $bytes)]));
         $this->assertSame('completed', $result['status']);
-        $this->assertCount(3, $result['items']);
-        $this->assertSame(['101.00', '20.00', '100.00'], array_column($result['items'], 'amount'));
+        $this->assertCount(4, $result['items']);
+        $this->assertSame(['101.00', '20.00', '100.00', '100.00'], array_column($result['items'], 'amount'));
         $this->assertSame('180.00', $result['items'][2]['original_amount']);
+        $this->assertSame('90.00', $result['items'][3]['original_amount']);
+        $this->assertStringContainsString('按约定默认1天', $result['items'][3]['description']);
         $this->assertStringContainsString('按约定计1天', $result['items'][2]['description']);
         $this->assertEmpty($result['issues']);
         $this->assertSame([1], $result['done_pages']);
-        ReimbursementEvidenceAgent::assertPrompted(fn ($prompt) => str_contains($prompt->agent->instructions(), '用户批准的单间例外') && str_contains($prompt->agent->instructions(), '明确晚数或住宿日期优先'));
+        ReimbursementEvidenceAgent::assertPrompted(fn ($prompt) => str_contains($prompt->agent->instructions(), '用户批准的信息缺失默认规则') && str_contains($prompt->agent->instructions(), '用户批准的单间例外') && str_contains($prompt->agent->instructions(), '明确晚数或住宿日期优先'));
 
     }
 
