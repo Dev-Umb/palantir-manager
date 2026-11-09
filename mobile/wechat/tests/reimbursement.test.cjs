@@ -138,3 +138,15 @@ test('explicitly associating payment evidence removes generated duplicate expens
 test('removing attachment while recognition is in flight prevents late expense insertion',async()=>{
  let finish;const p=load('form',{onClear(){},epoch:()=>1,request:()=>new Promise(r=>finish=r)});const file={id:'a'};p.data.items[0].attachments=[file];const call=p.recognizeEvidence(file);p.removeFile({currentTarget:{dataset:{i:0,j:0}}});finish({status:'completed',result:{items:[{id:'1-1',amount:'90.00'}]}});await call;assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].amount,'');assert.equal(p.data.items[0].attachments.length,0);
 });
+
+test('expense attachment picker keeps album and PDF paths alongside chat images',()=>{
+ let sheet,picker,album,uploaded;const p=load('form',{onClear(){}},{showActionSheet:o=>sheet=o,chooseMessageFile:o=>picker=o,chooseMedia:o=>album=o});
+ p.upload=(i,f)=>uploaded={i,f};const event={currentTarget:{dataset:{i:'2'}}};p.choose(event);
+ assert.deepEqual(Array.from(sheet.itemList),['拍照或相册','聊天中的 PDF 文件','聊天中的图片']);
+ sheet.success({tapIndex:2});assert.equal(picker.type,'image');assert.equal(picker.extension,undefined);
+ const file={path:'chat.jpg',name:'chat.jpg',size:1};picker.success({tempFiles:[file]});assert.equal(uploaded.i,2);assert.equal(uploaded.f,file);
+ sheet.success({tapIndex:1});assert.equal(picker.type,'file');assert.deepEqual(Array.from(picker.extension),['pdf']);
+ sheet.success({tapIndex:0});assert.deepEqual(Array.from(album.mediaType),['image']);
+ album.success({tempFiles:[{tempFilePath:'album.png',size:1}]});assert.equal(uploaded.f.path,'album.png');
+ sheet=null;p.pending={};p.choose(event);assert.equal(sheet,null);
+});
