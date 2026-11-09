@@ -58,18 +58,12 @@ class ReimbursementEvidenceRecognition
             } else {
                 $amount = sprintf('%d.%02d', intdiv($cents, 100), $cents % 100);
             }
-            if ($item['kind'] !== 'invoice') {
-                $warnings[] = '请核对是否与发票重复计费，再确认此项支出。';
-            }
             if ($item['number'] && isset($numbers[$item['number']])) {
                 $amount = null;
                 $warnings[] = '识别到重复凭证号，请核对是否为同一票据的重复联或截图。';
             }
             if ($item['number']) {
                 $numbers[$item['number']] = true;
-            }
-            if (! $item['number']) {
-                $warnings[] = '未识别凭证号码，请核对是否重复。';
             }
             $items[] = [
                 'id' => $page.'-'.$counts[$page], 'page' => $page, 'region' => $item['region'],

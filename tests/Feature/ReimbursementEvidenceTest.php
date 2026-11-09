@@ -78,6 +78,19 @@ class ReimbursementEvidenceTest extends TestCase
         $result = app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [$this->candidate(['kind' => 'receipt', 'status' => 'paid'])], 'page_issues' => []], [1]);
         $this->assertNull($result['items'][0]['invoice_date']);
         $this->assertSame('2026-11-07', $result['items'][0]['payment_date']);
+        $this->assertSame([], $result['issues']);
+    }
+
+    public function test_receipts_and_missing_numbers_do_not_add_speculative_duplicate_warnings(): void
+    {
+        foreach (['invoice', 'receipt', 'payment'] as $kind) {
+            $result = app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [$this->candidate(['kind' => $kind, 'status' => $kind === 'invoice' ? 'issued' : 'paid', 'number' => null])], 'page_issues' => []], [1]);
+            $this->assertSame('101.00', $result['items'][0]['amount']);
+            $this->assertSame([], $result['items'][0]['warnings']);
+            $this->assertSame([], $result['issues']);
+        }
+        $result = app(ReimbursementEvidenceRecognition::class)->normalize(['items' => [$this->candidate(['kind' => 'receipt', 'warnings' => ['原件金额模糊']])], 'page_issues' => []], [1]);
+        $this->assertSame(['原件金额模糊'], $result['items'][0]['warnings']);
         $this->assertNotEmpty($result['issues']);
     }
 

@@ -55,3 +55,6 @@ The batch upload and recognition pipeline SHALL process separately selected uplo
 #### Scenario: Evidence matches an earlier upload or reimbursement
 - **WHEN** recognized evidence shares a file hash or evidence number with the owner's other evidence, drafts or reimbursement history
 - **THEN** recognition adds no cross-file duplicate warning and retains the extracted expense and original, while actual recognition issues still require review.
+#### Scenario: Receipt without an invoice number
+- **WHEN** a valid receipt or payment evidence has an explicit amount and optionally no evidence number
+- **THEN** recognition does not add speculative duplicate-billing warnings merely because it is not an invoice or has no number; actual uncertainty and failed payment warnings remain visible.
