@@ -150,3 +150,13 @@ test('expense attachment picker keeps album and PDF paths alongside chat images'
  album.success({tempFiles:[{tempFilePath:'album.png',size:1}]});assert.equal(uploaded.f.path,'album.png');
  sheet=null;p.pending={};p.choose(event);assert.equal(sheet,null);
 });
+
+test('finished batch cards disappear while drafts, progress and failed files remain visible',async()=>{
+ let batches=[{id:'done',status:'completed',failed_names:[]},{id:'review',status:'attention',failed_names:[]},{id:'running',status:'processing',failed_names:[]},{id:'failed',status:'attention',failed_names:['bad.pdf']},{id:'upload',status:'uploading',failed_names:[]}];
+ const draft={id:'draft',revision:1,batch_id:'done',unread:true,payload:{title:'已生成草稿',items:[{amount:'10.00'}]}};
+ const api={onClear(){},query:()=>'',request:async url=>url==='/reimbursements/options'?{batch_enabled:true,capabilities:{submit:true},types:[]}:url.startsWith('/reimbursements/batches')?{records:{last_page:1,data:batches}}:{records:{last_page:1,data:[draft]}}};
+ const p=load('index',api);p.data.scope='drafts';await p.refresh();
+ assert.deepEqual(Array.from(p.data.batches,b=>b.id),['running','failed']);assert.equal(p.data.rows[0].id,'draft');assert.equal(p.data.rows[0].total,'10.00');assert.equal(p.data.rows[0].unread,true);
+ batches=batches.map(b=>({...b,status:'completed',failed_names:[]}));await p.refresh();assert.equal(p.data.batches.length,0);assert.equal(p.data.rows.length,1);
+ const template=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/index.wxml'),'utf8');assert.match(template,/scope==='drafts' && batches.length/);
+});
