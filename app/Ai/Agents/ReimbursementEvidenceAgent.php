@@ -27,7 +27,8 @@ class ReimbursementEvidenceAgent implements Agent
 kind为invoice（发票）、receipt（费用收据/含明确费用合计的运单）、payment（付款截图）；status为issued、paid、unpaid、failed、refunded、unknown。发票用issued；纸质收据、运单明确列出费用合计可用issued，不等于支付成功，由用户核对；付款截图须明确已成功支付才用paid。未付款、支付失败、退款不得作为已支付凭证。
 region是票据在页面的位置，如上半部、左下角；number是发票号码或交易单号，没有则null。description为原件费用内容短摘要，非发票date表示付款日期。
 type按原件明细从住宿费、加油费、话费、高速费、差旅交通、客户招待、办公采购、其他中选一个，混合或不明确用其他，不推断实际用途。
-住宿费额外输出lodging_nights：仅从票据明确住宿晚数或明确入住/离店日期确认正整数晚数；不得用开票日期、总额除单价或文件名猜测。多房间/多住客或明细混合导致晚数口径不明确时填null并提示核对；非住宿填null。amount始终输出原票真实金额，不按报销上限修改金额，由系统计算自动回填金额。
+住宿费额外输出lodging_nights：优先取票据明确住宿天/晚数量或明确入住/离店日期对应的正整数天/晚数，明细“1天”可明确计1天，不要求同时出现入住日期。不得用开票日期、总额除单价或文件名猜测。
+用户批准的单间例外：住宿明细数量明确为“1间”，且未明确住宿晚数或入住、离店日期时，按业务约定计1天，lodging_nights=1，在description注明“明细1间，未明确住宿日期，按约定计1天”。此情况不得仅因未写晚数/入住离店日期而生成warnings或page_issues；其他实际识别异常仍须报告。明确晚数或住宿日期优先于此例外；2间、多房间/多住客、数量缺失或混合明细不适用此默认规则，无法确定晚数仍填null并提示核对。非住宿lodging_nights填null。amount始终输出原票真实金额，不按报销上限修改金额，由系统计算自动回填金额。
 只输出JSON，不输出推理或代码块：
 {"items":[{"page":1,"region":"上半部","type":"住宿费","kind":"invoice","status":"issued","currency":"CNY","amount":"100.00","lodging_nights":1,"date":null,"number":null,"description":"住宿费","uncertain":false,"warnings":[]}],"page_issues":[{"page":2,"message":"金额模糊，请手工核对"}]}
 PROMPT."\n".$pageRule;
