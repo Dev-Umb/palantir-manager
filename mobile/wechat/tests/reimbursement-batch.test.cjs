@@ -8,3 +8,17 @@ test('all batch template actions exist and manual entry remains visible',()=>{co
 test('after handoff user goes directly to drafts without classification or task-detail UI',async()=>{let target;const p=load({request:async()=>({})},{redirectTo:o=>target=o.url});p.data.task={files:[{id:'a',status:'uploaded'}]};p.refresh=async()=>{};await p.start();assert.equal(target,'/pages/reimbursements/index?scope=drafts');const template=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/batch.wxml'),'utf8');assert.doesNotMatch(template,/review-sheet|调整分类|重新识别|按类型整理的草稿/);assert.match(template,/上传并交给 AI/);});
 
 test('domain rejection offers restart guidance without asserting configuration is missing',async()=>{const calls=[];const p=load({request:async url=>{calls.push(url);return {url:'https://bucket.tos-s3-cn-beijing.volces.com/a',headers:{}};}},{getFileSystemManager:()=>({readFile:o=>o.success({data:new ArrayBuffer(2)})}),request:o=>{queueMicrotask(()=>o.fail({errMsg:'request:fail url not in domain list'}));return {abort(){}};}});p.data.id='batch';const f={id:'file',name:'a.pdf',size:2,mime:'application/pdf'};p.data.local=[f];await p.send(f);assert.match(f.error,/当前微信未放行上传域名/);assert.doesNotMatch(f.error,/尚未配置/);assert.equal(f.done,undefined);assert.equal(calls.length,1);});
+
+test('batch chat image picker is separate from PDF files and retains album selection',()=>{
+ let sheet,picker,album;const p=load({}, {showActionSheet:o=>sheet=o,chooseMessageFile:o=>picker=o,chooseMedia:o=>album=o});
+ p.addFiles([{name:'existing.pdf',path:'existing',size:1}]);p.choose();
+ assert.deepEqual(Array.from(sheet.itemList),['聊天中的 PDF 文件','聊天中的图片','选择相册图片']);
+ sheet.success({tapIndex:1});assert.equal(picker.type,'image');assert.equal(picker.extension,undefined);
+ picker.success({tempFiles:[{name:'chat.jpg',path:'chat',size:1}]});assert.equal(p.data.local.length,2);
+ picker.fail({errMsg:'chooseMessageFile:fail cancel'});assert.equal(p.data.error,'');
+ picker.fail({errMsg:'chooseMessageFile:fail unavailable'});assert.match(p.data.error,/选择失败/);
+ sheet.success({tapIndex:0});assert.equal(picker.type,'file');assert.deepEqual(Array.from(picker.extension),['pdf']);
+ sheet.success({tapIndex:2});assert.deepEqual(Array.from(album.sourceType),['album']);assert.deepEqual(Array.from(album.mediaType),['image']);
+ album.success({tempFiles:[{tempFilePath:'album.png',size:1}]});assert.equal(p.data.local.length,3);
+ sheet=null;p.data.busy=true;p.choose();assert.equal(sheet,null);
+});
