@@ -43,3 +43,22 @@ test('unload or logout discards late inbox response',async()=>{
 });
 
 test('approval detail preserves invoice dates and evidence source from current production',()=>{const wxml=fs.readFileSync(path.join(root,'pages/reimbursements/detail.wxml'),'utf8');assert.match(wxml,/expense.invoice_date/);assert.match(wxml,/expense.evidence_source.candidate_id/);});
+
+test('home approval entry sits between collection overview and reimbursement actions',()=>{
+ const wxml=fs.readFileSync(path.join(root,'pages/index/index.wxml'),'utf8');
+ const overview=wxml.indexOf('class="overview box"'),entry=wxml.indexOf('class="oa-entry"'),forms=wxml.indexOf('reimbursement-actions');
+ assert.ok(overview>=0 && overview<entry && entry<forms);
+ assert.match(wxml,/<button wx:if="{{canApprove}}" class="oa-entry" bindtap="approvals">/);
+ for(const action of ['createReimbursement','batchReimbursement','create','projects'])assert.ok(wxml.includes('bindtap="'+action+'"'));
+});
+test('approval cards foreground applicant and amount while preserving ordinary cards and detail navigation',()=>{
+ const wxml=fs.readFileSync(path.join(root,'pages/reimbursements/index.wxml'),'utf8');
+ const approval=wxml.slice(wxml.indexOf('<block wx:if="{{approval}}">'),wxml.indexOf('<block wx:else>'));
+ assert.ok(approval.indexOf('item.owner.name')<approval.indexOf('item.title'));
+ assert.ok(approval.indexOf('item.total')<approval.indexOf('item.title'));
+ for(const field of ['item.title','item.note','item.type','item.date','item.state','item.reimbursement_id','item.number','item.nodes[item.node_index].name'])assert.ok(approval.includes(field),field);
+ assert.match(wxml,/data-id="{{item.id}}" bindtap="open"/);
+ const ordinary=wxml.slice(wxml.indexOf('<block wx:else>'));
+ for(const capability of ['draft-source','draft-unread-dot','catchtap="deleteDraft"','record-amount','继续编辑'])assert.ok(ordinary.includes(capability),capability);
+ assert.doesNotMatch(approval,/bindtap="decide"/);
+});
