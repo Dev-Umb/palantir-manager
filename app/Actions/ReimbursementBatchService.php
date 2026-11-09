@@ -68,8 +68,7 @@ class ReimbursementBatchService
             unset($bytes);
             $stored = StoredAttachment::create(['logical_path' => $file->object_key, 'disk' => $file->disk, 'object_key' => $file->object_key, 'original_name' => $file->name, 'mime_type' => $file->mime, 'size' => $file->size, 'sha256' => $hash, 'status' => StoredAttachment::STATUS_ATTACHED]);
             $upload = ReimbursementUpload::create(['user_id' => $batch->user_id, 'stored_attachment_id' => $stored->id]);
-            $duplicate = $this->files($batch)->where('sha256', $hash)->where('id', '!=', $file->id)->whereNotIn('status', ['excluded', 'uploading'])->exists();
-            $file->update(['status' => $duplicate ? 'excluded' : 'uploaded', 'sha256' => $hash, 'upload_id' => $upload->id, 'issues' => $duplicate ? ['完全相同的文件已在本批次上传，未重复计入。'] : []]);
+            $file->update(['status' => 'uploaded', 'sha256' => $hash, 'upload_id' => $upload->id, 'issues' => []]);
         });
     }
 
