@@ -42,7 +42,7 @@ test('unload or logout discards late inbox response',async()=>{
  const h=setup('reimbursements/index');let finish;h.api.request=()=>new Promise(r=>finish=r);const pending=h.p.refresh();await new Promise(r=>setImmediate(r));h.clear();finish({records:{data:[h.record],total:1,last_page:1}});await pending;assert.equal(h.p.data.rows.length,0);assert.equal(h.p.data.total,0);
 });
 
-test('approval detail preserves invoice dates and evidence source from current production',()=>{const wxml=fs.readFileSync(path.join(root,'pages/reimbursements/detail.wxml'),'utf8');assert.match(wxml,/expense.invoice_date/);assert.match(wxml,/expense.evidence_source.candidate_id/);});
+test('compact detail retains invoice actions without verbose recognition text',()=>{const wxml=fs.readFileSync(path.join(root,'pages/reimbursements/detail.wxml'),'utf8');assert.match(wxml,/record.expenseSummary.groups/);assert.match(wxml,/data-i="{{file.i}}"/);assert.match(wxml,/bindtap="zip"/);assert.doesNotMatch(wxml,/expense.description|expense.evidence_source.candidate_id|expense.invoice_date/);});
 
 test('home approval entry sits between collection overview and reimbursement actions',()=>{
  const wxml=fs.readFileSync(path.join(root,'pages/index/index.wxml'),'utf8');
