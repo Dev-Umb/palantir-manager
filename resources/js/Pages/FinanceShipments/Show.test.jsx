@@ -217,3 +217,24 @@ it('drags headers, aligns totals by field, and restores only the current user pr
     cleanup();sessionUser.id=73;setup();
     expect(screen.getAllByRole('columnheader')[1].textContent).toBe('发货日期');
 });
+it('deletes only the context row, removes dangling subtotal references and autosaves recalculated totals', async()=>{
+    vi.useFakeTimers();vi.spyOn(window,'confirm').mockReturnValue(true);
+    const fetch=vi.fn().mockResolvedValue({ok:true,json:async()=>({revision:1})});vi.stubGlobal('fetch',fetch);
+    const savedOrder=structuredClone(order);savedOrder.rows[1].subtotal_starts=['row'];
+    const {container}=render(<Show project={{title:'项目'}} ledger={{orders:[savedOrder],revision:0}} imports={[]} urls={{save:'/save'}} />);
+    fireEvent.contextMenu(screen.getByLabelText('第1行货物名称'));
+    fireEvent.click(screen.getByRole('button',{name:'删除此行'}));
+    expect(screen.getByLabelText('第1行货物名称').value).toBe('连接件');
+    expect(screen.queryByText('第 1–2 行小计')).toBeNull();
+    expect(container.querySelector('tfoot').textContent).toContain('300');
+    await act(async()=>vi.advanceTimersByTimeAsync(650));
+    const rows=JSON.parse(fetch.mock.calls[0][1].body).orders[0].rows;
+    expect(rows).toHaveLength(1);expect(rows[0].subtotal_starts).toEqual([]);
+});
+it('keeps the row when deletion is cancelled and disables deletion for the trailing blank row',()=>{
+    vi.spyOn(window,'confirm').mockReturnValue(false);setup();
+    fireEvent.contextMenu(screen.getByLabelText('第1行货物名称'));fireEvent.click(screen.getByRole('button',{name:'删除此行'}));
+    expect(screen.getByLabelText('第1行货物名称').value).toBe('模板');
+    fireEvent.contextMenu(screen.getByLabelText('第3行货物名称'));
+    expect(screen.getByRole('button',{name:'删除此行'}).disabled).toBe(true);
+});
