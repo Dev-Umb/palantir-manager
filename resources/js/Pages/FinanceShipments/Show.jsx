@@ -80,6 +80,16 @@ export default function Show({ project, ledger, imports: initialImports, urls })
         rows[rowIndex][key] = value === '' && ['quantity', ...moneyFields].includes(key) ? null : value;
         change(next);
     }
+    function removeRow(oi, ri) {
+        const row = current.current[oi]?.rows[ri];
+        if (!row || !window.confirm('删除此行？以该行为起点或终点的小计也会移除，其他明细保留。')) return;
+        const next = structuredClone(current.current);
+        next[oi].rows.splice(ri, 1);
+        for (const order of next) for (const detail of order.rows) {
+            if (detail.subtotal_starts) detail.subtotal_starts = detail.subtotal_starts.filter(id => id !== row.id);
+        }
+        setSelection(null); setMenu(null); change(next);
+    }
     function insert(orderIndex, rowIndex) {
         const next = structuredClone(current.current);
         if (!next[orderIndex]) next.push({ ...blankOrder(), date: null, rows: [blankRow()] });
@@ -139,7 +149,7 @@ export default function Show({ project, ledger, imports: initialImports, urls })
             <tbody>{renderRow({oi:orders.length,ri:0,row:{id:'trailing',date:null,vehicle:'',name:'',unit:'吨',quantity:null,price:null,note:''}},rowNumber,true)}</tbody>
             <tfoot><tr>{summaryCells(summary,'合计')}</tr></tfoot>
         </table></div>
-        {menu && <div className="finance-context" role="group" aria-label="明细行操作" style={{ left: menu.x, top: menu.y }}><span>{selectedRows.length ? `已选中 ${selectedRows.length} 行` : '明细操作'}</span><button autoFocus onClick={() => insert(menu.oi, menu.ri)}>在下方插入明细</button><button disabled={!selectedRows.length} onClick={() => subtotal()}>在选区下方插入小计</button><button className="ghost-button" onClick={() => setMenu(null)}>取消</button></div>}
+        {menu && <div className="finance-context" role="group" aria-label="明细行操作" style={{ left: menu.x, top: menu.y }}><span>{selectedRows.length ? `已选中 ${selectedRows.length} 行` : '明细操作'}</span><button autoFocus onClick={() => insert(menu.oi, menu.ri)}>在下方插入明细</button><button disabled={!orders[menu.oi]?.rows[menu.ri]} onClick={() => removeRow(menu.oi,menu.ri)}>删除此行</button><button disabled={!selectedRows.length} onClick={() => subtotal()}>在选区下方插入小计</button><button className="ghost-button" onClick={() => setMenu(null)}>取消</button></div>}
         {preview && <section className="surface finance-preview"><div className="section-head"><h3>导入预检 · {preview.name}</h3><button className="ghost-button" onClick={() => setPreview(null)}>关闭</button></div><p>可进入明细 {preview.importable_count ?? preview.counts.ready} 行（含待确认 {preview.draft_count ?? 0} 行） · 待订正 {preview.counts.pending} 行 · 排除 {preview.counts.excluded} 行</p><p className="muted">未标单位按吨统计；件、台、米不计吨数。原文件和排除记录保留。</p><button disabled={busy || dirty() || !!preview.imported_at || !(preview.importable_count ?? preview.counts.ready)} onClick={commit}>{preview.imported_at ? '已导入，不会重复添加' : '确认导入发货明细'}</button><ImportRows records={preview.records} /></section>}
         <details className="finance-import-history"><summary>导入记录{importPending > 0 ? ` · ${importPending} 行待处理` : ''}</summary>{imports.length ? imports.map(item => <details key={item.id}><summary>{item.name} · {item.imported_at ? '已处理' : '待确认'} · 可导入 {item.counts.ready} / 待订正 {item.counts.pending} / 排除 {item.counts.excluded}</summary>{!item.imported_at && <button onClick={() => setPreview(item)}>查看预检</button>}<ImportRows records={item.records} /></details>) : <p className="muted">尚无导入记录</p>}</details>
     </div></Layout>;
