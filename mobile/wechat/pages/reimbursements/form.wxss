@@ -48,3 +48,5 @@
 .draft-save{padding:20rpx 32rpx;color:#62758a;font-size:24rpx;}
 
 .evidence-card{position:relative;margin-top:20rpx;padding:24rpx;background:#f6f8fb;border-radius:16rpx;word-break:break-all}.evidence-dot{position:absolute;right:12rpx;top:12rpx;width:16rpx;height:16rpx;border-radius:50%;background:#dc2626}
+
+.draft-summary-row{display:flex;align-items:center;justify-content:space-between;gap:24rpx;padding:24rpx 0;border-bottom:1rpx solid #edf0f4}.draft-summary-money{flex-shrink:0;white-space:nowrap;font-weight:600}
