@@ -31,12 +31,12 @@ test('review applies complete fields, missing data preserves input and oversized
  p.applyInvoice(e);row.description='更新的手写内容';p.confirmInvoiceReview();assert.equal(row.description,'更新的手写内容');
  row.description='长'.repeat(500);file.recognition.fields={total_cents:200,invoice_date:'2026-10-20',seller:'新销售方'};p.applyInvoice(e);assert.match(p.data.error,/500/);assert.equal(row.amount,'113.00');assert.equal(row.invoice_date,'2026-10-29');
 });
-test('each added invoice gets its own expense and failed retry does not add another row',async()=>{
+test('manual attachments stay on the selected expense and retries preserve amount',async()=>{
  let fail=false,n=0;const api={onClear(){},epoch:()=>1,upload:async()=>{if(fail)throw Error('上传失败');return {file:{id:String(++n),mime:'image/png',name:'票.png'}};}};const p=load('form',api);const f={path:'one',name:'票.png',size:20};
  await p.upload(0,f);p.data.items[0].amount='10.00';p.data.items[0].description='原费用';
- fail=true;await p.upload(0,{...f,path:'two'});assert.equal(p.data.items.length,2);assert.equal(p.data.items[0].amount,'10.00');assert.equal(p.data.items[1].failed.length,1);
- fail=false;await p.upload(1,{...f,path:'two'});assert.equal(p.data.items.length,2);assert.equal(p.data.items[1].attachments.length,1);assert.equal(p.data.items[1].failed.length,0);
- p.data.items=Array.from({length:50},()=>({attachments:[{id:'old'}],failed:[]}));await p.upload(0,{...f,path:'three'});assert.equal(p.data.items.length,50);assert.equal(n,2);assert.match(p.data.error,/50/);
+ fail=true;await p.upload(0,{...f,path:'two'});assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].amount,'10.00');assert.equal(p.data.items[0].failed.length,1);
+ fail=false;await p.upload(0,{...f,path:'two'});assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].attachments.length,2);assert.equal(p.data.items[0].failed.length,0);
+ p.data.items=[{attachments:Array.from({length:10},(_,i)=>({id:String(i)})),failed:[]}];await p.upload(0,{...f,path:'three'});assert.equal(p.data.items.length,1);assert.equal(n,2);assert.match(p.data.error,/10/);
 });
 
 test('recognition reviews open automatically in sequence and results are not repeated under files',async()=>{
@@ -159,4 +159,20 @@ test('finished batch cards disappear while drafts, progress and failed files rem
  assert.deepEqual(Array.from(p.data.batches,b=>b.id),['running','failed']);assert.equal(p.data.rows[0].id,'draft');assert.equal(p.data.rows[0].total,'10.00');assert.equal(p.data.rows[0].unread,true);
  batches=batches.map(b=>({...b,status:'completed',failed_names:[]}));await p.refresh();assert.equal(p.data.batches.length,0);assert.equal(p.data.rows.length,1);
  const template=fs.readFileSync(path.join(__dirname,'../pages/reimbursements/index.wxml'),'utf8');assert.match(template,/scope==='drafts' && batches.length/);
+});
+
+test('batch draft groups expenses, shortens displayed notes and requests each shared attachment once',async()=>{
+ const items=Array.from({length:44},(_,i)=>({description:(i%2?'住宿费':'物流运单')+'\n来源：原始发票信息保留',amount:'100.00',attachments:[{id:'file'+i%5,evidence_status:'completed'}],evidence_source:{upload_id:'file'+i%5,candidate_id:String(i)}}));
+ const draft={id:'batch-draft',batch_id:'batch',revision:1,payload:{title:'测试',note:'说明',type:'其他',cc:[],items}};
+ const api={onClear:()=>()=>{},epoch:()=>1,request:async url=>url.endsWith('/options')?{types:['其他'],capabilities:{submit:true},users:[]}:{draft}};
+ const p=load('form',api);const calls=[];p.recognizeEvidence=f=>{calls.push(f.id);f.evidenceLoaded=true;};p.onLoad({draft:'batch-draft'});await p.loaded;
+ assert.equal(p.data.showExpenseDetails,false);assert.equal(p.data.expenseGroups.length,2);assert.equal(p.data.expenseGroups.reduce((s,g)=>s+g.cents,0),440000);assert.equal(calls.length,5);
+ assert.ok(p.data.items.every(i=>Array.from(i.shortDescription).length<=20));assert.match(p.draftPayload().items[0].description,/来源/);
+ p.toggleExpenses();assert.equal(p.data.showExpenseDetails,true);p.itemInput({currentTarget:{dataset:{i:0,key:'amount'}},detail:{value:'101.00'}});assert.equal(p.data.expenseGroups.reduce((s,g)=>s+g.cents,0),440100);assert.equal(calls.length,5);
+ p.closed=true;clearTimeout(p.draftTimer);
+});
+test('manual PDF upload does not call recognition or replace entered description and amount',async()=>{
+ let ai=0;const p=load('form',{onClear(){},epoch:()=>1,upload:async()=>({file:{id:'pdf',name:'票.pdf',mime:'application/pdf'}})});
+ p.recognizeEvidence=()=>ai++;p.recognizeFile=()=>ai++;p.data.items[0].amount='120.00';p.data.items[0].description='邮费';
+ await p.upload(0,{name:'票.pdf',path:'/test.pdf',size:20});assert.equal(ai,0);assert.equal(p.data.items.length,1);assert.equal(p.data.items[0].amount,'120.00');assert.equal(p.data.items[0].description,'邮费');assert.equal(p.data.items[0].attachments.length,1);
 });

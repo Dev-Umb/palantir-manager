@@ -4,8 +4,9 @@ function cents(value) {if(!/^(?:0|[1-9]\d{0,6})(\.\d{1,2})?$/.test(value))return
 function timestamp(value){const date=new Date(value);if(Number.isNaN(date.getTime()))return '—';const pad=n=>String(n).padStart(2,'0');return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;}
 function money(value){return (value/100).toFixed(2);}
 function uuid(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.floor(Math.random()*16);return (c==='x'?r:(r&3)|8).toString(16);});}
+function shortDescription(value){return Array.from((value||'').split('\n')[0].trim()).slice(0,20).join('');}
 function expenseSummary(items){
- const categories=[['通信费',/通信|话费|电信服务/],['名片费',/名片/],['邮费',/邮费|邮寄|快递|寄件/],['住宿费',/住宿|房费/],['加油费',/汽油|柴油|加油/],['交通费',/出租车|网约车|打车|火车票|机票|高铁|客运/],['停车费',/停车/],['过路费',/过路|通行费/],['餐费',/餐费|餐饮|用餐/]];
+ const categories=[['通信费',/通信|话费|电信服务/],['名片费',/名片/],['邮费',/邮费|邮寄|快递|寄件|物流运单|快运/],['住宿费',/住宿|房费/],['加油费',/汽油|柴油|加油/],['交通费',/出租车|网约车|打车|火车票|机票|高铁|客运/],['停车费',/停车/],['过路费',/过路|通行费/],['餐费',/餐费|餐饮|用餐/]];
  const groups=[],byCategory=new Map(),files=[],seen=new Set();
  items.forEach((item,i)=>{
   const text=(item.description||'').split('\n')[0].trim(),matches=categories.filter(([,pattern])=>pattern.test(text));
@@ -23,4 +24,4 @@ async function download(url,name){const epoch=api.epoch();const data=await api.r
 function validInvoiceDate(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(value||''))return false;const d=new Date(value+'T00:00:00Z');return !Number.isNaN(d.getTime()) && d.toISOString().slice(0,10)===value;}
 function invoiceDescription(previous,fields){const lines=previous.trim()?previous.trim().split('\n'):[];for(const [key,label] of [['invoice_number','发票号码'],['invoice_code','发票代码'],['buyer','购买方'],['seller','销售方']]){if(typeof fields[key]!=='string' || !fields[key].trim())continue;const line=label+'：'+fields[key].trim();if(!lines.includes(line))lines.push(line);}return lines.join('\n');}
 function isAdmin(){const roles=api.user()?.roles||[];return roles.some(r=>r.name==='admin')&&!roles.some(r=>r.name==='timebook_operator');}
-module.exports={expenseSummary,isAdmin,validInvoiceDate,invoiceDescription,timestamp,cents,money,uuid,display,download,states};
+module.exports={shortDescription,expenseSummary,isAdmin,validInvoiceDate,invoiceDescription,timestamp,cents,money,uuid,display,download,states};
