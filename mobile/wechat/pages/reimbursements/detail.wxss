@@ -1,1 +1,3 @@
 @import "./common.wxss";
+
+.summary-row{display:flex;align-items:center;justify-content:space-between;gap:24rpx}.summary-money{flex-shrink:0;white-space:nowrap;font-weight:600}.summary-row .grow{min-width:0;word-break:break-all}
