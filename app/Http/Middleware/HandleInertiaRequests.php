@@ -121,7 +121,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ['key' => 'dashboard', 'label' => '经营大盘', 'href' => route('dashboard'), 'visible' => $can('dashboard.view'), 'mobile_priority' => 10],
             ['key' => 'visualization', 'label' => '可视化大盘', 'href' => route('home'), 'exact' => true, 'visible' => $can('dashboard.view'), 'mobile_priority' => 45],
-            ['key' => 'reimbursements', 'label' => '报销 OA', 'href' => route('reimbursements.index'), 'visible' => ! $request->user()->isTimebookOperator(), 'mobile_priority' => 35],
+            ['key' => 'reimbursements', 'label' => '报销申请', 'href' => route('reimbursements.index'), 'visible' => ! $request->user()->isTimebookOperator(), 'mobile_priority' => 35],
             ['key' => 'notifications', 'label' => '通知中心', 'href' => route('notifications.index'), 'visible' => true, 'mobile_priority' => 40],
             [
                 'key' => 'ontology',
@@ -150,6 +150,7 @@ class HandleInertiaRequests extends Middleware
             ['key' => 'finance-shipments', 'label' => '财务工作台', 'href' => route('finance-shipments.index'), 'visible' => app(FinanceShipmentAccess::class)->allows($request->user()), 'mobile_priority' => 63],
             ['key' => 'support-library', 'label' => '钢箱梁工作台', 'href' => route('support-library.index'), 'visible' => $can('support-library.view'), 'mobile_priority' => 64],
             ['key' => 'quotations', 'label' => '参考报价', 'href' => route('quotations.index'), 'visible' => QuotationAccess::allows($request->user()), 'mobile_priority' => 62],
+            ['key' => 'reimbursement-approvals', 'label' => 'OA 审批', 'href' => route('reimbursements.index', ['workspace' => 'approval']), 'visible' => in_array('admin', $roles, true), 'mobile_priority' => 36],
         ];
     }
 }

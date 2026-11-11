@@ -16,7 +16,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 it('keeps information and actions expanded, only three sections collapsible and preview on demand', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => response({})));
     URL.createObjectURL = vi.fn(() => 'blob:preview'); URL.revokeObjectURL = vi.fn();
-    const { container } = render(<Show record={record} />);
+    const { container } = render(<Show approval_ui={true} record={record} />);
     expect(container.querySelectorAll('details')).toHaveLength(3);
     expect(screen.getByText('申请信息').closest('details')).toBeNull();
     expect(screen.getByText('审批处理').closest('details')).toBeNull();
@@ -31,7 +31,7 @@ it('keeps information and actions expanded, only three sections collapsible and 
 });
 it('requires rejection note, sends logged-in decision once and updates final status', async () => {
     let finish; vi.stubGlobal('fetch', vi.fn(() => new Promise((r) => { finish = r; })));
-    render(<Show record={record} />);
+    render(<Show approval_ui={true} record={record} />);
     fireEvent.click(screen.getByRole('button', { name: '驳回' })); expect(fetch).not.toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent('请填写');
     fireEvent.click(screen.getByRole('button', { name: '同意' }));
@@ -63,7 +63,7 @@ it('workflow uses dropdown multiselect and preserves trigger association when so
     await screen.findByText('已保存，仅影响后续新提交版本。');
 });
 it('restores prototype list hierarchy without dropping scope, dates, pagination or real statuses', () => {
-    const { container } = render(<Index records={{ data: [record], total: 21, current_page: 1, next_page_url: '/reimbursements?page=2' }} pending_count={21} filters={{ scope: 'review', from: '2026-10-01', to: '2026-10-31' }} capabilities={{ manage: false, configure: true }} />);
+    const { container } = render(<Index records={{ data: [record], total: 21, current_page: 1, next_page_url: '/reimbursements?page=2' }} approval_ui={true} pending_count={21} filters={{ workspace: 'approval', scope: 'review', from: '2026-10-01', to: '2026-10-31' }} capabilities={{ manage: false, configure: true }} />);
     expect(screen.getByText('每一笔费用，清晰有据')).toBeVisible();
     expect(screen.getByText('21 笔待审批')).toBeVisible();
     expect(screen.getByText('客户拜访').tagName).toBe('STRONG');
@@ -75,14 +75,14 @@ it('restores prototype list hierarchy without dropping scope, dates, pagination 
     expect(screen.getByRole('link', { name: '下一页' })).toHaveAttribute('href', '/reimbursements?page=2');
     expect(screen.queryByRole('option', { name: '全部报销' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '已通过' }));
-    expect(router.get).toHaveBeenLastCalledWith('/reimbursements', { scope: 'review', from: '2026-10-01', to: '2026-10-31', status: 'approved' });
+    expect(router.get).toHaveBeenLastCalledWith('/reimbursements', { workspace: 'approval', scope: 'review', from: '2026-10-01', to: '2026-10-31', status: 'approved' });
     fireEvent.click(screen.getByRole('button', { name: '重置' }));
-    expect(router.get).toHaveBeenLastCalledWith('/reimbursements', { scope: 'review' });
+    expect(router.get).toHaveBeenLastCalledWith('/reimbursements', { workspace: 'approval', scope: 'review' });
 });
 
 it('displays invoice dates and preserves legacy expense details and approval controls', () => {
     const dated = {...record, items: [{...record.items[0], invoice_date: '2026-10-29'}, {...record.items[0], description: '旧费用', attachments: []}]};
-    render(<Show record={dated} />);
+    render(<Show approval_ui={true} record={dated} />);
     expect(screen.getByText('开票日期：2026-10-29')).toBeVisible();
     expect(screen.getByText('开票日期：未填写')).toBeVisible();
     expect(screen.getByRole('button', {name: '预览 发票.pdf'})).toBeVisible();
@@ -109,8 +109,26 @@ it('new reimbursement categories coexist with historical filters', () => {
 });
 
 it('shows multi-ticket source while preserving original preview and manual description', () => {
- render(<Show record={{...record,items:[{...record.items[0],description:'手工核对金额',evidence_source:{upload_id:'a',candidate_id:'3-2'}}]}} />);
+ render(<Show approval_ui={true} record={{...record,items:[{...record.items[0],description:'手工核对金额',evidence_source:{upload_id:'a',candidate_id:'3-2'}}]}} />);
  expect(screen.getByText('凭证来源：第 3 页 · 凭证 2')).toBeVisible();
  expect(screen.getByText('1. 手工核对金额')).toBeVisible();
  expect(screen.getByRole('button',{name:'预览 发票.pdf'})).toBeVisible();
+});
+
+
+it('ordinary applicants retain personal and CC views without OA controls', () => {
+    const { unmount } = render(<Index approval_ui={false} records={{ data: [record] }} filters={{ scope: 'mine', workspace: 'application' }} capabilities={{ submit: true, manage: true, configure: true }} />);
+    expect(screen.getByRole('heading', { name: '报销申请' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '＋ 发起报销' })).toHaveAttribute('href', '/reimbursements/create');
+    expect(screen.getByRole('button', { name: '知会我的' })).toBeVisible();
+    expect(screen.queryByText('流程配置')).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '分配给我的审批' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '全部报销' })).not.toBeInTheDocument();
+    expect(screen.queryByText('处理审批 ›')).not.toBeInTheDocument();
+    unmount();
+    render(<Show record={{ ...record, status: 'rejected', can_resubmit: true }} approval_ui={false} />);
+    expect(screen.queryByText('审批处理')).not.toBeInTheDocument();
+    expect(screen.getByText('审批进度')).toBeVisible();
+    expect(screen.getByRole('link', { name: '修改后重新提交' })).toHaveAttribute('href', '/reimbursements/create?version=1');
+    expect(screen.getByRole('button', { name: '预览 发票.pdf' })).toBeVisible();
 });

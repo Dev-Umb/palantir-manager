@@ -76,7 +76,7 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                     {visibleNav.map((item) => {
                         const itemLabel = businessText(item.label);
                         const Icon = iconFor[item.key] || LayoutDashboard;
-                        const open = (cockpit && item.key === 'visualization') || isActive(page.url, item.href, item.exact === true) || (item.children || []).some((group) => group.items.some((child) => isActive(page.url, child.href, true)));
+                        const open = (cockpit && item.key === 'visualization') || isNavItemActive(page.url, item);
                         const moduleGroups = (item.children || []).filter((group) => group.items?.length > 0);
                         return (
                             <div key={item.href} className="nav-group">
@@ -287,6 +287,11 @@ function MobileNavigation({
 }
 
 function isNavItemActive(currentUrl, item) {
+    if (['reimbursements', 'reimbursement-approvals'].includes(item.key)) {
+        const url = new URL(currentUrl, window.location.origin);
+        const approval = url.searchParams.get('workspace') === 'approval' || ['all', 'review'].includes(url.searchParams.get('scope'));
+        return url.pathname.startsWith('/reimbursements') && (item.key === 'reimbursement-approvals' ? approval : !approval);
+    }
     return (item.key === 'visualization' && pathOf(currentUrl) === '/visualization') || isActive(currentUrl, item.href, item.exact === true)
         || (item.children || []).some((group) => group.items.some((child) => isActive(currentUrl, child.href, true)));
 }
