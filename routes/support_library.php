@@ -19,3 +19,5 @@ Route::middleware(['auth', 'permission:support-library.view'])->prefix('support-
         Route::get('/template', [SupportLibraryController::class, 'template'])->name('template');
     });
 });
+
+require __DIR__.'/steel_girder.php';

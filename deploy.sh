@@ -60,6 +60,7 @@ echo "==> 4/5 服务器：同步元数据、清缓存、重启服务"
 ssh ${SSH_OPTS} ${HOST} "cd ${REMOTE} && \
 php artisan optimize:clear && \
 php artisan migrate --force && \
+php artisan steel-girder-projects:install-permissions && \
 php artisan route:cache && \
 php artisan config:cache && \
 php artisan view:cache && \
