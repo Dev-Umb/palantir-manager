@@ -111,7 +111,7 @@ export default function Layout({ title, eyebrow, children, aside, immersive = fa
                                     <div className="nav-sublist">
                                         {item.children.map((group) => (
                                             <section key={group.label}>
-                                                <h4>{businessText(group.label)}</h4>
+                                                {item.key !== 'support-library' && <h4>{businessText(group.label)}</h4>}
                                                 {group.items.map((child) => (
                                                     <Link key={child.href} href={child.href} className={isActive(page.url, child.href, true) ? 'active' : ''}>
                                                         <span>{businessText(child.label)}</span>
