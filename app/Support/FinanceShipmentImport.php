@@ -7,7 +7,6 @@ use App\Models\FinanceShipmentLedger;
 use App\Models\ObjectRecord;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
@@ -40,13 +39,11 @@ class FinanceShipmentImport
             $preview = $this->deduplicate($this->classify($sheets, $name), $this->writer->current($project)['orders']);
             $id = (string) Str::uuid();
             $stored = 'finance-shipments/ledger-'.$project->id.'/'.$hash.'.'.$extension;
-            $stream = fopen($path, 'rb');
             try {
-                if (! Storage::disk('local')->put($stored, $stream)) {
-                    throw ValidationException::withMessages(['file' => '原文件保存失败，尚未导入任何数据。']);
-                }
-            } finally {
-                fclose($stream);
+                app(BusinessFileStorage::class)->storeBytes($stored, file_get_contents($path), mb_substr($name, 0, 255), mime_content_type($path) ?: 'application/octet-stream');
+            } catch (\Throwable $exception) {
+                report($exception);
+                throw ValidationException::withMessages(['file' => '原文件保存失败，尚未导入任何数据。']);
             }
             DB::table('finance_shipment_imports')->insertOrIgnore(['id' => $id, 'project_id' => $project->project_id, 'ledger_id' => $project->id, 'user_id' => $user->id,
                 'hash' => $hash, 'name' => mb_substr($name, 0, 255), 'path' => $stored, 'preview' => json_encode($preview, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'created_at' => now(), 'updated_at' => now()]);
