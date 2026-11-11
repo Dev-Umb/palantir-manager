@@ -1,3 +1,4 @@
+import SteelGirderNavigation from '../../Components/SteelGirderNavigation';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../../Components/Layout';
@@ -146,7 +147,7 @@ export default function Index({ initial, capabilities, urls }) {
     async function exportFile(kind) {
         if (exportLock.current || (kind === 'result' && !querySnapshot)) return;
         if (draft && kind !== 'result') { setLibraryFeedback('请先保存或取消正在编辑的数据库，再导出当前库。'); return; }
-        const names = { result: result?.bracing_complete ? '支架构件明细.xlsx' : '支架构件明细_部分结果.xlsx', library: '支架库_当前数据库.xlsx', html: '钢箱梁工作台_更新版.html', template: '支架库_导入模板.xlsx' };
+        const names = { result: result?.bracing_complete ? '支架构件明细.xlsx' : '支架构件明细_部分结果.xlsx', library: '支架库_当前数据库.xlsx', html: '支架检索_更新版.html', template: '支架库_导入模板.xlsx' };
         const report = kind === 'result' ? setResultFeedback : setLibraryFeedback;
         const snapshot = querySnapshot;
         const version = data?.revision;
@@ -158,9 +159,9 @@ export default function Index({ initial, capabilities, urls }) {
             if (error.status === 409) invalidate(error.message);
         } finally { exportLock.current = false; setExporting(false); }
     }
-    return <Layout hideHeader><Head title="钢箱梁工作台" /><main className="support-library" id="support-top">
+    return <Layout hideHeader><Head title="支架检索" /><SteelGirderNavigation /><main className="support-library" id="support-top">
 
-        <section className="support-overview"><div className="support-hero-copy"><nav className="support-local-nav" aria-label="支架库页面导航"><a href="#support-search">组合检索</a><a href="#support-catalog">已有搭配</a></nav><h1>钢箱梁工作台</h1><p>选定用途、柱撑型号和钢柱规格，用“高度@横向间距@纵向间距/组数”输入支架组合；单柱可直接写“高度/组数”。</p><div className="support-tags"><span>来源：{data?.source_filename || '尚未初始化'}</span><span>库中数量按每个柱撑面</span><span>备注带孔独立区分</span></div><p className="muted">版本 {data?.revision || 0} · {data?.updated_at ? new Date(data.updated_at).toLocaleString('zh-CN') : '未保存'}</p></div>
+        <section className="support-overview"><div className="support-hero-copy"><nav className="support-local-nav" aria-label="支架库页面导航"><a href="#support-search">组合检索</a><a href="#support-catalog">已有搭配</a></nav><h1>支架检索</h1><p>选定用途、柱撑型号和钢柱规格，用“高度@横向间距@纵向间距/组数”输入支架组合；单柱可直接写“高度/组数”。</p><div className="support-tags"><span>来源：{data?.source_filename || '尚未初始化'}</span><span>库中数量按每个柱撑面</span><span>备注带孔独立区分</span></div><p className="muted">版本 {data?.revision || 0} · {data?.updated_at ? new Date(data.updated_at).toLocaleString('zh-CN') : '未保存'}</p></div>
             <div className="support-hero-library"><div className="support-library-counts"><p><strong>{library.frames.length}</strong>种支架搭配<br />{[...new Set(library.frames.map((f) => f.support_use))].join(' / ') || '暂无搭配'}</p><p><strong>{library.parts.length}</strong>条构件记录<br />{library.parts.filter((p) => p.kind === '钢柱').length}条钢柱 / {library.parts.filter((p) => p.kind === '柱撑').length}条柱撑</p></div><p>C14A、C16A均适用原表搭配；按连续跨距及高度分段展开，中间排柱撑一并计入。</p>
                 <div className="support-actions">{capabilities.manage && <><button disabled={!data || busy || !!draft} onClick={() => { setImportMessage(''); fileInput.current?.click(); }}>从Excel导入支架库</button><input ref={fileInput} type="file" accept=".xlsx" aria-label="选择Excel支架库" hidden onChange={selectFile} /></>}
                     {capabilities.export && <button disabled={!data || exporting} onClick={() => exportFile('library')}>导出当前数据库 Excel</button>}

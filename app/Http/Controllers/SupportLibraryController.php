@@ -110,7 +110,7 @@ class SupportLibraryController extends Controller
         $this->authorizeAction($request, 'export');
         $version = $this->writer->current($this->requestedRevision($request));
 
-        return $this->download($this->exporter->html($version), '钢箱梁工作台_更新版.html', $version->revision, 'text/html; charset=utf-8');
+        return $this->download($this->exporter->html($version), '支架检索_更新版.html', $version->revision, 'text/html; charset=utf-8');
     }
 
     public function template(Request $request): Response

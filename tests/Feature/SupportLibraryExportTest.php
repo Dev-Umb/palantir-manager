@@ -88,8 +88,8 @@ class SupportLibraryExportTest extends TestCase
         $this->assertStringNotContainsString('</script><script>alert(1)', $html);
         $this->assertStringNotContainsString('original_path', $html);
         $this->assertStringContainsString('共享支架库版本 2', $html);
-        $this->assertStringContainsString('<title>钢箱梁工作台 · 离线快照</title>', $html);
-        $this->assertStringContainsString('<h1>钢箱梁工作台</h1>', $html);
+        $this->assertStringContainsString('<title>支架检索 · 离线快照</title>', $html);
+        $this->assertStringContainsString('<h1>支架检索</h1>', $html);
         $this->assertStringContainsString('离线修改不会自动同步平台', $html);
         $start = strpos($html, '/*LIBRARY_START*/let DB=') + strlen('/*LIBRARY_START*/let DB=');
         $end = strpos($html, ';/*LIBRARY_END*/', $start);

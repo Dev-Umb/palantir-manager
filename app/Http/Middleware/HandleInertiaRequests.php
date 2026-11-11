@@ -148,7 +148,15 @@ class HandleInertiaRequests extends Middleware
             ...($can('timebook.view') ? [['key' => 'timebook', 'label' => '工日簿', 'href' => route('timebook.index'), 'visible' => true, 'mobile_priority' => 25]] : []),
             ['key' => 'production-workbench', 'label' => '生产管理工作台', 'href' => route('production-workbench'), 'visible' => $can('material-arrivals.view') || $can('template-accessories.view'), 'mobile_priority' => 20],
             ['key' => 'finance-shipments', 'label' => '财务工作台', 'href' => route('finance-shipments.index'), 'visible' => app(FinanceShipmentAccess::class)->allows($request->user()), 'mobile_priority' => 63],
-            ['key' => 'support-library', 'label' => '钢箱梁工作台', 'href' => route('support-library.index'), 'visible' => $can('support-library.view'), 'mobile_priority' => 64],
+            [
+                'key' => 'support-library', 'label' => '钢箱梁工作台',
+                'href' => $can('steel-girder-projects.view') ? route('steel-girder-projects.index') : route('support-library.index'),
+                'visible' => $can('support-library.view') || $can('steel-girder-projects.view'), 'mobile_priority' => 64,
+                'children' => [['label' => '工作内容', 'items' => array_values(array_filter([
+                    $can('steel-girder-projects.view') ? ['label' => '项目管理', 'href' => route('steel-girder-projects.index')] : null,
+                    $can('support-library.view') ? ['label' => '支架检索', 'href' => route('support-library.index')] : null,
+                ]))]],
+            ],
             ['key' => 'quotations', 'label' => '参考报价', 'href' => route('quotations.index'), 'visible' => QuotationAccess::allows($request->user()), 'mobile_priority' => 62],
         ];
     }

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src 'none'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>钢箱梁深化工作台</title>
+<style>/*__CSS__*/</style>
+</head>
+<body data-motion="off">
+<div class="ambient" aria-hidden="true">
+ <div class="ambient-light light-sage"></div><div class="ambient-light light-sand"></div><div class="ambient-grid"></div><div class="ambient-rings"></div><div class="ambient-plane"></div>
+ <svg class="bridge-lines" viewBox="0 0 1600 500" fill="none" preserveAspectRatio="xMidYMax slice">
+  <g stroke="currentColor" stroke-width="1"><path d="M-80 270Q650 60 1680 210M-80 295Q650 85 1680 235M-80 332Q650 122 1680 272M-80 345Q650 135 1680 285"/>
+   <path d="M210 230v40l35 13v175m-35-198 35 13M590 174v37l35 18v208m-35-236 35 17M1010 172v38l35 21v210m-35-241 35 21M1410 204v38l35 23v194m-35-227 35 23"/>
+   <path d="M0 244l18 46m77-69 18 47m77-69 18 47m77-65 18 46m77-63 18 46m77-60 18 46m77-57 18 46m77-52 18 45m77-48 18 45m77-44 18 45m77-39 18 45m77-35 18 45m77-30 18 45m77-26 18 46m77-21 18 46m77-17 18 47m77-12 18 48"/>
+  </g><path class="bridge-flow" d="M-80 270Q650 60 1680 210" stroke="currentColor" stroke-width="2" stroke-dasharray="150 1900"/>
+ </svg>
+</div>
+<header class="masthead"><div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M4 23h24M6 23V11h20v12M6 12l10 11 10-11M16 11v12" stroke="currentColor" stroke-width="1.7"/></svg></span><strong>钢箱梁深化工作台</strong></div><div class="header-tools"><span class="offline"><i></i>团队共享</span><button id="motion-toggle" type="button" class="motion-toggle" aria-label="动态背景" aria-pressed="false" title="开启动效"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="pause-icon" d="M5 3v10M11 3v10" fill="none" stroke="currentColor" stroke-width="2"/><path class="play-icon" d="m5 3 8 5-8 5z" fill="currentColor"/></svg><span id="motion-label">静态背景</span></button></div></header>
+<main>
+<section id="project-home" class="project-home" aria-labelledby="home-title">
+ <div class="home-hero"><div class="home-copy"><p class="eyebrow">STEEL BOX GIRDER · WORKSPACE</p><h1 id="home-title" tabindex="-1">钢箱梁深化<br><span>从项目开始。</span></h1><p class="home-description">将图纸、材料与核对数据，归入每一个项目。</p></div>
+ <svg class="home-structure" viewBox="0 0 520 310" fill="none" aria-hidden="true"><defs><linearGradient id="beam-shade" x1="60" y1="120" x2="450" y2="250" gradientUnits="userSpaceOnUse"><stop stop-color="#b5cfbc" stop-opacity=".6"/><stop offset="1" stop-color="#dce8db" stop-opacity=".15"/></linearGradient></defs><path d="M45 154 335 64 472 122 181 218Z" fill="url(#beam-shade)" stroke="#789d87"/><path d="m45 154 17 63 115 51 4-50M181 218l291-96-14 66-281 80M62 217l280-87 116 58" stroke="#789d87"/><path d="m112 134 130 63m-65-83 130 62m-65-82 130 61m-65-80 129 60M94 176l23 64m44-84 22 61m40-84 23 63m42-83 23 60m42-81 23 61m41-83 22 64" stroke="#95b09a" stroke-opacity=".65"/><path d="m43 282 440-135M48 117 329 30m165 74-133-57M29 112v24m300-116v24" stroke="#a8bda7" stroke-dasharray="4 5"/><circle cx="45" cy="154" r="4" fill="#5f8b70"/><circle cx="472" cy="122" r="4" fill="#bb9c64"/><circle cx="177" cy="268" r="4" fill="#5f8b70"/></svg>
+ </div>
+ <div class="project-options">
+  <button type="button" id="new-project-btn" class="project-option new-option"><span class="option-top"><span class="option-icon"><svg viewBox="0 0 32 32" fill="none"><path d="M5 9h9l3 4h10v13H5V9Zm0 0V6h9l3 3h10v4M16 16v7m-3.5-3.5h7" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span class="option-index">01 / START</span></span><strong>新建项目</strong><span class="option-description">建立项目，整理图纸与材料表</span><span class="option-bottom">开始新的深化工作<span aria-hidden="true">↗</span></span></button>
+  <button type="button" id="select-project-btn" class="project-option"><span class="option-top"><span class="option-icon"><svg viewBox="0 0 32 32" fill="none"><path d="M5 10V6h9l3 4h10v16H5V10Zm0 4h22M10 19h12m-12 4h7" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span><span class="option-index">02 / CONTINUE</span></span><strong>选择项目</strong><span class="option-description">打开已保存的项目，继续深化工作</span><span class="option-bottom"><span id="project-count">共享项目</span><span aria-hidden="true">↗</span></span></button>
+ </div>
+ <p class="home-storage-note">项目数据保存到服务器 · 原始文件存储于 TOS</p>
+ <p id="project-home-status" class="project-message" role="status" aria-live="polite" hidden></p>
+</section>
+<section id="project-workspace" hidden aria-label="项目工作台">
+<nav class="project-nav" aria-label="项目导航"><button type="button" id="project-home-btn">← 项目首页</button><span class="nav-divider">/</span><span id="active-project-name"></span></nav>
+<div class="workspace-tabs" role="tablist" aria-label="项目工作内容">
+ <button type="button" id="drawings-tab" role="tab" aria-selected="true" aria-controls="drawings-section"><span>01</span><strong>图纸管理</strong><small>导入 / 导出</small></button>
+ <button type="button" id="materials-tab" role="tab" aria-selected="false" aria-controls="materials-section" tabindex="-1"><span>02</span><strong>材料统计表</strong><small>统计 / 核对</small></button>
+</div>
+<div class="project-save-line"><span id="project-save-status" role="status" aria-live="polite"></span><button type="button" id="project-retry-save" hidden>重试保存</button><button type="button" id="project-reload">重新载入</button></div>
+<section id="drawings-section" role="tabpanel" aria-labelledby="drawings-tab">
+ <div class="page-heading"><div><p class="eyebrow">第一部分 · 图纸管理</p><h1><span id="drawing-project-title">项目图纸</span><span class="heading-dot">.</span></h1><p class="page-description">集中保存项目图纸，随时导出原文件。</p></div><div class="page-actions"><button class="secondary" id="drawing-export-all" type="button" disabled><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3v10m-4-4 4 4 4-4M3 13v4h14v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>导出全部图纸</button><button class="primary" id="drawing-upload-btn" type="button"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 13V3m-4 4 4-4 4 4M3 12v5h14v-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>导入图纸</button></div></div>
+ <input id="drawing-input" type="file" accept=".pdf,.dwg" multiple class="visually-hidden" aria-label="选择PDF或DWG图纸">
+ <div id="drawing-drop-zone" class="drawing-drop-zone" role="button" tabindex="0" aria-label="选择或拖入PDF、DWG图纸">
+  <span class="drawing-upload-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="M12 6h16l9 9v27H12zM28 6v10h9M19 31l5-5 5 5m-5-5v11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><h2>将图纸拖入此处，或点击选择</h2><p>支持多份文件 · PDF / DWG · 单份最大 200 MB</p></div><span class="drawing-format-tags" aria-hidden="true"><b>PDF</b><b>DWG</b></span>
+ </div>
+ <div id="drawing-status" class="drawing-status" role="status" aria-live="polite" hidden></div>
+ <section class="drawing-library panel" aria-labelledby="drawing-library-title"><div class="drawing-library-heading"><h2 id="drawing-library-title">项目图纸</h2><span id="drawing-count">0 份图纸</span></div><p id="drawing-empty">尚未导入图纸。导入后将随当前项目自动保存。</p><ul id="drawing-list" class="drawing-list"></ul></section>
+ <p class="drawing-hint">PDF、DWG 按原格式保存与导出 · 同一文件重复导入会自动跳过</p>
+</section>
+<section id="materials-section" role="tabpanel" aria-labelledby="materials-tab" hidden>
+<section class="page-heading"><div><p class="eyebrow">第二部分 · 材料统计表</p><h1><span id="project-title">材料总览</span><span class="heading-dot">.</span></h1><p class="page-description">重量、涂装面积与安装数量，一览清晰。</p></div><div class="page-actions"><button class="secondary" id="export-btn" type="button" disabled><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3v10m-4-4 4 4 4-4M3 13v4h14v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="export-label">导出材料表</span></button><button class="primary" id="upload-btn" type="button"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 13V3m-4 4 4-4 4 4M3 12v5h14v-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="upload-label">导入材料表</span></button></div></section>
+<input id="file-input" type="file" accept=".xlsx" class="visually-hidden" aria-label="上传Excel材料表">
+<section id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="选择或拖入Excel材料表">
+ <span class="file-symbol" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M9 4h10l6 6v18H9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M19 4v7h6M13 16h8M13 21h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+ <div class="drop-copy"><h2 id="file-name">拖入材料表，生成总览</h2><p id="file-meta">选择 .xlsx 文件 · 文件名可注明“单幅”或“双幅”</p></div>
+ <span class="drop-action" aria-hidden="true">选择文件 <span>↗</span></span>
+</section>
+<div id="status" role="status" aria-live="polite" hidden></div>
+<div id="export-status" role="status" aria-live="polite" hidden></div>
+<section id="dashboard" hidden>
+ <div id="review-status" class="visually-hidden" role="status" aria-live="polite"></div>
+ <div id="issues" hidden></div>
+ <section class="dashboard-grid" aria-label="材料数据总览">
+  <article class="panel weight-panel"><div class="panel-heading"><div class="panel-title"><span class="section-mark" aria-hidden="true">01</span><h2>重量对比</h2></div><div class="unit-switch" role="group" aria-label="重量显示单位"><button type="button" data-unit="t" aria-pressed="true">吨 t</button><button type="button" data-unit="kg" aria-pressed="false">千克 kg</button></div></div><div id="weight-metrics" class="weight-metrics"></div></article>
+  <section id="metrics" class="metrics" aria-label="需安装数量"></section>
+  <article class="panel area-panel"><div class="panel-heading"><div class="panel-title"><span class="section-mark" aria-hidden="true">02</span><h2>涂装面积构成</h2></div><span class="chart-unit">m²</span></div><div id="area-chart" class="area-chart"></div></article>
+ </section>
+ <p class="review-hint">文件名可注明单幅或双幅 · 核对状态与备注随文件保存</p>
+</section>
+<section id="empty-guide" class="empty-guide" aria-label="可查看的数据"><span>设计重量与净重</span><i></i><span>涂装面积</span><i></i><span>剪力钉与螺栓数量</span></section>
+</section>
+</section>
+<footer><span>钢箱梁深化工作台 · 团队共享使用</span><span>修改 Excel 后，请重算保存并重新上传</span></footer>
+</main>
+<dialog id="create-project-dialog" class="project-dialog" aria-labelledby="create-project-title"><form id="create-project-form"><div class="project-dialog-heading"><div><p class="eyebrow">NEW PROJECT</p><h2 id="create-project-title">新建项目</h2></div><button type="button" class="dialog-close" data-close-dialog="create-project-dialog" aria-label="关闭新建项目">×</button></div><label for="new-project-name">项目名称</label><input id="new-project-name" type="text" maxlength="100" required autocomplete="off" placeholder="例如：荣乌高速钢箱梁"><p class="project-field-note">创建后可导入项目图纸，并整理材料统计表。</p><p id="create-project-error" class="project-message error" role="alert" hidden></p><div class="project-dialog-actions"><button type="button" class="secondary" data-close-dialog="create-project-dialog">取消</button><button type="submit" class="primary" id="create-project-submit">创建并进入</button></div></form></dialog>
+<dialog id="select-project-dialog" class="project-dialog project-picker-simple" aria-labelledby="select-project-title"><div class="project-dialog-heading"><div><p class="eyebrow">YOUR PROJECTS</p><h2 id="select-project-title">选择项目</h2></div><button type="button" class="dialog-close" data-close-dialog="select-project-dialog" aria-label="关闭选择项目">×</button></div><label for="project-select">项目名称</label><div class="project-select-wrap"><select id="project-select"><option value="">请选择项目</option></select></div><p id="project-list-status" class="project-message" role="status" aria-live="polite" hidden></p><div class="project-select-actions"><button type="button" class="danger-outline" id="delete-project-btn" disabled><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 5h14M7 5V3h6v2M5 5l1 12h8l1-12M8 8v6m4-6v6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>删除项目</button><button type="button" class="primary" id="open-project-btn" disabled>进入项目</button></div></dialog>
+<dialog id="delete-project-dialog" class="project-dialog delete-project-dialog" aria-labelledby="delete-project-title" aria-describedby="delete-project-description"><div class="project-dialog-heading"><h2 id="delete-project-title">确认删除项目？</h2><button type="button" class="dialog-close" data-close-dialog="delete-project-dialog" aria-label="取消删除">×</button></div><div class="delete-project-target"><span>即将删除</span><strong id="delete-project-name"></strong></div><p id="delete-project-description">确认后，该项目将从共享项目列表移除，其他同事也无法继续编辑。图纸、原材料表及核对数据保留在服务器，TOS 原文件不会删除。</p><p id="delete-project-error" class="project-message error" role="alert" hidden></p><div class="project-dialog-actions"><button type="button" class="secondary" id="cancel-delete-project" data-close-dialog="delete-project-dialog">取消</button><button type="button" class="danger-primary" id="confirm-delete-project">确定删除</button></div></dialog>
+<dialog id="note-dialog" aria-labelledby="note-title"><div class="note-dialog-heading"><h2 id="note-title">核对备注</h2><button type="button" id="note-close" class="dialog-close" aria-label="关闭备注">×</button></div><p id="note-context"></p><label for="note-input">备注内容</label><textarea id="note-input" rows="6" maxlength="2000" placeholder="填写未核对原因、缺失资料或需要确认的内容"></textarea><p class="note-dialog-hint">备注随材料表导出；标记为已核对后仍保留。</p><div class="note-dialog-actions"><button type="button" class="secondary" id="note-cancel">取消</button><button type="button" class="primary" id="note-save">保存备注</button></div></dialog>
+<script>/*__ZIP__*/</script>
+<script>/*__EXPORT__*/</script>
+<script>/*__PROJECTS__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>
