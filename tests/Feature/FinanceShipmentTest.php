@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Actions\SaveFinanceShipments;
 use App\Models\AuditLog;
 use App\Models\ObjectRecord;
+use App\Models\StoredAttachment;
 use App\Models\User;
+use App\Support\BusinessFileStorage;
 use App\Support\FinanceShipmentImport;
 use Database\Seeders\XycPrototypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -76,6 +78,43 @@ class FinanceShipmentTest extends TestCase
             ->assertJsonCount(2, 'orders')->assertJsonPath('summary.amount', 500)
             ->assertJsonPath('orders.0.rows.0.net_price', 80)->assertJsonPath('orders.0.rows.0.processing_fee', 30)
             ->assertJsonPath('orders.1.rows.0.net_price', 0)->assertJsonPath('orders.1.rows.0.processing_fee', null);
+    }
+
+    public function test_import_original_uses_tos_preserving_preview_and_deduplication(): void
+    {
+        Storage::fake('local');
+        Storage::fake('contract_tos');
+        config(['services.business_files.disk' => 'contract_tos']);
+        $bytes = "发货日期,货物名称,数量,单价\n2026.11.01,模板,2,100\n";
+        $file = UploadedFile::fake()->createWithContent('原始发货.csv', $bytes);
+        $url = route('finance-shipments.preview', $this->project);
+        $preview = $this->actingAs($this->finance)->postJson($url, ['file' => $file])->assertOk()->assertJsonPath('counts.ready', 1)->json();
+        $import = DB::table('finance_shipment_imports')->sole();
+        $stored = StoredAttachment::where('logical_path', $import->path)->sole();
+        $this->assertSame('contract_tos', $stored->disk);
+        $this->assertSame('原始发货.csv', $stored->original_name);
+        $this->assertSame(hash('sha256', $bytes), $stored->sha256);
+        $this->assertSame($bytes, Storage::disk('contract_tos')->get($stored->object_key));
+        Storage::disk('local')->assertDirectoryEmpty('finance-shipments');
+        $this->postJson($url, ['file' => UploadedFile::fake()->createWithContent('原始发货.csv', $bytes)])->assertOk()->assertJsonPath('id', $preview['id']);
+        $this->assertDatabaseCount('finance_shipment_imports', 1);
+        $this->assertDatabaseCount('stored_attachments', 1);
+        $this->postJson(route('finance-shipments.commit', $this->project), ['id' => $preview['id']])->assertOk()->assertJsonPath('summary.amount', 200);
+    }
+
+    public function test_import_storage_failure_preserves_data_without_local_fallback(): void
+    {
+        Storage::fake('local');
+        $this->mock(BusinessFileStorage::class, function ($mock): void {
+            $mock->shouldReceive('storeBytes')->once()->andThrow(new \RuntimeException('TOS unavailable'));
+        });
+        $file = UploadedFile::fake()->createWithContent('原始发货.csv', "发货日期,货物名称,数量,单价\n2026.11.01,模板,2,100\n");
+        $before = $this->project->getRawOriginal();
+        $this->actingAs($this->finance)->postJson(route('finance-shipments.preview', $this->project), ['file' => $file])->assertUnprocessable()->assertJsonValidationErrors('file');
+        $this->assertDatabaseCount('finance_shipment_imports', 0);
+        $this->assertDatabaseCount('stored_attachments', 0);
+        $this->assertSame($before, $this->project->fresh()->getRawOriginal());
+        Storage::disk('local')->assertDirectoryEmpty('finance-shipments');
     }
 
     public function test_range_subtotals_persist_without_changing_totals_and_reject_invalid_endpoints(): void

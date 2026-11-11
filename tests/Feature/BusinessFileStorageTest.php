@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\StoredAttachment;
+use App\Models\User;
 use App\Support\BusinessFileStorage;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use League\Flysystem\Config;
 use RuntimeException;
 use Tests\TestCase;
@@ -122,6 +125,7 @@ class BusinessFileStorageTest extends TestCase
     public function test_migration_uploads_before_switch_and_rechecks_every_file_without_deleting_sources(): void
     {
         Storage::disk('local')->put('attachments/legacy.pdf', '%PDF legacy');
+        Storage::disk('local')->put('finance-shipments/ledger-1/legacy.csv', 'legacy finance');
         Storage::disk('local')->put('ai-quotations/legacy.docx', 'quotation');
         Storage::disk('local')->put('backups/private.json', 'DO NOT UPLOAD');
         $stored = StoredAttachment::factory()->create(['logical_path' => 'attachments/legacy.pdf', 'object_key' => 'attachments/legacy.pdf', 'disk' => 'local', 'original_name' => '原合同.pdf', 'size' => 11, 'sha256' => hash('sha256', '%PDF legacy')]);
@@ -134,16 +138,42 @@ class BusinessFileStorageTest extends TestCase
             $this->assertSame('contract_tos', $stored->fresh()->disk);
             $this->assertSame('原合同.pdf', $stored->fresh()->original_name);
             $this->artisan('business-files:tos', ['--phase' => 'switch', '--manifest' => $manifest])->assertSuccessful();
-            $this->assertDatabaseCount('audit_logs', 2);
+            $this->assertDatabaseCount('audit_logs', 3);
 
             $this->artisan('business-files:tos', ['--phase' => 'verify', '--manifest' => $manifest])->assertSuccessful();
             $entries = json_decode(file_get_contents($manifest), true)['entries'];
-            $this->assertCount(2, $entries);
-            $this->assertCount(2, array_filter($entries, fn ($e) => ! empty($e['post_switch_verified_at'])));
+            $this->assertCount(3, $entries);
+            $this->assertCount(3, array_filter($entries, fn ($e) => ! empty($e['post_switch_verified_at'])));
             Storage::disk('local')->assertExists('attachments/legacy.pdf');
+            $this->assertSame('legacy finance', Storage::disk('contract_tos')->get('finance-shipments/ledger-1/legacy.csv'));
+            Storage::disk('local')->assertExists('finance-shipments/ledger-1/legacy.csv');
             Storage::disk('contract_tos')->assertMissing('backups/private.json');
             Storage::disk('contract_tos')->put('ai-quotations/legacy.docx', 'corrupt');
             $this->artisan('business-files:tos', ['--phase' => 'verify', '--manifest' => $manifest])->assertFailed();
+        } finally {
+            @unlink($manifest);
+        }
+    }
+
+    public function test_legacy_import_migration_preserves_original_name_and_import_record(): void
+    {
+        $path = 'finance-shipments/legacy/source.csv';
+        Storage::disk('local')->put($path, 'legacy finance');
+        DB::table('finance_shipment_imports')->insert([
+            'id' => (string) Str::uuid(), 'user_id' => User::factory()->create()->id,
+            'hash' => hash('sha256', 'legacy finance'), 'name' => '历史发货.csv', 'path' => $path, 'preview' => '{}',
+        ]);
+        $before = DB::table('finance_shipment_imports')->sole();
+        $manifest = sys_get_temp_dir().'/finance-tos-'.Str::uuid().'.json';
+        try {
+            foreach (['inventory', 'upload', 'switch', 'verify'] as $phase) {
+                $this->artisan('business-files:tos', ['--phase' => $phase, '--manifest' => $manifest])->assertSuccessful();
+            }
+            $stored = StoredAttachment::where('logical_path', $before->path)->sole();
+            $this->assertSame('历史发货.csv', $stored->original_name);
+            $this->assertSame('contract_tos', $stored->disk);
+            $this->assertEquals($before, DB::table('finance_shipment_imports')->sole());
+            Storage::disk('local')->assertExists($before->path);
         } finally {
             @unlink($manifest);
         }

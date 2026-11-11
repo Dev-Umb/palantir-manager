@@ -125,8 +125,9 @@ class MigrateBusinessFilesToTos extends Command
     private function inventory(): array
     {
         $registered = StoredAttachment::all()->keyBy('logical_path');
-        $paths = $registered->keys()->all();
-        foreach (['attachments', 'ai-quotations', 'procurement-hub/evidence'] as $prefix) {
+        $imports = DB::table('finance_shipment_imports')->pluck('name', 'path');
+        $paths = [...$registered->keys()->all(), ...$imports->keys()->all()];
+        foreach (['attachments', 'ai-quotations', 'procurement-hub/evidence', 'finance-shipments'] as $prefix) {
             $paths = [...$paths, ...Storage::disk('local')->allFiles($prefix)];
         }
         foreach (ObjectRecord::cursor() as $record) {
@@ -172,7 +173,7 @@ class MigrateBusinessFilesToTos extends Command
             }
             $result[] = ['logical_path' => $path, 'source_disk' => $sourceDisk, 'source_key' => $sourceKey,
                 'exists' => $exists, 'size' => $exists ? $disk->size($sourceKey) : $stored?->size,
-                'sha256' => $hash, 'original_name' => $stored?->original_name ?: basename($path),
+                'sha256' => $hash, 'original_name' => $stored?->original_name ?: ($imports->get($path) ?: basename($path)),
                 'mime_type' => $stored?->mime_type ?: ($exists ? $disk->mimeType($sourceKey) : 'application/octet-stream'),
                 'status' => $stored?->status ?: StoredAttachment::STATUS_ATTACHED, 'registered_before' => $stored?->toArray()];
         }
