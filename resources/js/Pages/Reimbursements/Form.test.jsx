@@ -107,3 +107,21 @@ it('continues incomplete drafts whose nullable fields are normalized by the serv
     expect(screen.getByText('合计 ¥0.00')).toBeVisible();
     expect(screen.getByRole('button', { name: '保存草稿' })).toBeEnabled();
 });
+
+
+it('preserves evidence links for retained files and clears only a removed source reference', async () => {
+    const other = { ...file, id: 'other', name: '补充附件.pdf' };
+    vi.stubGlobal('fetch', vi.fn(async (url, options) => {
+        const body = JSON.parse(options.body);
+        return response({ draft: { ...draft, revision: body.revision + 1, payload: { ...body.payload, items: body.payload.items.map(item => ({ ...item, attachments: item.attachments.map(id => [file, other].find(value => value.id === id)) })) } } });
+    }));
+    render(<Form {...props} draft={{ ...draft, payload: { ...payload, items: [{ ...payload.items[0], attachments: [file, other], evidence_source: { upload_id: file.id, candidate_id: '1-1' } }] } }} />);
+    fireEvent.click(screen.getByRole('button', { name: '移除 补充附件.pdf' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+    await screen.findByText('草稿已保存，可在小程序继续编辑');
+    expect(JSON.parse(fetch.mock.calls[0][1].body).payload.items[0].evidence_source).toEqual({ upload_id: file.id, candidate_id: '1-1' });
+    fireEvent.click(screen.getByRole('button', { name: '移除 住宿.pdf' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(fetch.mock.calls[1][1].body).payload.items[0]).not.toHaveProperty('evidence_source');
+});

@@ -54,7 +54,12 @@ export default function Form({ draft = null, source = null, types = [], users = 
     }, []);
     function change(next) { dirty.current = true; setValues(next); setMessage('有未保存的修改'); }
     function changeItem(index, key, value) {
-        change({ ...values, items: values.items.map((item, i) => i === index ? { ...item, [key]: value } : item) });
+        change({ ...values, items: values.items.map((item, i) => {
+            if (i !== index) return item;
+            const next = { ...item, [key]: value };
+            if (key === 'attachments' && item.evidence_source && !value.some(file => file.id === item.evidence_source.upload_id)) delete next.evidence_source;
+            return next;
+        }) });
     }
     function acceptDraft(record) {
         session.revision = record.revision;
