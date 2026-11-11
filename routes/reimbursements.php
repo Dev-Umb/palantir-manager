@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'reimbursement-access'])->prefix('reimbursements')->name('reimbursements.')->group(function (): void {
     Route::get('/', [ReimbursementController::class, 'index'])->name('index');
+    Route::get('/create', [ReimbursementController::class, 'create'])->name('create');
+    Route::post('/drafts', [ReimbursementDraftController::class, 'store'])->middleware('throttle:120,1')->name('drafts.store');
     Route::prefix('batches')->name('batches.')->middleware('throttle:240,1')->group(function (): void {
         Route::get('/', [ReimbursementBatchController::class, 'index'])->name('index');
         Route::post('/', [ReimbursementBatchController::class, 'store'])->name('store');

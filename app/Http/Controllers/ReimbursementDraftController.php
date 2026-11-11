@@ -40,6 +40,13 @@ class ReimbursementDraftController extends Controller
         return $request->expectsJson() && ! $request->header('X-Inertia') ? response()->json(['draft' => $record]) : Inertia::render('Reimbursements/Draft', ['draft' => $record]);
     }
 
+    public function store(SaveReimbursementDraftRequest $request): JsonResponse
+    {
+        $data = $request->validate(['id' => ['required', 'uuid']]);
+
+        return response()->json(['draft' => $this->drafts->present($this->drafts->save($request->user(), $data['id'], $request->validated(), true))], 201);
+    }
+
     public function update(SaveReimbursementDraftRequest $request, string $draft): JsonResponse
     {
         return response()->json(['draft' => $this->drafts->present($this->drafts->save($request->user(), $draft, $request->validated()))]);

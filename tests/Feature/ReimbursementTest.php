@@ -7,6 +7,7 @@ use App\Jobs\SendReimbursementWechatNotice;
 use App\Models\Permission;
 use App\Models\ReimbursementBatch;
 use App\Models\ReimbursementBatchFile;
+use App\Models\ReimbursementDraft;
 use App\Models\ReimbursementNotice;
 use App\Models\ReimbursementUpload;
 use App\Models\ReimbursementVersion;
@@ -49,6 +50,69 @@ class ReimbursementTest extends TestCase
         $this->reviewer = $this->person();
         $this->admin = $this->person(['manage', 'configure']);
         $this->flow([[$this->reviewer->id]]);
+    }
+
+    public function test_pc_applicant_view_hides_oa_but_preserves_json_review_and_cc_contracts(): void
+    {
+        $input = $this->input();
+        $input['cc'] = [$this->reviewer->id];
+        $record = $this->actingAs($this->owner)->postJson('/reimbursements', $input)->assertCreated()->json('record');
+        $this->get('/reimbursements?workspace=approval&scope=all')->assertOk()->assertInertia(fn ($page) => $page
+            ->component('Reimbursements/Index')->where('approval_ui', false)
+            ->where('filters.workspace', 'application')->where('filters.scope', 'mine')->has('records.data', 1)
+            ->where('nav', fn ($nav) => collect($nav)->firstWhere('key', 'reimbursement-approvals')['visible'] === false));
+        $this->actingAs($this->reviewer)->get('/reimbursements?scope=cc')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('filters.scope', 'cc')->has('records.data', 1));
+        $this->getJson('/reimbursements?scope=review')->assertOk()->assertJsonPath('records.data.0.id', $record['id']);
+        $this->getJson('/reimbursements/versions/'.$record['id'])->assertJsonPath('record.can_decide', true);
+        $this->get('/reimbursements/versions/'.$record['id'])->assertOk()->assertInertia(fn ($page) => $page->where('approval_ui', false));
+        $role = Role::firstOrCreate(['name' => 'admin'], ['label' => '管理员']);
+        $this->admin->roles()->attach($role);
+        $this->actingAs($this->admin)->get('/reimbursements?workspace=approval')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('approval_ui', true)->where('filters.workspace', 'approval')->where('filters.scope', 'all')
+            ->where('nav', fn ($nav) => collect($nav)->firstWhere('key', 'reimbursement-approvals')['visible'] === true));
+    }
+
+    public function test_pc_form_and_new_manual_draft_reuse_existing_authorization_and_revision_rules(): void
+    {
+        $this->actingAs($this->reviewer)->get('/reimbursements/create')->assertForbidden();
+        $this->actingAs($this->owner)->get('/reimbursements/create')->assertOk()->assertInertia(fn ($page) => $page
+            ->component('Reimbursements/Form')->where('draft', null)->where('source', null)->has('types')->has('users'));
+        $id = (string) Str::uuid();
+        $payload = ['title' => 'PC草稿', 'type' => '其他', 'note' => '', 'items' => [], 'cc' => []];
+        $data = ['id' => $id, 'revision' => 0, 'payload' => $payload];
+        $this->postJson('/reimbursements/drafts', $data)->assertCreated()->assertJsonPath('draft.revision', 1);
+        $this->postJson('/reimbursements/drafts', $data)->assertCreated()->assertJsonPath('draft.revision', 1);
+        $this->get('/reimbursements/create?draft='.$id)->assertOk()->assertInertia(fn ($page) => $page->where('draft.id', $id));
+        $this->actingAs($this->reviewer)->get('/reimbursements/create?draft='.$id)->assertForbidden();
+        $other = $this->person(['submit']);
+        $this->actingAs($other)->get('/reimbursements/create?draft='.$id)->assertForbidden();
+        $this->actingAs($this->owner)->putJson('/reimbursements/drafts/'.$id, ['revision' => 1, 'payload' => [...$payload, 'note' => '小程序修改']])->assertOk();
+        $this->putJson('/reimbursements/drafts/'.$id, ['revision' => 1, 'payload' => [...$payload, 'note' => 'PC旧修改']])->assertConflict();
+        $this->get('/reimbursements/create?draft='.$id)->assertInertia(fn ($page) => $page->where('draft.payload.note', '小程序修改'));
+        $this->assertSame(0, ReimbursementVersion::count());
+        $batch = ReimbursementBatch::factory()->create(['user_id' => $this->owner->id]);
+        ReimbursementDraft::whereKey($id)->update(['batch_id' => $batch->id]);
+        $this->get('/reimbursements/create?draft='.$id)->assertConflict();
+        $this->get('/reimbursements/drafts/'.$id)->assertOk();
+    }
+
+    public function test_pc_rejected_form_preserves_source_and_existing_non_admin_approval_flow(): void
+    {
+        $input = $this->input();
+        $record = $this->actingAs($this->owner)->postJson('/reimbursements', $input)->assertCreated()->json('record');
+        $url = '/reimbursements/create?version='.$record['id'];
+        $this->get($url)->assertConflict();
+        $this->actingAs($this->reviewer)->postJson($record['url'].'/decision', ['node_index' => 0, 'decision' => 'reject', 'note' => '补充说明'])->assertOk();
+        $this->actingAs($this->owner)->get($url)->assertOk()->assertInertia(fn ($page) => $page
+            ->component('Reimbursements/Form')->where('source.id', $record['id'])->where('source.can_resubmit', true)
+            ->where('source.items.0.attachments.0.id', $input['items'][0]['attachments'][0]));
+        $other = $this->person(['submit']);
+        $this->actingAs($other)->get($url)->assertForbidden();
+        $next = [...$input, 'submission_key' => (string) Str::uuid(), 'reimbursement_id' => $record['reimbursement_id'], 'expected_version' => 1];
+        $this->actingAs($this->owner)->postJson('/reimbursements', $next)->assertCreated()->assertJsonPath('record.number', 2)->assertJsonPath('record.node_index', 0);
+        $this->get($url)->assertConflict();
+        $this->assertSame('rejected', ReimbursementVersion::findOrFail($record['id'])->status);
     }
 
     private function person(array $permissions = []): User

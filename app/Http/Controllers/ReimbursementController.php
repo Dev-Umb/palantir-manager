@@ -43,6 +43,12 @@ class ReimbursementController extends Controller
     public function index(Request $request): JsonResponse|Response
     {
         $filters = $request->validate(['scope' => ['nullable', Rule::in(['mine', 'review', 'cc', 'all'])], 'owner' => ['nullable', 'string', 'max:120'], 'type' => ['nullable', 'string', 'max:32'], 'status' => ['nullable', Rule::in(['pending', 'approved', 'rejected'])], 'from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])]]);
+        $approvalUi = $request->user()->roles()->where('name', 'admin')->exists();
+        $web = ! $request->expectsJson() || $request->header('X-Inertia');
+        $workspace = $approvalUi && ($request->query('workspace') === 'approval' || in_array($filters['scope'] ?? '', ['all', 'review'], true)) ? 'approval' : 'application';
+        if ($web && $workspace === 'application' && ! in_array($filters['scope'] ?? '', ['mine', 'cc'], true)) {
+            $filters['scope'] = 'mine';
+        }
         $scope = $filters['scope'] ?? ($request->user()->canDo('reimbursements.manage') ? 'all' : 'mine');
         $query = $this->service->visible($request->user());
         if ($scope === 'mine') {
@@ -65,7 +71,31 @@ class ReimbursementController extends Controller
         $query->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status));
         $records = $query->latest('id')->paginate(20)->withQueryString()->through(fn ($v) => $this->service->present($request->user(), $v));
 
-        return $this->page($request, 'Index', ['records' => $records, 'pending_count' => $pendingCount, 'filters' => [...$filters, 'scope' => $scope], ...$this->capabilities($request)]);
+        return $this->page($request, 'Index', ['records' => $records, 'pending_count' => $pendingCount, 'filters' => [...$filters, 'scope' => $scope, ...($web ? ['workspace' => $workspace] : [])], ...$this->capabilities($request), ...($web ? ['approval_ui' => $approvalUi] : [])]);
+    }
+
+    public function create(Request $request): Response
+    {
+        abort_unless($request->user()->canDo('reimbursements.submit'), 403);
+        $data = $request->validate(['draft' => ['nullable', 'uuid'], 'version' => ['nullable', 'integer', 'prohibits:draft']]);
+        $draft = null;
+        $source = null;
+        $drafts = app(ReimbursementDraftService::class);
+        if (! empty($data['draft'])) {
+            $row = ReimbursementDraft::findOrFail($data['draft']);
+            $drafts->authorize($request->user(), $row);
+            abort_if($row->version_id !== null, 409, '草稿已提交，请查看报销清单。');
+            abort_if($row->batch_id !== null, 409, '批量识别草稿请在小程序继续核对。');
+            $drafts->checkSource($request->user(), $row->payload);
+            $draft = $drafts->present($row);
+        } elseif (! empty($data['version'])) {
+            $version = ReimbursementVersion::findOrFail($data['version']);
+            $this->service->authorizeVersion($request->user(), $version);
+            $source = $this->service->present($request->user(), $version);
+            abort_unless($source['can_resubmit'], 409, '仅本人当前已驳回的申请可修改重提。');
+        }
+
+        return Inertia::render('Reimbursements/Form', ['draft' => $draft, 'source' => $source, ...$this->options($request)->getData(true)]);
     }
 
     public function approvals(Request $request): JsonResponse
@@ -98,7 +128,7 @@ class ReimbursementController extends Controller
             $record['can_resubmit'] = false;
         }
 
-        return $this->page($request, 'Show', ['record' => $record]);
+        return $this->page($request, 'Show', ['record' => $record, ...(! $request->expectsJson() || $request->header('X-Inertia') ? ['approval_ui' => $request->user()->roles()->where('name', 'admin')->exists()] : [])]);
     }
 
     public function submit(SubmitReimbursementRequest $request): JsonResponse
