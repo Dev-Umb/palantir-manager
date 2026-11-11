@@ -3,8 +3,8 @@
 # 前提：本地已执行 npm run build 与 php artisan test（均通过）。
 set -euo pipefail
 
-KEY=~/.ssh/cloud_server_ed25519
-HOST=ubuntu@62.234.53.54
+KEY=~/.ssh/id_ed25519
+HOST=ubuntu@82.156.205.147
 REMOTE=/var/www/palantir
 SSH_OPTS="-o BindInterface=en0 -i ${KEY}"
 ASSET_CACHE_MARKER='max-age=31536000, immutable'
@@ -35,6 +35,7 @@ rsync -az --delete -e "ssh ${SSH_OPTS}" \
   --exclude='node_modules' \
   --exclude='tests' \
   --exclude='vendor' \
+  --exclude='public/app-updates/***' \
   --exclude='*.png' \
   --exclude='bootstrap/cache/*' \
   --exclude='database/database.sqlite' \
