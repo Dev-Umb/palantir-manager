@@ -132,3 +132,10 @@ it('ordinary applicants retain personal and CC views without OA controls', () =>
     expect(screen.getByRole('link', { name: '修改后重新提交' })).toHaveAttribute('href', '/reimbursements/create?version=1');
     expect(screen.getByRole('button', { name: '预览 发票.pdf' })).toBeVisible();
 });
+it('shows cashier notices while preserving read-only OA links', () => {
+    render(<Index records={{ data: [{ ...record, can_decide: false }], links: [] }} filters={{ workspace: 'approval', scope: 'all' }} capabilities={{ manage: true, submit: false, configure: false }} approval_ui notice_unread_count={2} />);
+    expect(screen.getByRole('button', { name: '知会我的（2 未读）' })).toBeVisible();
+    expect(screen.getByRole('link', { name: /查看详情/ })).toBeVisible();
+    expect(screen.queryByRole('link', { name: /发起报销/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: '流程配置' })).toBeNull();
+});

@@ -74,6 +74,10 @@ class AuthController extends Controller
 
     public function loginFallback(User $user): string
     {
+        if ($user->isCashier()) {
+            return route('reimbursements.index', ['workspace' => 'approval']);
+        }
+
         if ($user->canDo('timebook.view') && ! $user->canDo('dashboard.view') && ! $user->canDo('object.project.view')) {
             return route('timebook.index');
         }
