@@ -2,8 +2,27 @@ const api=require('../../services/api');
 const statusLabels={staged:'排队识别',analyzing:'识别中',review:'待核对',failed:'识别失败',confirmed:'已归档'};
 module.exports={
  async loadIntakes(){return this.act(async()=>{const r=await api.request('/ai/contracts');this.safeData({intakes:(r.intakes||[]).map(i=>({...i,statusLabel:statusLabels[i.status]||i.status}))});});},
- chooseFile(){if(this.data.busy)return;wx.chooseMessageFile({count:1,type:'file',extension:['pdf','jpg','jpeg','png'],success:r=>{const file=r.tempFiles[0];if(file.size>100*1024*1024){this.safeData({error:'文件不能超过 100 MB'});return;}if(!/\.(pdf|jpe?g|png)$/i.test(file.name)){this.safeData({error:'请选择 PDF、JPG 或 PNG 文件'});return;}this.safeData({uploadFile:file,error:''});},fail:e=>{if(!/cancel/i.test(e.errMsg||''))this.safeData({error:'选择文件失败，请重试'});}});},
- uploadContract(){if(!this.data.uploadFile)return;return this.confirmAction('上传合同并识别','文件将上传到线上平台并调用 AI 识别，归档前需要你核对确认。',async()=>{const r=await api.upload('/ai/contracts',this.data.uploadFile.path);if(this.isCurrent()){this.applyIntake(r);this.schedule();}});},
+ selectContractFile(file){
+  if(!file||!file.path){this.safeData({error:'未取得文件，请重新选择'});return;}
+  if(!Number.isFinite(file.size)||file.size<=0){this.safeData({error:'文件为空或大小无效，请重新选择'});return;}
+  if(file.size>100*1024*1024){this.safeData({error:'文件不能超过 100 MB'});return;}
+  if(!/\.(pdf|jpe?g|png)$/i.test(file.name)){this.safeData({error:'请选择 PDF、JPG 或 PNG 文件'});return;}
+  this.safeData({uploadFile:file,error:''});
+ },
+ chooseFile(){
+  if(this.data.busy||this.data.intakeActive)return;
+  wx.chooseMessageFile({count:1,type:'all',success:r=>this.selectContractFile(r.tempFiles&&r.tempFiles[0]),fail:e=>{if(!/cancel/i.test(e.errMsg||''))this.safeData({error:'选择文件失败，请重试'});}});
+ },
+ chooseContractImage(){
+  if(this.data.busy||this.data.intakeActive)return;
+  wx.chooseMedia({count:1,mediaType:['image'],sourceType:['album','camera'],sizeType:['original'],success:r=>{
+   const file=r.tempFiles&&r.tempFiles[0];
+   if(!file){this.safeData({error:'未取得图片，请重新选择'});return;}
+   const path=file.tempFilePath;
+   this.selectContractFile({path,size:file.size,name:(path||'').split('/').pop()});
+  },fail:e=>{if(!/cancel/i.test(e.errMsg||''))this.safeData({error:'选择图片失败，请检查相册或相机权限后重试'});}});
+ },
+ uploadContract(){if(!this.data.uploadFile||this.data.busy||this.data.intakeActive)return;return this.confirmAction('上传合同并识别','文件将上传到线上平台并调用 AI 识别，归档前需要你核对确认。',async()=>{const r=await api.upload('/ai/contracts',this.data.uploadFile.path);if(this.isCurrent()){this.applyIntake(r);this.schedule();}});},
  applyIntake(intake){const changed=!this.data.intake||this.data.intake.id!==intake.id||this.data.intake.status!==intake.status;this.safeData({intake,intakeStatus:statusLabels[intake.status]||intake.status,intakeActive:['staged','analyzing'].includes(intake.status)});if(changed){const e=intake.extraction||{};this.safeData({intakeFields:{amount:e.amount==null?'':e.amount,ctype:e.ctype||'',signed_date:e.signed_date||'',contract_qty:e.contract_qty==null?'':e.contract_qty},intakeProject:null,intakeProjects:[],contractChoice:'',intakePreview:null,updateAmount:false,projectWeight:e.weight_tonnes==null?'':e.weight_tonnes,projectSearch:e.project_no||e.project_name||''});}},
  async openIntake(e){return this.act(async()=>{const r=await api.request('/ai/contracts/'+encodeURIComponent(e.currentTarget.dataset.id));if(this.isCurrent()){this.applyIntake(r);this.schedule();}});},
  async pollIntake(){if(!this.data.intake)return;return this.act(async()=>{const r=await api.request('/ai/contracts/'+encodeURIComponent(this.data.intake.id));if(this.isCurrent())this.applyIntake(r);});},

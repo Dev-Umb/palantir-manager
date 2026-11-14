@@ -1,0 +1,13 @@
+<navigation-bar title="新增客户" back="{{true}}" color="#182331" background="#ffffff" />
+<scroll-view class="scrollarea" scroll-y type="list"><view class="content">
+<view wx:if="{{error}}" class="error">{{error}}</view>
+<view wx:if="{{!allowed}}" class="empty">当前账号无权新增客户</view>
+<view wx:else class="card">
+<view class="field"><label>客户名称 *</label><input value="{{draft.name}}" data-key="name" bindinput="input" maxlength="200" disabled="{{busy || savedId}}" placeholder="请输入客户名称"/></view>
+<view class="field"><label>地址</label><input value="{{draft.address}}" data-key="address" bindinput="input" maxlength="500" disabled="{{busy || savedId}}" placeholder="请输入地址"/></view>
+<view class="field"><label>客户等级</label><picker range="{{levels}}" bindchange="level" disabled="{{busy || savedId}}"><view>{{draft.level || '未设置'}} ▾</view></picker></view>
+<view class="field"><label>联系人姓名</label><input value="{{draft.contactName}}" data-key="contactName" bindinput="input" maxlength="100" disabled="{{busy || savedId}}" placeholder="选填，与客户一起保存"/></view>
+<view class="field"><label>联系电话</label><input value="{{draft.contactPhone}}" data-key="contactPhone" bindinput="input" maxlength="100" disabled="{{busy || savedId}}" placeholder="手机号或座机"/></view>
+<view class="field"><label>备注</label><textarea value="{{draft.remark}}" data-key="remark" bindinput="input" maxlength="1000" disabled="{{busy || savedId}}" placeholder="选填"/></view>
+<button class="primary save" bindtap="save" loading="{{busy}}" disabled="{{busy}}">{{savedId?'查看已新增客户':'保存客户'}}</button>
+</view></view></scroll-view>
