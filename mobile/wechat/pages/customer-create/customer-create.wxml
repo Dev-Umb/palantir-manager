@@ -1,13 +1,20 @@
-<navigation-bar title="新增客户" back="{{true}}" color="#182331" background="#ffffff" />
-<scroll-view class="scrollarea" scroll-y type="list"><view class="content">
-<view wx:if="{{error}}" class="error">{{error}}</view>
+<navigation-bar title="{{fromProject?'填写客户':'新增客户'}}" back="{{true}}" color="#182331" background="#ffffff" />
+<scroll-view class="scrollarea" scroll-y type="list">
+<view wx:if="{{error}}" class="error" aria-role="alert">{{error}}</view>
 <view wx:if="{{!allowed}}" class="empty">当前账号无权新增客户</view>
-<view wx:else class="card">
-<view class="field"><label>客户名称 *</label><input value="{{draft.name}}" data-key="name" bindinput="input" maxlength="200" disabled="{{busy || savedId}}" placeholder="请输入客户名称"/></view>
-<view class="field"><label>地址</label><input value="{{draft.address}}" data-key="address" bindinput="input" maxlength="500" disabled="{{busy || savedId}}" placeholder="请输入地址"/></view>
-<view class="field"><label>客户等级</label><picker range="{{levels}}" bindchange="level" disabled="{{busy || savedId}}"><view>{{draft.level || '未设置'}} ▾</view></picker></view>
-<view class="field"><label>联系人姓名</label><input value="{{draft.contactName}}" data-key="contactName" bindinput="input" maxlength="100" disabled="{{busy || savedId}}" placeholder="选填，与客户一起保存"/></view>
-<view class="field"><label>联系电话</label><input value="{{draft.contactPhone}}" data-key="contactPhone" bindinput="input" maxlength="100" disabled="{{busy || savedId}}" placeholder="手机号或座机"/></view>
-<view class="field"><label>备注</label><textarea value="{{draft.remark}}" data-key="remark" bindinput="input" maxlength="1000" disabled="{{busy || savedId}}" placeholder="选填"/></view>
-<button class="primary save" bindtap="save" loading="{{busy}}" disabled="{{busy}}">{{savedId?'查看已新增客户':'保存客户'}}</button>
-</view></view></scroll-view>
+<block wx:else>
+<view class="customer-intro">{{fromProject?'填好后返回项目，保存项目时一并保存客户。':'客户名称必填，其余信息可稍后补充。'}}</view>
+<view wx:if="{{!moreOpen}}" class="customer-card">
+ <view class="field"><label>客户名称 <text class="required">*</text></label><input value="{{draft.name}}" data-key="name" bindinput="input" maxlength="200" disabled="{{busy || savedId}}" placeholder="请输入客户名称"/></view>
+ <view class="field"><label>客户地址 <text class="optional">选填</text></label><input value="{{draft.address}}" data-key="address" bindinput="input" maxlength="500" disabled="{{busy || savedId}}" placeholder="请输入客户地址"/><view wx:if="{{fromProject}}" class="field-hint">名称和地址相同会复用已有客户。</view></view>
+ <view class="field"><label>联系人 <text class="optional">选填</text></label><input value="{{draft.contactName}}" data-key="contactName" bindinput="input" maxlength="100" disabled="{{busy || savedId}}" placeholder="联系人姓名"/></view>
+ <view class="field"><label>联系电话 <text class="optional">选填</text></label><input value="{{draft.contactPhone}}" data-key="contactPhone" bindinput="input" maxlength="100" disabled="{{busy || savedId}}" placeholder="手机号或座机"/></view>
+</view>
+<button class="more-toggle" bindtap="toggleMore" aria-expanded="{{moreOpen}}">更多资料（{{draft.level || draft.customer_nature || draft.remark?'已填写':'选填'}}）<text>{{moreOpen?'返回基本资料':'展开'}}</text></button>
+<view wx:if="{{moreOpen}}" class="customer-card">
+ <view class="field"><label>客户等级</label><picker range="{{levels}}" value="{{levelIndex}}" bindchange="level" disabled="{{busy || savedId}}"><view>{{draft.level || '未设置'}} ▾</view></picker></view>
+ <view wx:if="{{fromProject}}" class="field"><label>客户性质</label><picker range="{{natures}}" value="{{natureIndex}}" bindchange="nature" disabled="{{busy}}"><view>{{draft.customer_nature || '未设置'}} ▾</view></picker></view>
+ <view wx:if="{{!fromProject}}" class="field"><label>备注</label><textarea value="{{draft.remark}}" data-key="remark" bindinput="input" maxlength="1000" disabled="{{busy || savedId}}" placeholder="选填"/></view>
+</view>
+</block></scroll-view>
+<view wx:if="{{allowed}}" class="customer-footer"><button class="save" bindtap="save" loading="{{busy}}" disabled="{{busy}}">{{fromProject?'确定并返回项目':savedId?'查看已新增客户':'保存客户'}}</button></view>

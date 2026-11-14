@@ -5,21 +5,8 @@
   <view wx:if="{{loading}}" class="loading">正在加载项目资料…</view><view wx:if="{{!loading && !error && !allowed}}" class="empty">当前账号无权编辑</view>
   <view wx:if="{{allowed}}" class="form-card">
    <view class="form-heading">项目资料</view><view class="form-description">带 * 的为必填项</view>
-   <view wx:for="{{fields}}" wx:key="key" wx:if="{{!(customerDirect && item.key==='customer_contact_ids')}}" class="editor-field"><view class="field-label">{{item.label}}<text wx:if="{{item.required}}" class="required"> *</text></view>
-    <block wx:if="{{item.key==='customer_id' && canEnterCustomer}}">
-     <block wx:if="{{customerDirect}}">
-      <input class="field-input" value="{{customerDraft.name}}" data-key="name" bindinput="customerInput" maxlength="200" disabled="{{busy}}" placeholder="填写客户名称，不存在时随项目新建"/>
-      <view class="choice-hint">与 Web 一致：按客户名称＋地址匹配，已有则复用，没有则随项目创建。</view>
-      <view class="field-label">客户地址</view><input class="field-input" value="{{customerDraft.address}}" data-key="address" bindinput="customerInput" maxlength="500" disabled="{{busy}}" placeholder="同名不同地址视为不同客户"/>
-      <view class="field-label">客户等级</view><picker range="{{customerLevels}}" data-key="level" bindchange="customerSelect" disabled="{{busy}}"><view class="field-select">{{customerDraft.level || '未选择'}}</view></picker>
-      <view class="field-label">客户性质</view><picker range="{{customerNatures}}" data-key="customer_nature" bindchange="customerSelect" disabled="{{busy}}"><view class="field-select">{{customerDraft.customer_nature || '未选择'}}</view></picker>
-      <view class="field-label">联系人姓名（选填）</view><input class="field-input" value="{{customerDraft.contactName}}" data-key="contactName" bindinput="customerInput" maxlength="100" disabled="{{busy}}"/>
-      <view class="field-label">联系电话（选填）</view><input class="field-input" value="{{customerDraft.contactPhone}}" data-key="contactPhone" bindinput="customerInput" maxlength="100" disabled="{{busy}}"/>
-     </block>
-     <button class="relation-control" data-key="customer_id" bindtap="choose" disabled="{{busy}}">{{customerDirect?'选择已有客户':item.selectedText}} ›</button>
-     <button wx:if="{{!customerDirect}}" bindtap="enterCustomer" disabled="{{busy}}">改为直接填写客户</button>
-    </block>
-    <button wx:elif="{{item.relation}}" class="relation-control" data-key="{{item.key}}" bindtap="choose"><text class="relation-label">{{item.selectedText}}</text><text class="chevron">›</text></button>
+   <view wx:for="{{fields}}" wx:key="key" class="editor-field"><view class="field-label">{{item.label}}<text wx:if="{{item.required}}" class="required"> *</text></view>
+    <button wx:if="{{item.relation}}" class="relation-control" data-key="{{item.key}}" bindtap="choose"><text class="relation-label">{{item.selectedText}}</text><text class="chevron">›</text></button>
     <picker wx:elif="{{item.type==='select'}}" range="{{item.options}}" data-key="{{item.key}}" bindchange="select"><view class="field-select"><text>{{values[item.key] || '请选择'}}</text><text class="chevron">⌄</text></view></picker>
     <block wx:elif="{{item.type==='date' && item.allow_year}}"><input value="{{values[item.key]}}" data-key="{{item.key}}" bindinput="input" placeholder="YYYY（仅年份）或 YYYY-MM-DD"/><picker mode="date" data-key="{{item.key}}" bindchange="date"><view class="field-select">选择完整日期</view></picker></block>
     <picker wx:elif="{{item.type==='date'}}" mode="date" value="{{values[item.key]}}" data-key="{{item.key}}" bindchange="date"><view class="field-select"><text>{{values[item.key] || '请选择日期'}}</text><text class="chevron">⌄</text></view></picker>
@@ -31,8 +18,8 @@
  <view wx:if="{{allowed}}" class="editor-footer"><button class="save-button" disabled="{{busy || loading}}" loading="{{busy}}" bindtap="save">保存项目</button></view>
 </block>
 <block wx:else>
- <view class="choice-header"><view class="choice-search"><input value="{{choiceQuery}}" bindinput="choiceInput" bindconfirm="searchChoices" confirm-type="search" placeholder="搜索{{choiceTitle}}"/><button bindtap="searchChoices">搜索</button></view><view class="choice-hint">{{choiceMultiple?'可选择多项，选好后点完成':'点击一项即可选定'}}</view></view>
+ <view class="choice-header"><view class="choice-search"><input value="{{choiceQuery}}" bindinput="choiceInput" bindconfirm="searchChoices" confirm-type="search" placeholder="搜索{{choiceTitle}}"/><button bindtap="searchChoices">搜索</button></view><button class="customer-create-entry" wx:if="{{choiceKey==='customer_id' && canEnterCustomer}}" bindtap="createCustomer" disabled="{{busy || openingCustomer}}">{{customerDirect?'编辑待保存客户':'＋ 新增客户'}} ›</button><view class="choice-hint">{{choiceMultiple?'可选择多项，选好后点完成':'点击一项即可选定'}}</view></view>
  <view wx:if="{{choiceLoading}}" class="loading">正在加载…</view><view wx:if="{{choiceError}}" class="error">{{choiceError}}</view>
- <scroll-view class="choice-list" scroll-y type="list"><view class="choice-content"><view wx:if="{{!choiceLoading && !choiceError && !choices.length}}" class="empty">没有匹配结果，请更换关键词</view><view wx:for="{{choices}}" wx:key="id" data-id="{{item.id}}" bindtap="pick" class="choice-option {{item.selected?'is-selected':''}}"><text class="choice-label">{{item.label}}</text><text class="choice-check">{{item.selected?'✓':''}}</text></view></view></scroll-view>
+ <scroll-view class="choice-list" scroll-y type="list"><view class="choice-content"><view wx:if="{{!choiceLoading && !choiceError && !choices.length}}" class="empty">{{choiceKey==='customer_id' && canEnterCustomer?'没有匹配客户，可点上方新增客户':'没有匹配结果，请更换关键词'}}</view><view wx:for="{{choices}}" wx:key="id" data-id="{{item.id}}" bindtap="pick" class="choice-option {{item.selected?'is-selected':''}}"><text class="choice-label">{{item.label}}</text><text class="choice-check">{{item.selected?'✓':''}}</text></view></view></scroll-view>
  <view class="choice-footer"><button class="clear-button" bindtap="clearChoice">清除选择</button><button class="done-button" bindtap="closeChoices">完成</button></view>
 </block>
