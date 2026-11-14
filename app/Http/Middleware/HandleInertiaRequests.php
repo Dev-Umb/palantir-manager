@@ -121,7 +121,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ['key' => 'dashboard', 'label' => '经营大盘', 'href' => route('dashboard'), 'visible' => $can('dashboard.view'), 'mobile_priority' => 10],
             ['key' => 'visualization', 'label' => '可视化大盘', 'href' => route('home'), 'exact' => true, 'visible' => $can('dashboard.view'), 'mobile_priority' => 45],
-            ['key' => 'reimbursement-approvals', 'label' => 'OA 审批', 'href' => route('reimbursements.index', ['workspace' => 'approval']), 'visible' => in_array('admin', $roles, true), 'mobile_priority' => 36],
+            ['key' => 'reimbursement-approvals', 'label' => 'OA 审批', 'href' => route('reimbursements.index', ['workspace' => 'approval']), 'visible' => in_array('admin', $roles, true) || $request->user()->isCashier(), 'mobile_priority' => 36],
             ['key' => 'notifications', 'label' => '通知中心', 'href' => route('notifications.index'), 'visible' => true, 'mobile_priority' => 40],
             [
                 'key' => 'ontology',

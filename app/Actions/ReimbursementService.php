@@ -192,7 +192,7 @@ class ReimbursementService
 
     public function canDecide(User $actor, ReimbursementVersion $version): bool
     {
-        return ! $actor->isTimebookOperator() && $version->status === 'pending' && ! $this->blocked($version)
+        return ! $actor->isCashier() && ! $actor->isTimebookOperator() && $version->status === 'pending' && ! $this->blocked($version)
             && in_array($actor->id, array_column($version->flow['nodes'][$version->node_index]['people'], 'id'), true)
             && ! collect($version->decisions)->contains(fn ($decision) => $decision['node'] === $version->node_index && $decision['user_id'] === $actor->id);
     }
@@ -247,6 +247,8 @@ class ReimbursementService
         if (in_array($event, ['submitted', 'approved', 'rejected'], true)) {
             $ids = array_merge($ids, array_column($version->cc, 'id'));
         }
+        $cashiers = User::whereHas('roles', fn ($q) => $q->where('name', 'cashier'))->pluck('id')->all();
+        $ids = $event === 'approved' ? array_merge($ids, $cashiers) : array_diff($ids, $cashiers);
         $ids = User::whereIn('id', $ids)->pluck('id')->all();
         $this->grant($version, $ids, 'cc');
         foreach ($ids as $id) {

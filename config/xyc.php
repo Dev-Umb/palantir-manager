@@ -24,6 +24,7 @@ return [
     'retired_roles' => ['warehouse'],
 
     'roles' => [
+        ['name' => 'cashier', 'label' => '出纳', 'description' => '只读查看报销并接收审批完成知会。', 'locked' => true],
         ['name' => 'basic', 'label' => '基础角色', 'description' => '默认注册角色：查看大盘和使用授权的 AI 助手。', 'locked' => false],
         ['name' => 'admin', 'label' => '管理', 'description' => '系统管理、RBAC、全部对象权限。', 'locked' => true],
         ['name' => 'business', 'label' => '业务', 'description' => '客户、合同和项目推进。', 'locked' => false],
@@ -67,6 +68,7 @@ return [
     ],
 
     'role_permissions' => [
+        'cashier' => ['reimbursements.manage'],
         'basic' => ['dashboard.view', 'ai.harness.view'],
         'admin' => ['*'],
         'business' => ['dashboard.view', 'ai.harness.view', 'reimbursements.submit'],

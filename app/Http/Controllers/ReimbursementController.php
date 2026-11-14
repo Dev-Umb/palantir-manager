@@ -43,7 +43,7 @@ class ReimbursementController extends Controller
     public function index(Request $request): JsonResponse|Response
     {
         $filters = $request->validate(['scope' => ['nullable', Rule::in(['mine', 'review', 'cc', 'all'])], 'owner' => ['nullable', 'string', 'max:120'], 'type' => ['nullable', 'string', 'max:32'], 'status' => ['nullable', Rule::in(['pending', 'approved', 'rejected'])], 'from' => ['nullable', 'date_format:Y-m-d'], 'to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('from') ? ['after_or_equal:from'] : [])]]);
-        $approvalUi = $request->user()->roles()->where('name', 'admin')->exists();
+        $approvalUi = $request->user()->isCashier() || $request->user()->roles()->where('name', 'admin')->exists();
         $web = ! $request->expectsJson() || $request->header('X-Inertia');
         $workspace = $approvalUi && ($request->query('workspace') === 'approval' || in_array($filters['scope'] ?? '', ['all', 'review'], true)) ? 'approval' : 'application';
         if ($web && $workspace === 'application' && ! in_array($filters['scope'] ?? '', ['mine', 'cc'], true)) {
@@ -71,7 +71,7 @@ class ReimbursementController extends Controller
         $query->when($filters['status'] ?? null, fn ($q, $status) => $q->where('status', $status));
         $records = $query->latest('id')->paginate(20)->withQueryString()->through(fn ($v) => $this->service->present($request->user(), $v));
 
-        return $this->page($request, 'Index', ['records' => $records, 'pending_count' => $pendingCount, 'filters' => [...$filters, 'scope' => $scope, ...($web ? ['workspace' => $workspace] : [])], ...$this->capabilities($request), ...($web ? ['approval_ui' => $approvalUi] : [])]);
+        return $this->page($request, 'Index', ['records' => $records, 'pending_count' => $pendingCount, 'filters' => [...$filters, 'scope' => $scope, ...($web ? ['workspace' => $workspace] : [])], ...$this->capabilities($request), ...($web ? ['approval_ui' => $approvalUi, 'notice_unread_count' => ReimbursementNotice::where('user_id', $request->user()->id)->whereNull('read_at')->count()] : [])]);
     }
 
     public function create(Request $request): Response
@@ -128,7 +128,7 @@ class ReimbursementController extends Controller
             $record['can_resubmit'] = false;
         }
 
-        return $this->page($request, 'Show', ['record' => $record, ...(! $request->expectsJson() || $request->header('X-Inertia') ? ['approval_ui' => $request->user()->roles()->where('name', 'admin')->exists()] : [])]);
+        return $this->page($request, 'Show', ['record' => $record, ...(! $request->expectsJson() || $request->header('X-Inertia') ? ['approval_ui' => $request->user()->roles()->where('name', 'admin')->exists(), 'approval_view' => $request->user()->isCashier()] : [])]);
     }
 
     public function submit(SubmitReimbursementRequest $request): JsonResponse

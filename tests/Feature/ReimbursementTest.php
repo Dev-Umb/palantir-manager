@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Actions\ReimbursementDraftService;
+use App\Actions\ReimbursementService;
+use App\Http\Controllers\AuthController;
 use App\Jobs\SendReimbursementWechatNotice;
 use App\Models\Permission;
 use App\Models\ReimbursementBatch;
@@ -113,6 +115,46 @@ class ReimbursementTest extends TestCase
         $this->actingAs($this->owner)->postJson('/reimbursements', $next)->assertCreated()->assertJsonPath('record.number', 2)->assertJsonPath('record.node_index', 0);
         $this->get($url)->assertConflict();
         $this->assertSame('rejected', ReimbursementVersion::findOrFail($record['id'])->status);
+    }
+
+    public function test_cashier_reads_all_and_receives_only_final_approval_notice(): void
+    {
+        $this->artisan('reimbursements:install-permissions')->assertSuccessful();
+        $cashier = User::factory()->create();
+        $cashier->roles()->attach(Role::where('name', 'cashier')->firstOrFail());
+        $last = $this->person();
+        $this->flow([[$this->reviewer->id], [$last->id]]);
+        $input = $this->input();
+        $input['cc'] = [$cashier->id];
+        $record = $this->submit($input);
+        $this->assertSame(0, ReimbursementNotice::where('user_id', $cashier->id)->count());
+        $this->actingAs($cashier)->get('/reimbursements?workspace=approval')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('approval_ui', true)->where('filters.scope', 'all')->has('records.data', 1)
+            ->where('capabilities.submit', false)->where('capabilities.configure', false));
+        $this->decision($cashier, $record)->assertForbidden();
+        $this->actingAs($cashier)->postJson('/reimbursements', $input)->assertForbidden();
+        $this->putJson('/reimbursements/workflow', [])->assertForbidden();
+        $this->assertSame(route('reimbursements.index', ['workspace' => 'approval']), app(AuthController::class)->loginFallback($cashier));
+        $this->decision($this->reviewer, $record)->assertOk();
+        $this->assertSame(0, ReimbursementNotice::where('user_id', $cashier->id)->count());
+        $this->decision($last, $record, node: 1)->assertOk();
+        $this->assertSame(1, ReimbursementNotice::where('user_id', $cashier->id)->where('event', 'cc:approved')->count());
+        $this->decision($last, $record, node: 1)->assertConflict();
+        $this->assertSame(1, ReimbursementNotice::where('user_id', $cashier->id)->count());
+        $this->actingAs($cashier)->getJson($record['url'])->assertOk()->assertJsonPath('record.can_decide', false);
+    }
+
+    public function test_cashier_is_not_an_approver_even_if_assigned_and_receives_no_rejection_notice(): void
+    {
+        $this->artisan('reimbursements:install-permissions')->assertSuccessful();
+        $cashier = User::factory()->create();
+        $cashier->roles()->attach(Role::where('name', 'cashier')->firstOrFail());
+        $this->flow([[$cashier->id, $this->reviewer->id]]);
+        $record = $this->submit($this->input());
+        $this->assertFalse(app(ReimbursementService::class)->canDecide($cashier, ReimbursementVersion::findOrFail($record['id'])));
+        $this->decision($cashier, $record)->assertForbidden();
+        $this->decision($this->reviewer, $record, 'reject', note: '需补充附件')->assertOk();
+        $this->assertSame(0, ReimbursementNotice::where('user_id', $cashier->id)->count());
     }
 
     private function person(array $permissions = []): User

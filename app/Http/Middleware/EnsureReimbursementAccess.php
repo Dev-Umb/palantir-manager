@@ -12,6 +12,8 @@ class EnsureReimbursementAccess
     {
         abort_if($request->user()->isTimebookOperator(), 403);
 
+        abort_if($request->user()->isCashier() && ! $request->isMethodSafe() && ! $request->routeIs('reimbursements.notices.read'), 403);
+
         return $next($request);
     }
 }

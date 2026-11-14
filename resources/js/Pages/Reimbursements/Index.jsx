@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../../Components/Layout';
 import { types, statuses, money, Status, Pages } from './shared';
 
-export default function Index({ records, filters, capabilities, pending_count = 0, approval_ui = false }) {
+export default function Index({ records, filters, capabilities, pending_count = 0, approval_ui = false, notice_unread_count = 0 }) {
     const [form, setForm] = useState(filters);
     useEffect(() => setForm(filters), [filters]);
     const workbench = approval_ui && filters.workspace === 'approval';
@@ -19,9 +19,10 @@ export default function Index({ records, filters, capabilities, pending_count = 
             <div><h1>{title}</h1><p>每一笔费用，清晰有据</p></div>
             <div className="oa-list-tools">
                 {workbench && <span className="oa-pending" title="当前范围与筛选条件下的待审批单据，不代表全部需要由你处理">{pending_count} 笔待审批</span>}
-                <div className="oa-actions">{capabilities.submit && <Link className="oa-create-link" href="/reimbursements/create">＋ 发起报销</Link>}<Link href="/reimbursements/drafts">我的草稿</Link><Link href="/reimbursements/notices">报销通知</Link>{workbench && capabilities.configure && <Link href="/reimbursements/workflow">流程配置</Link>}</div>
+                <div className="oa-actions">{capabilities.submit && <Link className="oa-create-link" href="/reimbursements/create">＋ 发起报销</Link>}<Link href="/reimbursements/drafts">我的草稿</Link>{!workbench && <Link href="/reimbursements/notices">报销通知</Link>}{workbench && capabilities.configure && <Link href="/reimbursements/workflow">流程配置</Link>}</div>
             </div>
         </header>
+        {workbench && <nav className="oa-tabs" aria-label="审批查看范围">{[['all', '全部报销'], ['cc', `知会我的${notice_unread_count > 0 ? `（${notice_unread_count} 未读）` : ''}`]].map(([scope, label]) => <button key={scope} aria-current={filters.scope === scope ? 'page' : undefined} onClick={() => router.get('/reimbursements', { ...form, scope, workspace: 'approval' })}>{label}</button>)}</nav>}
         {!workbench && <nav className="oa-tabs" aria-label="申请范围">{[['mine', '我的报销'], ['cc', '知会我的']].map(([scope, label]) => <button key={scope} aria-current={filters.scope === scope ? 'page' : undefined} onClick={() => router.get('/reimbursements', { scope, workspace: 'application' })}>{label}</button>)}</nav>}
         <nav className="oa-tabs" aria-label="报销状态">
             {[['', '全部申请'], ['pending', workbench ? '待审批' : '审批中'], ['approved', '已通过'], ['rejected', '已驳回']].map(([value, label]) => <button key={value} type="button" aria-current={(filters.status || '') === value ? 'page' : undefined} onClick={() => selectStatus(value)}>{label}</button>)}
