@@ -1,4 +1,6 @@
-<button bindtap="chooseFile" disabled="{{busy}}">从微信会话选择合同文件</button><view wx:if="{{uploadFile}}" class="card"><text>{{uploadFile.name}}</text><button bindtap="uploadContract" disabled="{{busy || intakeActive}}">上传并识别</button></view>
+<button bindtap="chooseFile" disabled="{{busy || intakeActive}}">从微信聊天选择合同文件</button>
+<button bindtap="chooseContractImage" disabled="{{busy || intakeActive}}">从相册选择／拍照上传合同</button>
+<view class="hint">支持 PDF、JPG、PNG，单个文件不超过 100 MB。本地 PDF 可先发送到微信文件传输助手，再从聊天选择。上传后需核对识别结果，确认后才归档。</view><view wx:if="{{uploadFile}}" class="card"><text>{{uploadFile.name}}</text><button bindtap="uploadContract" disabled="{{busy || intakeActive}}">上传并识别</button></view>
 <view wx:for="{{intakes}}" wx:key="id" class="cell" data-id="{{item.id}}" bindtap="openIntake"><view>{{item.file_name}}</view><text class="muted">{{item.statusLabel}} ›</text></view>
 <view wx:if="{{intake}}" class="card"><view class="subtitle">{{intake.file_name}}</view><view>{{intakeStatus}}</view><view wx:if="{{intake.error}}" class="error">{{intake.error}}</view><button wx:if="{{intake.status==='failed'}}" bindtap="retryIntake" disabled="{{busy}}">重新识别</button><view wx:if="{{intake.status==='confirmed'}}">已完成归档</view></view>
 <block wx:if="{{intake.status==='review'}}">

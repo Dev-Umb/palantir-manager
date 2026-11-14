@@ -30,4 +30,5 @@ function home(props) {
  const unpaid=metric('unpaid_amount');
  return {unpaid:money(unpaid&&unpaid.value),occurred:compactMoney((metric('occurred_amount')||{}).value),paid:compactMoney((metric('paid_amount')||{}).value),projectCount:panel && panel.projects_count!==undefined?panel.projects_count:'—',coverage:unpaid&&unpaid.coverage?'已维护 '+unpaid.coverage.valid+'/'+unpaid.coverage.total:'',projects:(props.recentProjects||[]).slice(0,4).map(project),notices:(props.notificationRisks||[]).filter(n=>!n.read).slice(0,2),count:props.notificationUnreadCount||0};
 }
-module.exports={money,compactMoney,home,rows,project,list,detail,editable,savePayload};
+function canCreateCustomer(user) { return (user && user.roles || []).some(role => ['admin','business'].includes(role.name)); }
+module.exports={canCreateCustomer,money,compactMoney,home,rows,project,list,detail,editable,savePayload};
