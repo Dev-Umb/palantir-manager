@@ -16,6 +16,7 @@ use App\Http\Controllers\MiniappSessionController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OntologyController;
 use App\Http\Controllers\ProjectContractAmountController;
+use App\Http\Controllers\ProjectContractUploadController;
 use App\Http\Controllers\ProjectCustomerController;
 use App\Http\Controllers\ProjectCustomerProfilePreviewController;
 use App\Http\Controllers\RbacController;
@@ -115,6 +116,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/attachments/{record}/{field}/{index?}', AttachmentController::class)
         ->whereNumber('index')
         ->name('attachments.download');
+
+    Route::post('/projects/{project}/contract-uploads', ProjectContractUploadController::class)
+        ->middleware('throttle:20,1')->name('projects.contract-uploads.store');
 
     Route::get('/relation-options', RelationOptionsController::class)->name('relation-options.index');
     Route::post('/projects/{project}/contract-amount/sync', ProjectContractAmountController::class)

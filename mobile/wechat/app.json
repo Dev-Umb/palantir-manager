@@ -15,7 +15,8 @@
     "pages/reimbursements/notices",
     "pages/reimbursements/batch",
     "pages/web-login/web-login",
-    "pages/customer-create/customer-create"
+    "pages/customer-create/customer-create",
+    "pages/contract-upload/contract-upload"
   ],
   "window": {
     "navigationBarTextStyle": "black",

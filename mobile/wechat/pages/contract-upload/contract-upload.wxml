@@ -1,0 +1,19 @@
+<navigation-bar title="上传合同附件" back="{{true}}" color="#192b42" background="#ffffff"/>
+<scroll-view class="scrollarea" scroll-y type="list"><view class="content">
+ <view class="title">{{projectName}}</view><view class="muted">{{contractName}}</view>
+ <view wx:if="{{loading}}" class="loading">正在加载…</view>
+ <view wx:if="{{error}}" class="error">{{error}}</view>
+ <view wx:if="{{saved}}" class="card"><view>合同附件已保存</view><button class="primary" bindtap="back">返回项目查看附件</button></view>
+ <block wx:elif="{{allowed && !loading && !uncertain}}">
+  <view wx:if="{{!existing}}" class="card">
+   <view class="field"><label>合同状态</label><picker disabled="{{busy}}" range="{{statuses}}" value="{{statusIndex}}" data-key="statusIndex" bindchange="input"><view>{{statuses[statusIndex]}} ▾</view></picker></view>
+   <view class="field"><label>合同类型</label><picker disabled="{{busy}}" range="{{types}}" value="{{typeIndex}}" data-key="typeIndex" bindchange="input"><view>{{types[typeIndex]}} ▾</view></picker></view>
+   <view class="field"><label>合同金额（元，未确认可留空）</label><input disabled="{{busy}}" value="{{amount}}" data-key="amount" bindinput="input" placeholder="未确认"/></view>
+   <view class="field"><label>签订日期（可选，YYYY-MM-DD）</label><input disabled="{{busy}}" value="{{signedDate}}" data-key="signedDate" bindinput="input" placeholder="未填写"/></view>
+  </view>
+  <view class="card"><button disabled="{{busy}}" bindtap="chooseFile">从微信聊天选择文件</button><button disabled="{{busy}}" bindtap="chooseContractImage">相册选择／拍照</button><view class="hint">支持 PDF、JPG、PNG，单文件不超过 100 MB。直接保存附件，不进行 AI 识别。</view><view wx:if="{{uploadFile}}">已选择：{{uploadFile.name}}</view></view>
+  <button class="primary" disabled="{{busy || !uploadFile}}" loading="{{busy}}" bindtap="submit">{{busy?'上传中…':'确认上传'}}</button>
+ </block>
+ <view wx:elif="{{uncertain}}"><button bindtap="back">返回项目核对附件</button></view>
+ <view wx:elif="{{!loading && !error}}" class="empty">当前账号无权维护此项目合同</view>
+</view></scroll-view>
