@@ -98,18 +98,29 @@ class SteelGirderProjectTest extends TestCase
         $zip->close();
         $package = UploadedFile::fake()->createWithContent('离线包.zip', file_get_contents($path));
         unlink($path);
-        $this->post($url, ['package' => $package])->assertSessionHasNoErrors()->assertRedirect($url);
+        $this->post($url, ['package' => $package])->assertSessionHasNoErrors()->assertRedirect();
         $deployment = DB::table('steel_demo_deployments')->sole();
         $this->assertSame('https://site.umb.ink/d/'.$deployment->id.'/'.rawurlencode('吊车吊装演示.html'), $deployment->url);
         Storage::disk('demo_tos')->assertExists(['d/'.$deployment->id.'/js/main.js', 'd/'.$deployment->id.'/吊车吊装演示.html']);
-        $this->post($url, ['package' => UploadedFile::fake()->createWithContent('bad.zip', 'invalid')])->assertSessionHasErrors('package');
-        $this->assertDatabaseCount('steel_demo_deployments', 1);
+        $site = $deployment->site_id;
+        $share = '/s/'.$site;
+        $this->get($share)->assertRedirect($deployment->url)->assertHeader('Cache-Control', 'no-store, private');
+        $this->post($url, ['site_id' => $site, 'package' => UploadedFile::fake()->createWithContent('bad.zip', 'invalid')])->assertRedirect($url.'/'.$site);
+        $this->assertDatabaseHas('steel_demo_deployments', ['site_id' => $site, 'status' => 'failed', 'version' => 2]);
+        $this->get($share)->assertRedirect($deployment->url);
+        $this->post($url, ['site_id' => $site, 'package' => $package])->assertRedirect($url.'/'.$site);
+        $third = DB::table('steel_demo_deployments')->where('version', 3)->sole();
+        $this->get($share)->assertRedirect($third->url);
+        $this->post($url.'/'.$deployment->id.'/promote')->assertRedirect($url.'/'.$site);
+        $this->get($share)->assertRedirect($deployment->url);
         Http::fake([
             '*Action=SubmitRefreshTask*' => Http::response(['Result' => ['TaskID' => 'demo-refresh']]),
             '*Action=DescribeContentTasks*' => Http::response(['Result' => ['Data' => [['TaskID' => 'demo-refresh', 'Status' => 'complete']]]]),
         ]);
-        $this->delete($url.'/'.$deployment->id)->assertRedirect($url);
-        $this->assertDatabaseCount('steel_demo_deployments', 0);
+        $this->delete($url.'/'.$deployment->id)->assertRedirect($url.'/'.$site);
+        $this->assertDatabaseHas('steel_demo_deployments', ['id' => $deployment->id, 'status' => 'withdrawn']);
+        $this->get($share)->assertNotFound();
+        $this->post($url.'/'.$deployment->id.'/promote')->assertStatus(409);
         Storage::disk('demo_tos')->assertMissing('d/'.$deployment->id.'/js/main.js');
     }
 
