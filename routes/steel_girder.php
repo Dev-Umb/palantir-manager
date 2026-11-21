@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\SteelDemoController;
 use App\Http\Controllers\SteelGirderProjectController as Projects;
 use Illuminate\Support\Facades\Route;
 
@@ -10,6 +11,9 @@ Route::middleware(['auth', 'permission:steel-girder-projects.view'])->prefix('st
     Route::get('/projects/{project}', [Projects::class, 'show'])->name('show');
     Route::get('/projects/{project}/drawings', [Projects::class, 'drawings'])->name('drawings');
     Route::middleware('permission:steel-girder-projects.manage')->group(function (): void {
+        Route::get('/demos', [SteelDemoController::class, 'index'])->name('demos.index');
+        Route::post('/demos', [SteelDemoController::class, 'store'])->name('demos.store');
+        Route::delete('/demos/{id}', [SteelDemoController::class, 'destroy'])->whereUuid('id')->name('demos.destroy');
         Route::post('/projects', [Projects::class, 'create'])->name('create');
         Route::delete('/projects/{project}', [Projects::class, 'destroy'])->name('destroy');
         Route::post('/projects/{project}/material', [Projects::class, 'material'])->name('material');
