@@ -22,9 +22,11 @@ Schedule::command('xyc:sync-tender-notifications')
     ->dailyAt('13:40')
     ->withoutOverlapping();
 
+Schedule::command('reimbursements:prepare-daily-notices')->dailyAt('18:00')->timezone('Asia/Shanghai')->withoutOverlapping();
+
 Schedule::call(function (): void {
     ReimbursementNotice::where('delivery_status', 'sending')->where('claimed_at', '<', now()->subMinutes(5))->update(['delivery_status' => 'unknown', 'delivery_error' => 'worker_interrupted']);
-    ReimbursementNotice::whereIn('delivery_status', ['pending', 'retry'])->where('attempts', '<', 3)->orderBy('id')->limit(100)->pluck('id')->each(function ($id): void {
+    ReimbursementNotice::where('delivery_day', now('Asia/Shanghai')->toDateString())->whereIn('delivery_status', ['pending', 'retry'])->where('attempts', '<', 3)->orderBy('id')->limit(100)->pluck('id')->each(function ($id): void {
         SendReimbursementWechatNotice::dispatch($id)->afterCommit();
     });
 })->name('reimbursements:deliver-notices')->everyMinute()->withoutOverlapping();

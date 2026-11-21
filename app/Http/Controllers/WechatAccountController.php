@@ -14,12 +14,21 @@ class WechatAccountController extends Controller
     public function login(Request $request, WechatLogin $wechat, MiniappSessionController $session): JsonResponse
     {
         $data = $request->validate(['code' => ['required', 'string', 'max:256'], 'binding_code' => ['nullable', 'string', 'regex:/^[A-Fa-f0-9]{16}$/']]);
-        $row = $wechat->authenticate($wechat->identity($data['code']), $data['binding_code'] ?? null);
+        $openid = $wechat->openid($data['code']);
+        $row = $wechat->authenticate(WechatLogin::digest($openid), $data['binding_code'] ?? null, $openid);
         Auth::login(User::query()->findOrFail($row->user_id));
         $request->session()->regenerate();
         $request->session()->put('wechat_binding', ['id' => $row->id, 'version' => $row->version]);
 
         return $session->show($request);
+    }
+
+    public function refresh(Request $request, WechatLogin $wechat): JsonResponse
+    {
+        $data = $request->validate(['code' => ['required', 'string', 'max:256']]);
+        $wechat->refresh($request->user(), $data['code']);
+
+        return response()->json(['ok' => true])->header('Cache-Control', 'no-store, private');
     }
 
     public function issue(Request $request, WechatLogin $wechat): JsonResponse

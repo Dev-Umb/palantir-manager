@@ -20,7 +20,19 @@ class WechatLogin
         return filled(config('wechat.appid')) && filled(config('wechat.secret'));
     }
 
-    public function identity(string $code): string
+    /** Canonical identity digest; keeps case-insensitive collations from merging openids. */
+    public static function digest(string $openid): string
+    {
+        return hash('sha256', $openid);
+    }
+
+    /**
+     * Exchange a one-time wx.login code for the raw openid.
+     *
+     * Raw openids are only persisted encrypted (see {@see authenticate()} and
+     * {@see refresh()}); callers must never expose them.
+     */
+    public function openid(string $code): string
     {
         if (! $this->configured()) {
             throw ValidationException::withMessages(['wechat' => '微信登录尚未配置，请联系管理员。']);
@@ -40,8 +52,7 @@ class WechatLogin
             throw ValidationException::withMessages(['wechat' => '微信身份验证失败，请重试或联系管理员检查小程序配置。']);
         }
 
-        // Store a canonical digest so case-insensitive database collations cannot merge identities.
-        return hash('sha256', $openid);
+        return $openid;
     }
 
     /** @return array{bound: bool, configured: bool} */
@@ -70,22 +81,32 @@ class WechatLogin
         });
     }
 
-    public function authenticate(string $openid, ?string $code): object
+    public function authenticate(string $identity, ?string $code, ?string $rawOpenid = null): object
     {
         try {
-            return DB::transaction(function () use ($openid, $code): object {
+            return DB::transaction(function () use ($identity, $code, $rawOpenid): object {
                 $query = DB::table('wechat_account_bindings')->where('appid', config('wechat.appid'));
-                $row = ($code ? $query->where('code_hash', hash('sha256', strtoupper($code))) : $query->where('openid', $openid))->lockForUpdate()->first();
+                $row = ($code ? $query->where('code_hash', hash('sha256', strtoupper($code))) : $query->where('openid', $identity))->lockForUpdate()->first();
                 if (! $row || ($code && ! $row->code_encrypted)) {
                     throw ValidationException::withMessages(['binding_code' => $code ? '绑定码无效或已重置，请向管理员获取当前固定绑定码。' : '当前微信尚未绑定，请先在平台后台生成绑定码。']);
                 }
                 User::query()->whereKey($row->user_id)->firstOrFail();
-                if ($code && $row->openid !== $openid) {
-                    if ($row->openid && $row->openid !== $openid) {
+                if ($code && $row->openid !== $identity) {
+                    if ($row->openid && $row->openid !== $identity) {
                         throw ValidationException::withMessages(['binding_code' => '账号已绑定，请先解绑后重试。']);
                     }
-                    DB::table('wechat_account_bindings')->where('id', $row->id)->update(['openid' => $openid, 'bound_at' => now(), 'updated_at' => now()]);
+                    DB::table('wechat_account_bindings')->where('id', $row->id)->update([
+                        'openid' => $identity,
+                        'openid_encrypted' => $rawOpenid === null ? null : Crypt::encryptString($rawOpenid),
+                        'bound_at' => now(),
+                        'updated_at' => now(),
+                    ]);
                     $this->audit($row->user_id, $row->user_id, 'wechat.bind');
+                } elseif ($rawOpenid !== null) {
+                    DB::table('wechat_account_bindings')->where('id', $row->id)->update([
+                        'openid_encrypted' => Crypt::encryptString($rawOpenid),
+                        'updated_at' => now(),
+                    ]);
                 }
 
                 return $row;
@@ -98,12 +119,34 @@ class WechatLogin
         }
     }
 
+    /**
+     * Persist the addressable openid for an already-bound account.
+     *
+     * Used by the mini program before requesting subscriptions so old bindings
+     * (which only stored a digest) can receive messages without re-login.
+     */
+    public function refresh(User $user, string $code): void
+    {
+        $rawOpenid = $this->openid($code);
+        $identity = self::digest($rawOpenid);
+        DB::transaction(function () use ($user, $rawOpenid, $identity): void {
+            $row = DB::table('wechat_account_bindings')->where('user_id', $user->id)->where('appid', config('wechat.appid'))->lockForUpdate()->first();
+            if (! $row || ! is_string($row->openid) || ! hash_equals($row->openid, $identity)) {
+                throw ValidationException::withMessages(['wechat' => '当前微信与账号绑定不一致，请重新登录微信。']);
+            }
+            DB::table('wechat_account_bindings')->where('id', $row->id)->update([
+                'openid_encrypted' => Crypt::encryptString($rawOpenid),
+                'updated_at' => now(),
+            ]);
+        });
+    }
+
     public function unbind(User $target, User $actor): void
     {
         DB::transaction(function () use ($target, $actor): void {
             $row = DB::table('wechat_account_bindings')->where('user_id', $target->id)->where('appid', config('wechat.appid'))->lockForUpdate()->first();
             if ($row) {
-                DB::table('wechat_account_bindings')->where('id', $row->id)->update(['openid' => null, 'bound_at' => null, 'version' => (string) Str::uuid(), 'updated_at' => now()]);
+                DB::table('wechat_account_bindings')->where('id', $row->id)->update(['openid' => null, 'openid_encrypted' => null, 'bound_at' => null, 'version' => (string) Str::uuid(), 'updated_at' => now()]);
                 $this->audit($target->id, $actor->id, 'wechat.unbind');
             }
         });

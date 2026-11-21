@@ -1,4 +1,5 @@
 const api=require('../services/api');
+const wechat=require('../services/wechat');
 function attach(page, empty) { page.release=api.onClear(()=>{page.sequence=(page.sequence||0)+1;page.setData({...empty,user:null,loading:false,error:'请先登录'});}); }
 async function run(page, action) {
  const sequence=page.sequence=(page.sequence||0)+1, epoch=api.epoch();
@@ -8,7 +9,15 @@ async function run(page, action) {
  finally{if(sequence===page.sequence)page.setData({loading:false,refreshing:false});}
 }
 let navigating=false;
-function navigate(url){if(navigating)return;navigating=true;wx.navigateTo({url,complete(){navigating=false;},fail(error){wx.showModal({title:'无法打开页面',content:(error&&error.errMsg)||'请返回工作台后重试',showCancel:false});}});}
+function open(url){if(navigating)return;navigating=true;wx.navigateTo({url,complete(){navigating=false;},fail(error){wx.showModal({title:'无法打开页面',content:(error&&error.errMsg)||'请返回工作台后重试',showCancel:false});}});}
+function navigate(url){
+ if(/^\/pages\/reimbursements\//.test(url) && wechat && typeof wechat.prepare==='function' && typeof wechat.request==='function'){
+  const template = url === '/pages/reimbursements/index?approval=1' ? 'reimbursement_approval' : 'reimbursement_result';
+  wechat.request([template],()=>open(url));
+  return;
+ }
+ open(url);
+}
 function login(){if(navigating)return;navigating=true;wx.reLaunch({url:'/pages/login/login',complete(){navigating=false;},fail(error){wx.showModal({title:'无法打开登录页',content:(error&&error.errMsg)||'请重新打开小程序',showCancel:false});}});}
 function requireLogin(){if(api.user())return true;login();return false;}
 function unavailable(){wx.showModal({title:'暂未接入',content:'请在平台网页使用此功能。',showCancel:false});}

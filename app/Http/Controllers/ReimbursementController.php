@@ -115,7 +115,7 @@ class ReimbursementController extends Controller
 
     public function options(Request $request): JsonResponse
     {
-        return response()->json(['users' => User::whereDoesntHave('roles', fn ($q) => $q->where('name', 'timebook_operator'))->orderBy('name')->get(['id', 'name']), 'types' => config('reimbursements.types'), 'batch_enabled' => (bool) config('reimbursements.batch_enabled'), 'wechat_template' => config('reimbursements.wechat_template'), ...$this->capabilities($request)]);
+        return response()->json(['users' => User::whereDoesntHave('roles', fn ($q) => $q->where('name', 'timebook_operator'))->orderBy('name')->get(['id', 'name']), 'types' => config('reimbursements.types'), 'batch_enabled' => (bool) config('reimbursements.batch_enabled'), 'wechat_template' => config('wechat.notify.templates.reimbursement_result.id'), ...$this->capabilities($request)]);
     }
 
     public function show(Request $request, ReimbursementVersion $version): JsonResponse|Response
@@ -365,7 +365,7 @@ class ReimbursementController extends Controller
 
     public function notices(Request $request): JsonResponse|Response
     {
-        $query = ReimbursementNotice::where('user_id', $request->user()->id);
+        $query = ReimbursementNotice::where('user_id', $request->user()->id)->whereNotLike('event', 'progress:%')->whereNotLike('event', 'approval:%:%');
         if ($request->boolean('unread')) {
             $query->whereNull('read_at');
         }

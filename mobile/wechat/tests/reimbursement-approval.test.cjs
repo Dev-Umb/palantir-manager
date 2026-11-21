@@ -8,7 +8,7 @@ function setup(name='reimbursements/detail'){
  const wx={showModal:o=>{modals.push(o);o.success({confirm:true});},navigateTo:o=>{visits.push(o.url);o.complete();},reLaunch(){}};
  function module(file){const m={exports:{}};vm.runInNewContext(fs.readFileSync(path.join(root,file),'utf8'),{module:m,require:()=>api,wx});return m.exports;}
  const oa=module('pages/reimbursements/common.js'),u=module('utils/page.js');let p;
- vm.runInNewContext(fs.readFileSync(path.join(root,'pages',name+'.js'),'utf8'),{Page:d=>p=d,require:n=>n.endsWith('/api')?api:n.endsWith('/page')?u:n.endsWith('/common')||n==='./common'?oa:n.endsWith('/business')?{home:()=>({})}:{},wx,setTimeout,clearTimeout});
+ vm.runInNewContext(fs.readFileSync(path.join(root,'pages',name+'.js'),'utf8'),{Page:d=>p=d,require:n=>n.endsWith('/wechat')?{prepare(){}}:n.endsWith('/api')?api:n.endsWith('/page')?u:n.endsWith('/common')||n==='./common'?oa:n.endsWith('/business')?{home:()=>({})}:{},wx,setTimeout,clearTimeout});
  p.data=structuredClone(p.data);p.setData=o=>Object.assign(p.data,o);p.onLoad({id:7,approval:'1'});
  return {p,api,wx,record,calls,visits,modals,role(roles){user={...user,roles};},clear(){user=null;epoch++;clears.forEach(fn=>fn());}};
 }

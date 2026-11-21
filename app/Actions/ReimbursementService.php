@@ -14,6 +14,8 @@ use App\Models\StoredAttachment;
 use App\Models\User;
 use App\Support\BusinessFileStorage;
 use App\Support\ReimbursementEvidenceSources;
+use App\Support\ReimbursementWechatMessage;
+use App\Support\WechatSubscriptions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -158,17 +160,23 @@ class ReimbursementService
             }
             $request ??= Reimbursement::create(['user_id' => $actor->id, 'latest_version' => 0]);
             $request->update(['latest_version' => $request->latest_version + 1]);
+            $submissionBinding = $bindingVersion ?? DB::table('wechat_account_bindings')
+                ->where('user_id', $actor->id)->where('appid', config('wechat.appid'))->whereNotNull('openid')->value('version');
             $version = ReimbursementVersion::create([
                 'reimbursement_id' => $request->id, 'user_id' => $actor->id, 'number' => $request->latest_version,
                 'submission_key' => $data['submission_key'], 'submission_fingerprint' => $fingerprint, 'title' => $data['title'], 'type' => $data['type'], 'note' => $data['note'],
                 'items' => $items, 'total_cents' => array_sum(array_column($items, 'cents')), 'flow' => $flow, 'cc' => $cc,
                 'decisions' => [], 'node_index' => 0, 'status' => 'pending',
-                'wechat_subscribed' => $bindingVersion !== null && ($data['wechat_subscribed'] ?? false), 'wechat_binding_version' => $bindingVersion,
+                'wechat_subscribed' => $bindingVersion !== null && ($data['wechat_subscribed'] ?? false), 'wechat_binding_version' => $submissionBinding,
             ]);
             ReimbursementUpload::whereIn('id', $allIds)->update(['reimbursement_id' => $request->id]);
             $draft?->update(['version_id' => $version->id]);
             $this->grant($version, [$actor->id], 'owner');
             $this->grant($version, collect($flow['nodes'])->flatMap(fn ($node) => array_column($node['people'], 'id'))->unique()->all(), 'approver');
+            if ($version->wechat_subscribed) {
+                WechatSubscriptions::grant($actor->id, ReimbursementWechatMessage::RESULT);
+            }
+            $this->notifyApprovers($version);
             $this->notifyCc($version, 'submitted');
             $this->audit($actor, 'submitted', $version->id, ['number' => $version->number]);
 
@@ -221,11 +229,19 @@ class ReimbursementService
                 }
             }
             $version->save();
-            if ($version->status !== 'pending') {
-                $notice = $this->notice($version, $version->user_id, $version->status, $version->status === 'approved' ? '报销审批通过' : '报销申请被驳回');
-                if ($version->wechat_subscribed && $notice->wasRecentlyCreated) {
-                    $notice->update(['delivery_status' => 'pending']);
-                }
+            $event = $version->status === 'pending' ? 'progress:'.count($decisions) : $version->status;
+            $message = match ($version->status) {
+                'approved' => '报销审批通过',
+                'rejected' => '报销申请被驳回',
+                default => '报销审批进展更新',
+            };
+            $notice = $this->notice($version, $version->user_id, $event, $message);
+            if ($notice->wasRecentlyCreated && config('wechat.notify.enabled')) {
+                $notice->update(['delivery_status' => 'pending']);
+            }
+            if ($version->status === 'pending') {
+                $this->notifyApprovers($version);
+            } else {
                 $this->notifyCc($version, $version->status);
             }
             $this->audit($actor, $data['decision'], $version->id, ['node' => $data['node_index']]);
@@ -238,6 +254,24 @@ class ReimbursementService
     {
         foreach (array_unique($ids) as $id) {
             DB::table('reimbursement_access')->insertOrIgnore(['version_id' => $version->id, 'user_id' => $id, 'kind' => $kind]);
+        }
+    }
+
+    /**
+     * In-app notice for every approver of the current node; mark it pending
+     * only when that approver already accepted the WeChat approval template.
+     */
+    private function notifyApprovers(ReimbursementVersion $version): void
+    {
+        if ($version->status !== 'pending') {
+            return;
+        }
+        $node = $version->flow['nodes'][$version->node_index] ?? null;
+        $ids = collect($node['people'] ?? [])->pluck('id')->map(fn (mixed $id): int => (int) $id)->unique()->values();
+        $ids = User::whereIn('id', $ids)->whereDoesntHave('roles', fn ($query) => $query->whereIn('name', ['cashier', 'timebook_operator']))->pluck('id')->all();
+
+        foreach ($ids as $id) {
+            $this->notice($version, $id, 'approval:'.$version->node_index, '待你审批：'.$version->title);
         }
     }
 

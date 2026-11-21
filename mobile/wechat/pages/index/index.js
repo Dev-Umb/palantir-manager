@@ -1,4 +1,4 @@
-const api=require('../../services/api');
+const api=require('../../services/api');const wechat=require('../../services/wechat');
 const b=require('../../services/business');
 const u=require('../../utils/page');
 const oa=require('../reimbursements/common');
@@ -6,7 +6,7 @@ Page({
  data:{user:null,unpaid:'—',occurred:'—',paid:'—',projectCount:'—',coverage:'',projects:[],notices:[],count:0,canCreate:false,canReimburse:false,canApprove:false,canProcurement:false,error:'',loading:false},
  onLoad(){u.attach(this,{unpaid:'—',occurred:'—',paid:'—',projectCount:'—',coverage:'',projects:[],notices:[],count:0,canCreate:false,canReimburse:false,canApprove:false,canProcurement:false});},
  onUnload:u.unload,onShow(){if(u.requireLogin())this.refresh();},
- refresh(){this.setData({canApprove:false});return u.run(this,async()=>{if(!api.user())return {};await api.session();const p=await api.dashboard();return {canApprove:oa.isAdmin(),...b.home(p),canProcurement:(p.nav||[]).some(n=>n.key==='hub'&&n.visible===true),canCreate:(api.user().permissions||[]).includes('object.project.create'),canReimburse:(api.user().permissions||[]).includes('reimbursements.submit')};});},
+ refresh(){wechat.prepare();this.setData({canApprove:false});return u.run(this,async()=>{if(!api.user())return {};await api.session();const p=await api.dashboard();return {canApprove:oa.isAdmin(),...b.home(p),canProcurement:(p.nav||[]).some(n=>n.key==='hub'&&n.visible===true),canCreate:(api.user().permissions||[]).includes('object.project.create'),canReimburse:(api.user().permissions||[]).includes('reimbursements.submit')};});},
  createReimbursement(){if((api.user()?.permissions||[]).includes('reimbursements.submit'))u.navigate('/pages/reimbursements/form');},
  batchReimbursement(){if((api.user()?.permissions||[]).includes('reimbursements.submit'))u.navigate('/pages/reimbursements/batch');},
  approvals(){if(oa.isAdmin())u.navigate('/pages/reimbursements/index?approval=1');},
