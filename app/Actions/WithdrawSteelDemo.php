@@ -29,7 +29,7 @@ class WithdrawSteelDemo
         $result = $this->request('DescribeContentTasks', ['TaskType' => 'refresh_dir', 'TaskID' => $task]);
         $status = collect($result['Data'] ?? [])->firstWhere('TaskID', $task)['Status'] ?? null;
         if ($status === 'complete') {
-            $query->delete();
+            $query->update(['status' => 'withdrawn', 'withdrawing' => false, 'updated_at' => now()]);
         } elseif ($status === 'failed' || (! $status && now()->diffInDays($demo->updated_at, true) >= 7)) {
             $query->update(['refresh_task' => null, 'updated_at' => now()]);
         }

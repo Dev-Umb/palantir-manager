@@ -3,23 +3,20 @@
 namespace App\Actions;
 
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 use ZipArchive;
 
 class PublishSteelDemo
 {
-    public function handle(UploadedFile $package): void
+    public function handle(UploadedFile $package, string $id): string
     {
         $zip = new ZipArchive;
         if ($zip->open($package->getRealPath(), ZipArchive::RDONLY | ZipArchive::CHECKCONS) !== true) {
             throw $this->invalid('无法读取 ZIP 文件。');
         }
 
-        $id = (string) Str::uuid();
         $prefix = "d/{$id}";
         $disk = Storage::disk('demo_tos');
         $started = false;
@@ -40,7 +37,6 @@ class PublishSteelDemo
                         throw $this->invalid('包内文件长度错误。');
                     }
                     rewind($tmp);
-                    $started = true;
                     $mime = match (strtolower(pathinfo($name, PATHINFO_EXTENSION))) {
                         'html', 'htm' => 'text/html; charset=utf-8',
                         'js', 'mjs' => 'text/javascript',
@@ -52,19 +48,22 @@ class PublishSteelDemo
                         default => null,
                     };
                     $disk->put("{$prefix}/{$name}", $tmp, array_filter(['ContentType' => $mime, 'CacheControl' => 'no-store']));
+                    $started = true;
                 } finally {
                     fclose($tmp);
                     fclose($source);
                 }
             }
             $path = implode('/', array_map('rawurlencode', explode('/', $entry)));
-            DB::table('steel_demo_deployments')->insert([
-                'id' => $id, 'name' => mb_substr($package->getClientOriginalName(), 0, 250),
-                'url' => "https://site.umb.ink/{$prefix}/{$path}", 'created_at' => now(), 'updated_at' => now(),
-            ]);
+
+            return "https://site.umb.ink/{$prefix}/{$path}";
         } catch (Throwable $error) {
             if ($started) {
-                $disk->deleteDirectory($prefix);
+                try {
+                    $disk->deleteDirectory($prefix);
+                } catch (Throwable $cleanupError) {
+                    report($cleanupError);
+                }
             }
             throw $error;
         } finally {
