@@ -155,6 +155,7 @@ class HandleInertiaRequests extends Middleware
                 'children' => [['label' => '工作内容', 'items' => array_values(array_filter([
                     $can('steel-girder-projects.view') ? ['label' => '项目管理', 'href' => route('steel-girder-projects.index')] : null,
                     $can('support-library.view') ? ['label' => '支架检索', 'href' => route('support-library.index')] : null,
+                    $can('steel-girder-projects.view') && $can('steel-girder-projects.manage') ? ['label' => '演示发布', 'href' => route('steel-girder-projects.demos.index')] : null,
                 ]))]],
             ],
             ['key' => 'quotations', 'label' => '参考报价', 'href' => route('quotations.index'), 'visible' => QuotationAccess::allows($request->user()), 'mobile_priority' => 62],

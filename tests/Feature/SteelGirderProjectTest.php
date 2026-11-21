@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Support\BusinessFileStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -79,6 +81,36 @@ class SteelGirderProjectTest extends TestCase
             ->where('nav', fn ($nav) => collect($nav)->firstWhere('key', 'support-library')['children'][0]['items'][0]['label'] === '项目管理'
                 && collect($nav)->firstWhere('key', 'support-library')['children'][0]['items'][1]['label'] === '支架检索'));
         $this->get('/steel-girder-projects/workspace')->assertOk()->assertSee('服务器', false)->assertDontSee('indexedDB.open', false);
+    }
+
+    public function test_manager_publishes_zip_and_guest_cannot_manage_deployments(): void
+    {
+        Storage::fake('demo_tos');
+        $url = '/steel-girder-projects/demos';
+        $this->get($url)->assertRedirect('/login');
+        $this->actingAs($this->user(['view']))->post($url)->assertForbidden();
+        $this->actingAs($this->user())->get($url)->assertOk();
+        $path = tempnam(sys_get_temp_dir(), 'demo');
+        $zip = new ZipArchive;
+        $zip->open($path, ZipArchive::OVERWRITE);
+        $zip->addFromString('吊车吊装演示.html', '<script src="./js/main.js"></script>');
+        $zip->addFromString('js/main.js', 'document.title="demo"');
+        $zip->close();
+        $package = UploadedFile::fake()->createWithContent('离线包.zip', file_get_contents($path));
+        unlink($path);
+        $this->post($url, ['package' => $package])->assertSessionHasNoErrors()->assertRedirect($url);
+        $deployment = DB::table('steel_demo_deployments')->sole();
+        $this->assertSame('https://site.umb.ink/d/'.$deployment->id.'/'.rawurlencode('吊车吊装演示.html'), $deployment->url);
+        Storage::disk('demo_tos')->assertExists(['d/'.$deployment->id.'/js/main.js', 'd/'.$deployment->id.'/吊车吊装演示.html']);
+        $this->post($url, ['package' => UploadedFile::fake()->createWithContent('bad.zip', 'invalid')])->assertSessionHasErrors('package');
+        $this->assertDatabaseCount('steel_demo_deployments', 1);
+        Http::fake([
+            '*Action=SubmitRefreshTask*' => Http::response(['Result' => ['TaskID' => 'demo-refresh']]),
+            '*Action=DescribeContentTasks*' => Http::response(['Result' => ['Data' => [['TaskID' => 'demo-refresh', 'Status' => 'complete']]]]),
+        ]);
+        $this->delete($url.'/'.$deployment->id)->assertRedirect($url);
+        $this->assertDatabaseCount('steel_demo_deployments', 0);
+        Storage::disk('demo_tos')->assertMissing('d/'.$deployment->id.'/js/main.js');
     }
 
     public function test_creation_is_idempotent_and_shared_but_not_public(): void
