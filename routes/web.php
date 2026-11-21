@@ -25,6 +25,7 @@ use App\Http\Controllers\TenderConversionController;
 use App\Http\Controllers\VisualizationController;
 use App\Http\Controllers\WebWechatLoginController;
 use App\Http\Controllers\WechatAccountController;
+use App\Http\Controllers\WechatNotificationController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/webhooks/feishu/events', FeishuEventController::class)
@@ -69,6 +70,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/finance-shipments/{project}/preview', [FinanceShipmentController::class, 'preview'])->name('finance-shipments.preview');
     Route::post('/finance-shipments/{project}/commit', [FinanceShipmentController::class, 'commit'])->name('finance-shipments.commit');
     Route::post('/settings/wechat/code', [WechatAccountController::class, 'issue'])->middleware('throttle:6,1')->name('settings.wechat.code');
+    Route::post('/miniapp/wechat/refresh', [WechatAccountController::class, 'refresh'])->middleware('throttle:10,1')->name('miniapp.wechat.refresh');
+    Route::get('/miniapp/wechat/subscriptions', [WechatNotificationController::class, 'status'])->name('miniapp.wechat.subscriptions.show');
+    Route::post('/miniapp/wechat/subscriptions', [WechatNotificationController::class, 'store'])->middleware('throttle:12,1')->name('miniapp.wechat.subscriptions.store');
     Route::delete('/settings/wechat', [WechatAccountController::class, 'destroy'])->middleware('throttle:6,1')->name('settings.wechat.destroy');
     Route::get('/settings', [AccountSettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings/email', [AccountSettingsController::class, 'updateEmail'])->middleware('throttle:6,1')->name('settings.email');

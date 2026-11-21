@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Actions\ReimbursementDraftService;
 use App\Actions\ReimbursementService;
 use App\Http\Controllers\AuthController;
+use App\Integrations\Wechat\WechatClient;
 use App\Jobs\SendReimbursementWechatNotice;
 use App\Models\Permission;
 use App\Models\ReimbursementBatch;
@@ -20,9 +21,11 @@ use App\Models\User;
 use App\Support\BusinessFileStorage;
 use App\Support\InvoicePdfRecognition;
 use App\Support\ReimbursementEvidenceRecognition;
+use App\Support\WechatSubscriptions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -454,6 +457,19 @@ class ReimbursementTest extends TestCase
         $this->assertSame('450.00', $upload->fresh()->evidence_result['items'][0]['original_amount']);
     }
 
+    private function bindWechat(User $user, string $openid, ?string $version = null): void
+    {
+        DB::table('wechat_account_bindings')->insert([
+            'user_id' => $user->id,
+            'appid' => config('wechat.appid'),
+            'openid' => hash('sha256', $openid),
+            'openid_encrypted' => Crypt::encryptString($openid),
+            'version' => $version ?? (string) Str::uuid(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function input(?User $owner = null): array
     {
         $owner ??= $this->owner;
@@ -521,7 +537,8 @@ class ReimbursementTest extends TestCase
         $this->decision($last, $record)->assertForbidden();
         $this->decision($this->reviewer, $record)->assertOk()->assertJsonPath('record.node_index', 0);
         $this->decision($this->reviewer, $record)->assertForbidden();
-        $this->assertSame(0, ReimbursementNotice::count());
+        $this->assertSame(0, ReimbursementNotice::whereIn('event', ['approved', 'rejected'])->count());
+        $this->assertSame(2, ReimbursementNotice::where('event', 'approval:0')->count());
         $this->decision($other, $record)->assertOk()->assertJsonPath('record.node_index', 1);
         $this->decision($last, $record, node: 0)->assertConflict();
         $this->decision($last, $record, node: 1)->assertOk()->assertJsonPath('record.status', 'approved');
@@ -614,20 +631,59 @@ class ReimbursementTest extends TestCase
         $this->actingAs($this->owner)->getJson($record['url'])->assertJsonPath('record.flow.nodes.0.people.0.id', $this->reviewer->id);
     }
 
+    public function test_daily_selection_respects_cutoff_and_groups_visible_events_per_recipient(): void
+    {
+        config(['wechat.notify.enabled' => true]);
+        $this->travelTo(now()->setDate(2026, 11, 20)->setTime(9, 59));
+        $this->flow([[$this->admin->id, $this->reviewer->id]], 'all');
+        $first = $this->submit($this->input());
+        $second = $this->submit($this->input());
+        $this->decision($this->admin, $second)->assertOk();
+        $this->actingAs($this->owner)->getJson('/reimbursements/notices')->assertJsonPath('notices.total', 0);
+        $this->artisan('reimbursements:prepare-daily-notices')->assertSuccessful();
+        $this->assertSame(0, ReimbursementNotice::whereNotNull('delivery_day')->count());
+        $this->travel(1)->minutes();
+        $this->artisan('reimbursements:prepare-daily-notices')->assertSuccessful();
+        $this->artisan('reimbursements:prepare-daily-notices')->assertSuccessful();
+        foreach ([[$this->admin, $first, 'approval:0:2026-11-20'], [$this->reviewer, $second, 'approval:0:2026-11-20'], [$this->owner, $second, 'progress:1']] as [$user, $record, $event]) {
+            $this->assertDatabaseHas('reimbursement_notices', ['user_id' => $user->id, 'version_id' => $record['id'], 'event' => $event, 'delivery_day' => '2026-11-20']);
+        }
+        $this->assertSame(3, ReimbursementNotice::whereNotNull('delivery_day')->count());
+        $this->travel(1)->minutes();
+        $this->decision($this->reviewer, $second)->assertOk();
+        $this->artisan('reimbursements:prepare-daily-notices')->assertSuccessful();
+        $this->assertSame(3, ReimbursementNotice::whereNotNull('delivery_day')->count());
+        // Historical tasks can predate the introduction of in-app approval notices.
+        ReimbursementNotice::where('version_id', $first['id'])->where('event', 'approval:0')->delete();
+        $this->travel(1)->days();
+        $this->artisan('reimbursements:prepare-daily-notices')->assertSuccessful();
+        $this->assertDatabaseHas('reimbursement_notices', ['user_id' => $this->owner->id, 'event' => 'approved', 'delivery_day' => '2026-11-21']);
+        foreach ([$this->admin, $this->reviewer] as $approver) {
+            $this->assertDatabaseHas('reimbursement_notices', ['user_id' => $approver->id, 'version_id' => $first['id'], 'delivery_day' => '2026-11-21']);
+        }
+        $this->assertSame(6, ReimbursementNotice::whereNotNull('delivery_day')->count());
+        $this->decision($this->admin, $first, 'reject', note: '缺凭证')->assertOk();
+        $this->travel(1)->days();
+        $this->artisan('reimbursements:prepare-daily-notices')->assertSuccessful();
+        $this->assertSame(0, ReimbursementNotice::whereIn('user_id', [$this->admin->id, $this->reviewer->id])->where('delivery_day', '2026-11-22')->count());
+    }
+
     public function test_wechat_delivery_deduplicates_and_preserves_business_result_on_denial(): void
     {
-        config(['wechat.appid' => 'test-app', 'wechat.secret' => 'test-secret', 'reimbursements.wechat_template' => 'test-template']);
+        config(['wechat.appid' => 'test-app', 'wechat.secret' => 'test-secret', 'wechat.notify.enabled' => true, 'wechat.notify.templates.reimbursement_result.id' => 'test-result']);
         $binding = (string) Str::uuid();
-        DB::table('wechat_account_bindings')->insert(['user_id' => $this->owner->id, 'appid' => 'test-app', 'openid' => 'test-openid', 'version' => $binding]);
+        DB::table('wechat_account_bindings')->insert(['user_id' => $this->owner->id, 'appid' => 'test-app', 'openid' => 'test-openid', 'openid_encrypted' => Crypt::encryptString('test-openid'), 'version' => $binding]);
         $record = $this->submit($this->input());
-        ReimbursementVersion::findOrFail($record['id'])->update(['wechat_subscribed' => true, 'wechat_binding_version' => $binding]);
+        $this->assertSame($binding, ReimbursementVersion::findOrFail($record['id'])->wechat_binding_version);
+        WechatSubscriptions::grant($this->owner->id, 'reimbursement_result');
         $this->decision($this->reviewer, $record)->assertOk();
         $notice = ReimbursementNotice::where('event', 'approved')->firstOrFail();
+        $notice->forceFill(['delivery_day' => now('Asia/Shanghai')->toDateString()])->save();
         Http::fake(['*/cgi-bin/token*' => Http::response(['access_token' => 'fake-token']), '*/subscribe/send*' => Http::response(['errcode' => 43101])]);
         $job = new SendReimbursementWechatNotice($notice->id);
         $this->assertSame('integrations', $job->queue);
-        $job->handle();
-        $job->handle();
+        $job->handle(app(WechatClient::class));
+        $job->handle(app(WechatClient::class));
         $this->assertSame('denied', $notice->fresh()->delivery_status);
         $this->assertSame('approved', ReimbursementVersion::find($record['id'])->status);
         Http::assertSentCount(2);
@@ -639,22 +695,58 @@ class ReimbursementTest extends TestCase
 
     public function test_wechat_success_and_binding_replacement_do_not_send_to_wrong_person(): void
     {
-        config(['wechat.appid' => 'test-app', 'wechat.secret' => 'test-secret', 'reimbursements.wechat_template' => 'test-template']);
+        config(['wechat.appid' => 'test-app', 'wechat.secret' => 'test-secret', 'wechat.notify.enabled' => true, 'wechat.notify.templates.reimbursement_result.id' => 'test-result']);
         Cache::flush();
         $binding = (string) Str::uuid();
-        DB::table('wechat_account_bindings')->insert(['user_id' => $this->owner->id, 'appid' => 'test-app', 'openid' => 'test-openid', 'version' => $binding]);
+        DB::table('wechat_account_bindings')->insert(['user_id' => $this->owner->id, 'appid' => 'test-app', 'openid' => 'test-openid', 'openid_encrypted' => Crypt::encryptString('test-openid'), 'version' => $binding]);
         $record = $this->submit($this->input());
-        ReimbursementVersion::findOrFail($record['id'])->update(['wechat_subscribed' => true, 'wechat_binding_version' => $binding]);
+        $this->assertSame($binding, ReimbursementVersion::findOrFail($record['id'])->wechat_binding_version);
+        WechatSubscriptions::grant($this->owner->id, 'reimbursement_result');
         $this->decision($this->reviewer, $record)->assertOk();
-        $notice = ReimbursementNotice::firstOrFail();
+        $notice = ReimbursementNotice::where('user_id', $this->owner->id)->where('event', 'approved')->firstOrFail();
+        $notice->forceFill(['delivery_day' => now('Asia/Shanghai')->toDateString()])->save();
         Http::fake(['*/cgi-bin/token*' => Http::response(['access_token' => 'fake-token']), '*/subscribe/send*' => Http::response(['errcode' => 0])]);
-        (new SendReimbursementWechatNotice($notice->id))->handle();
+        (new SendReimbursementWechatNotice($notice->id))->handle(app(WechatClient::class));
         $this->assertSame('sent', $notice->fresh()->delivery_status);
         $notice->refresh()->update(['delivery_status' => 'pending']);
         DB::table('wechat_account_bindings')->where('user_id', $this->owner->id)->update(['version' => (string) Str::uuid()]);
-        (new SendReimbursementWechatNotice($notice->id))->handle();
+        (new SendReimbursementWechatNotice($notice->id))->handle(app(WechatClient::class));
         $this->assertSame('unavailable', $notice->fresh()->delivery_status);
         Http::assertSentCount(2);
+    }
+
+    public function test_oa_wechat_creates_pending_approver_and_initiator_notices(): void
+    {
+        config(['wechat.appid' => 'test-app', 'wechat.secret' => 'test-secret', 'wechat.notify.enabled' => true, 'wechat.notify.templates.reimbursement_approval.id' => 'test-approval', 'wechat.notify.templates.reimbursement_result.id' => 'test-result']);
+        $this->bindWechat($this->reviewer, 'approver-openid');
+        $this->bindWechat($this->owner, 'owner-openid');
+        WechatSubscriptions::grant($this->reviewer->id, 'reimbursement_approval');
+        WechatSubscriptions::grant($this->owner->id, 'reimbursement_result');
+
+        $record = $this->submit($this->input());
+        $approval = ReimbursementNotice::where('user_id', $this->reviewer->id)->where('event', 'approval:0')->firstOrFail();
+        $this->assertSame('not_required', $approval->delivery_status);
+        $this->assertSame('待你审批：客户拜访', $approval->message);
+
+        $this->decision($this->reviewer, $record)->assertOk();
+        $result = ReimbursementNotice::where('user_id', $this->owner->id)->where('event', 'approved')->firstOrFail();
+        $this->assertSame('pending', $result->delivery_status);
+    }
+
+    public function test_oa_wechat_creates_next_node_approver_notice_only_after_advance(): void
+    {
+        $this->flow([[$this->reviewer->id], [$this->admin->id]]);
+        config(['wechat.appid' => 'test-app', 'wechat.secret' => 'test-secret', 'wechat.notify.enabled' => true, 'wechat.notify.templates.reimbursement_approval.id' => 'test-approval']);
+        $this->bindWechat($this->admin, 'admin-openid');
+        WechatSubscriptions::grant($this->admin->id, 'reimbursement_approval');
+
+        $record = $this->submit($this->input());
+        $this->assertDatabaseMissing('reimbursement_notices', ['user_id' => $this->admin->id, 'event' => 'approval:1']);
+
+        $this->decision($this->reviewer, $record)->assertOk()->assertJsonPath('record.status', 'pending');
+        $notice = ReimbursementNotice::where('user_id', $this->admin->id)->where('event', 'approval:1')->firstOrFail();
+        $this->assertSame('not_required', $notice->delivery_status);
+        $this->assertSame('待你审批：客户拜访', $notice->message);
     }
 
     public function test_timebook_role_stays_restricted_and_permission_install_is_additive(): void
