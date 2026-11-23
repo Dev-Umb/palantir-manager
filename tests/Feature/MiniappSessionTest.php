@@ -25,6 +25,18 @@ class MiniappSessionTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_mac_wechat_bootstrap_returns_only_session_cookie_and_preserves_csrf(): void
+    {
+        $mac = ['User-Agent' => 'MiniProgramEnv/Mac MacWechat/WMPF'];
+        $response = $this->getJson('/miniapp/session', $mac)->assertOk()->assertJsonStructure(['csrfToken']);
+        $cookies = $response->headers->getCookies();
+        $this->assertCount(1, $cookies);
+        $this->assertSame(config('session.cookie'), $cookies[0]->getName());
+        $this->assertTrue($cookies[0]->isHttpOnly());
+        $this->get('/login', $mac)->assertCookie('XSRF-TOKEN');
+        $this->getJson('/miniapp/session', ['User-Agent' => 'iPhone'])->assertCookie('XSRF-TOKEN');
+    }
+
     public function test_login_rotates_session_and_logout_clears_identity(): void
     {
         $user = User::factory()->create(['password' => 'password123']);
