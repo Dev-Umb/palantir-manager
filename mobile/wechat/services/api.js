@@ -11,8 +11,9 @@ function url(path) {
 }
 function rememberCookies(response) {
   const header = response.header || {};
-  const raw = response.cookies || header['Set-Cookie'] || header['set-cookie'] || [];
-  const lines = Array.isArray(raw) ? raw : raw.split(/,(?=\s*[^;,=\s]+=)/);
+  const headerKey = Object.keys(header).find(key => key.toLowerCase() === 'set-cookie');
+  const raw = response.cookies && response.cookies.length ? response.cookies : header[headerKey];
+  const lines = [].concat(raw || []).flatMap(value => value.split(/,(?=\s*[^;,=\s]+=)/));
   lines.forEach(line => {
     const parts = line.split(';').map(v => v.trim()), pair = parts.shift(), split = pair.indexOf('=');
     if (split < 1) return;

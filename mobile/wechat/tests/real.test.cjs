@@ -24,3 +24,16 @@ test('navigation rejects duplicate taps and exposes native failure',()=>{let opt
 test('wechat login exchanges fresh native code, never sends account password and rejects stale wx callback',async()=>{reset();queue=[{data:{...boot,user:null,wechatConfigured:true}},{data:boot}];wx.login=o=>o.success({code:'wx-native'});await api.wechatLogin('ABCDEF0123456789');assert.deepEqual(calls[1].data,{code:'wx-native',binding_code:'ABCDEF0123456789'});assert.match(calls[1].url,/miniapp\/wechat\/login$/);reset();queue=[{data:{...boot,user:null,wechatConfigured:true}}];wx.login=o=>{api.clear();o.success({code:'stale'});};await assert.rejects(api.wechatLogin(),/账号已变更/);assert.equal(calls.length,1);});
 test('wechat unconfigured does not call native login and login page has no password form',async()=>{reset();queue=[{data:{...boot,user:null,wechatConfigured:false}}];wx.login=()=>assert.fail('native login must not run');await assert.rejects(api.wechatLogin(),/尚未配置/);const fs=require('node:fs'),path=require('node:path');const template=fs.readFileSync(path.join(__dirname,'../pages/login/login.wxml'),'utf8');assert.doesNotMatch(template,/password|data-field="email"/);assert.match(template,/绑定已有账号/);});
 test('unauthenticated tabs go directly to the single login screen, authenticated tabs remain',async()=>{reset();let navigation;wx.reLaunch=o=>{navigation=o;o.complete();};assert.equal(u.requireLogin(),false);assert.equal(navigation.url,'/pages/login/login');queue=[{data:boot}];await api.session();navigation=null;assert.equal(u.requireLogin(),true);assert.equal(navigation,null);const fs=require('node:fs'),path=require('node:path');const app=JSON.parse(fs.readFileSync(path.join(__dirname,'../app.json'),'utf8'));assert.equal(app.pages[0],'pages/login/login');assert.equal(app.tabBar.list.length,4);for(const name of ['index','projects','customers','mine']){const template=fs.readFileSync(path.join(__dirname,'../pages',name,name+'.wxml'),'utf8');assert.doesNotMatch(template,/登录后查看平台业务数据/);}const login=fs.readFileSync(path.join(__dirname,'../pages/login/login.js'),'utf8');assert.doesNotMatch(login,/navigateBack/);assert.match(login,/switchTab/);});
+
+test('cold WeChat login carries session and CSRF when native cookie list is empty', async () => {
+  reset();
+  queue.push({
+    data: {...boot, user: null, wechatConfigured: true},
+    cookies: [],
+    header: {'SET-COOKIE': ['xsrf=x; Path=/; Expires=Wed, 01 Jan 2098 00:00:00 GMT, session=fresh; Path=/; HttpOnly']}
+  }, {data: boot});
+  wx.login = options => options.success({code: 'native'});
+  await api.wechatLogin();
+  assert.equal(calls[1].header.Cookie, 'xsrf=x; session=fresh');
+  assert.equal(calls[1].header['X-CSRF-TOKEN'], boot.csrfToken);
+});
