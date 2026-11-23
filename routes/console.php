@@ -22,7 +22,7 @@ Schedule::command('xyc:sync-tender-notifications')
     ->dailyAt('13:40')
     ->withoutOverlapping();
 
-Schedule::command('reimbursements:prepare-daily-notices')->dailyAt('18:00')->timezone('Asia/Shanghai')->withoutOverlapping();
+Schedule::command('reimbursements:prepare-daily-notices')->dailyAt('09:00')->timezone('Asia/Shanghai')->withoutOverlapping();
 
 Schedule::call(function (): void {
     ReimbursementNotice::where('delivery_status', 'sending')->where('claimed_at', '<', now()->subMinutes(5))->update(['delivery_status' => 'unknown', 'delivery_error' => 'worker_interrupted']);

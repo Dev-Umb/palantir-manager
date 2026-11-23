@@ -19,7 +19,7 @@ class DeliverDailyReimbursementNotices extends Command
     public function handle(ReimbursementService $service): int
     {
         $now = now('Asia/Shanghai');
-        $cutoff = $now->copy()->setTime(18, 0);
+        $cutoff = $now->copy()->setTime(9, 0);
         if ($now->lt($cutoff) || ! config('wechat.notify.enabled')) {
             return self::SUCCESS;
         }

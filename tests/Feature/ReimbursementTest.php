@@ -634,7 +634,7 @@ class ReimbursementTest extends TestCase
     public function test_daily_selection_respects_cutoff_and_groups_visible_events_per_recipient(): void
     {
         config(['wechat.notify.enabled' => true]);
-        $this->travelTo(now()->setDate(2026, 11, 20)->setTime(9, 59));
+        $this->travelTo(now()->setDate(2026, 11, 20)->setTime(0, 59));
         $this->flow([[$this->admin->id, $this->reviewer->id]], 'all');
         $first = $this->submit($this->input());
         $second = $this->submit($this->input());
