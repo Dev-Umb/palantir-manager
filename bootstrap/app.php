@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureReimbursementAccess;
 use App\Http\Middleware\EnsureWechatBinding;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\NormalizeMacWechatSessionCookies;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -25,7 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'mcp/procurement',
         ]);
 
-        $middleware->web(append: [
+        $middleware->web(prepend: [NormalizeMacWechatSessionCookies::class], append: [
             EnsureWechatBinding::class,
             HandleInertiaRequests::class,
         ]);
