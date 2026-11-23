@@ -26,7 +26,7 @@ return [
             'reimbursement_approval' => [
                 'id' => (string) env('WECHAT_TEMPLATE_REIMBURSEMENT_APPROVAL', ''),
                 'label' => '报销待办提醒',
-                'page' => 'pages/reimbursements/index?approval=1',
+                'page' => 'pages/login/login?notice=approval',
                 'fields' => [
                     'thing16' => 'type',
                     'thing17' => 'owner',
@@ -37,7 +37,7 @@ return [
             'reimbursement_result' => [
                 'id' => (string) env('WECHAT_TEMPLATE_REIMBURSEMENT_RESULT', ''),
                 'label' => '报销结果通知',
-                'page' => 'pages/reimbursements/index',
+                'page' => 'pages/login/login?notice=result',
                 'fields' => [
                     'phrase1' => 'status',
                     'thing2' => 'title',

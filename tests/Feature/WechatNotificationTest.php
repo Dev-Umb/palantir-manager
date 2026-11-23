@@ -56,7 +56,7 @@ class WechatNotificationTest extends TestCase
         $this->assertSame('approver-openid', $request['touser']);
         $this->assertNotSame(hash('sha256', 'approver-openid'), $request['touser']);
         $this->assertSame('tmpl-approval', $request['template_id']);
-        $this->assertSame('pages/reimbursements/index?approval=1', $request['page']);
+        $this->assertSame('pages/login/login?notice=approval', $request['page']);
         $this->assertSame('差旅交通', $request['data']['thing16']['value']);
         $this->assertSame('张三', $request['data']['thing17']['value']);
         $this->assertSame('123.45', $request['data']['amount19']['value']);

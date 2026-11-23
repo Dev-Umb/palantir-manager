@@ -18,8 +18,8 @@ function navigate(url){
  }
  open(url);
 }
-function login(){if(navigating)return;navigating=true;wx.reLaunch({url:'/pages/login/login',complete(){navigating=false;},fail(error){wx.showModal({title:'无法打开登录页',content:(error&&error.errMsg)||'请重新打开小程序',showCancel:false});}});}
-function requireLogin(){if(api.user())return true;login();return false;}
+function login(notice){if(navigating)return;navigating=true;wx.reLaunch({url:'/pages/login/login'+(notice==='approval'||notice==='result'?'?notice='+notice:''),complete(){navigating=false;},fail(error){wx.showModal({title:'无法打开登录页',content:(error&&error.errMsg)||'请重新打开小程序',showCancel:false});}});}
+function requireLogin(notice){if(api.user())return true;login(notice);return false;}
 function unavailable(){wx.showModal({title:'暂未接入',content:'请在平台网页使用此功能。',showCancel:false});}
 function openProject(e){navigate('/pages/detail/detail?id='+encodeURIComponent(e.currentTarget.dataset.id));}
 function openTool(e){navigate('/pages/tools/tools?kind='+encodeURIComponent(e.currentTarget.dataset.kind));}
